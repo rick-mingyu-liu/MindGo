@@ -22,6 +22,9 @@ router.get('/', transactionController.getTransactions);
 router.post('/', transactionValidation, transactionController.createTransaction);
 router.get('/categories', transactionController.getCategories);
 router.delete('/clear-all', transactionController.clearAllTransactions);
+router.delete('/auto-delete', transactionController.autoDeleteOldTransactions);
+router.get('/retention-settings', transactionController.getDataRetentionSettings);
+router.put('/retention-settings', transactionController.updateDataRetentionSettings);
 router.put('/:id', transactionValidation, transactionController.updateTransaction);
 router.delete('/:id', transactionController.deleteTransaction);
 

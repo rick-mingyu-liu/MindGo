@@ -198,18 +198,88 @@ const transactionController = {
     }
   },
 
-  // Clear all transactions for user (for testing)
+  // Clear all transactions for user (testing purposes)
   async clearAllTransactions(req, res) {
     try {
-      await db.query(
+      const result = await db.query(
         'DELETE FROM transactions WHERE user_id = $1',
         [req.user.userId]
       );
 
-      res.json({ message: 'All transactions cleared successfully' });
+      res.json({ 
+        message: 'All transactions cleared successfully',
+        deletedCount: result.rowCount 
+      });
 
     } catch (error) {
-      console.error('Clear transactions error:', error);
+      console.error('Clear all transactions error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Auto-delete old transactions
+  async autoDeleteOldTransactions(req, res) {
+    try {
+      const { months = 4 } = req.query;
+      const cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(months));
+
+      const result = await db.query(
+        'DELETE FROM transactions WHERE user_id = $1 AND date < $2',
+        [req.user.userId, cutoffDate.toISOString().split('T')[0]]
+      );
+
+      res.json({ 
+        message: `Transactions older than ${months} months deleted successfully`,
+        deletedCount: result.rowCount,
+        cutoffDate: cutoffDate.toISOString().split('T')[0]
+      });
+
+    } catch (error) {
+      console.error('Auto-delete old transactions error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Get data retention settings
+  async getDataRetentionSettings(req, res) {
+    try {
+      // For now, return default settings
+      // In a real app, you'd store these in a user_preferences table
+      res.json({
+        autoDeleteEnabled: false,
+        retentionMonths: 4,
+        lastCleanup: null
+      });
+
+    } catch (error) {
+      console.error('Get data retention settings error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Update data retention settings
+  async updateDataRetentionSettings(req, res) {
+    try {
+      const { autoDeleteEnabled, retentionMonths } = req.body;
+
+      // Validate retention months
+      if (retentionMonths < 1 || retentionMonths > 60) {
+        return res.status(400).json({ error: 'Retention months must be between 1 and 60' });
+      }
+
+      // In a real app, you'd save these to a user_preferences table
+      // For now, just return success
+      res.json({
+        message: 'Data retention settings updated successfully',
+        settings: {
+          autoDeleteEnabled: autoDeleteEnabled || false,
+          retentionMonths: retentionMonths || 4
+        }
+      });
+
+    } catch (error) {
+      console.error('Update data retention settings error:', error);
       res.status(500).json({ error: 'Server error' });
     }
   }

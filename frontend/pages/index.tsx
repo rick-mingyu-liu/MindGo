@@ -15,7 +15,8 @@ import {
   Info,
   RefreshCw,
   Eye,
-  Edit
+  Edit,
+  Settings
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api, logout } from '@/utils/api'
@@ -366,6 +367,13 @@ export default function Dashboard() {
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Transaction
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/settings')}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
                 </Button>
                 <Button
                   variant="outline"
