@@ -14,7 +14,8 @@ import {
   Sparkles,
   Info,
   RefreshCw,
-  Eye
+  Eye,
+  Edit
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api, logout } from '@/utils/api'
@@ -173,10 +174,12 @@ export default function Dashboard() {
   const getCategoryChartData = () => {
     if (!summary?.categories) return []
     
-    return Object.entries(summary.categories).map(([name, data]) => ({
-      name,
-      value: data.total
-    }))
+    return Object.entries(summary.categories)
+      .map(([name, data]) => ({
+        name,
+        value: data.total
+      }))
+      .sort((a, b) => b.value - a.value) // Sort by value descending
   }
 
   const getMonthlyChartData = () => {
@@ -188,6 +191,64 @@ export default function Dashboard() {
       expenses: item.expenses,
       net: item.netIncome
     }))
+  }
+
+  // Custom label renderer for pie chart
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
+    const RADIAN = Math.PI / 180
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+    const x = cx + radius * Math.cos(-midAngle * RADIAN)
+    const y = cy + radius * Math.sin(-midAngle * RADIAN)
+    
+    // Calculate label position outside the pie
+    const labelRadius = outerRadius + 20
+    const labelX = cx + labelRadius * Math.cos(-midAngle * RADIAN)
+    const labelY = cy + labelRadius * Math.sin(-midAngle * RADIAN)
+    
+    // Determine text anchor based on angle
+    const textAnchor = x > cx ? 'start' : 'end'
+    const dominantBaseline = y > cy ? 'auto' : 'middle'
+    
+    // Only show labels for segments > 5%
+    if (percent < 0.05) return null
+    
+    return (
+      <g key={`label-${index}`}>
+        {/* Line from pie to label */}
+        <line
+          x1={x}
+          y1={y}
+          x2={labelX}
+          y2={labelY}
+          stroke="#666"
+          strokeWidth={1}
+          opacity={0.6}
+        />
+        {/* Label */}
+        <text
+          x={labelX}
+          y={labelY}
+          fill="#333"
+          textAnchor={textAnchor}
+          dominantBaseline={dominantBaseline}
+          fontSize={12}
+          fontWeight={500}
+        >
+          {name}
+        </text>
+        {/* Percentage */}
+        <text
+          x={labelX}
+          y={labelY + 15}
+          fill="#666"
+          textAnchor={textAnchor}
+          dominantBaseline={dominantBaseline}
+          fontSize={10}
+        >
+          {formatCurrency(value)} ({(percent * 100).toFixed(1)}%)
+        </text>
+      </g>
+    )
   }
 
   if (loading) {
@@ -411,7 +472,7 @@ export default function Dashboard() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          label={renderCustomLabel}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
@@ -424,6 +485,26 @@ export default function Dashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
+                  
+                  {/* Legend */}
+                  {getCategoryChartData().length > 0 && (
+                    <div className="mt-4">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {getCategoryChartData().map((entry, index) => (
+                          <div key={entry.name} className="flex items-center space-x-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                            />
+                            <span className="truncate">{entry.name}</span>
+                            <span className="text-muted-foreground ml-auto">
+                              {formatCurrency(entry.value)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -477,13 +558,23 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                        </p>
-                        <Badge variant="secondary" className="text-xs">
-                          {transaction.type}
-                        </Badge>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-right">
+                          <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                          </p>
+                          <Badge variant="secondary" className="text-xs">
+                            {transaction.type}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
                   ))}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign } from 'lucide-react'
+import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2 } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import { formatCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ export default function Transactions() {
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const fetchTransactions = async () => {
     try {
@@ -72,6 +73,24 @@ export default function Transactions() {
   const netAmount = totalIncome - totalExpenses
 
   const categories = [...new Set(transactions.map(t => t.category))]
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setDeletingId(id)
+      await api.delete(`/transactions/${id}`)
+      toast.success('Transaction deleted successfully')
+      fetchTransactions() // Refresh the list
+    } catch (error) {
+      console.error('Error deleting transaction:', error)
+      toast.error('Failed to delete transaction')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -240,13 +259,34 @@ export default function Transactions() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                        </p>
-                        <Badge variant="secondary" className="text-xs">
-                          {transaction.type}
-                        </Badge>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                          </p>
+                          <Badge variant="secondary" className="text-xs">
+                            {transaction.type}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(transaction.id)}
+                            disabled={deletingId === transaction.id}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
