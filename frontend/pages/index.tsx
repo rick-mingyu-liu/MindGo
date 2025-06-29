@@ -185,12 +185,82 @@ export default function Dashboard() {
   const getMonthlyChartData = () => {
     if (!summary?.monthlyBreakdown) return []
     
-    return summary.monthlyBreakdown.map(item => ({
-      month: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
-      income: item.income,
-      expenses: item.expenses,
-      net: item.netIncome
-    }))
+    return summary.monthlyBreakdown.map(item => {
+      // Parse the month string (e.g., "2025-06") more reliably
+      const [year, month] = item.month.split('-')
+      const monthIndex = parseInt(month) - 1 // JavaScript months are 0-indexed
+      const date = new Date(parseInt(year), monthIndex, 1)
+      
+      return {
+        month: date.toLocaleDateString('en-US', { month: 'short' }),
+        income: item.income,
+        expenses: item.expenses,
+        net: item.netIncome
+      }
+    })
+  }
+
+  // Custom tooltip for the line chart
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-4 border rounded-lg shadow-lg">
+          <p className="font-semibold text-gray-800 mb-2">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center space-x-2 mb-1">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-sm font-medium text-gray-600">
+                {entry.name}:
+              </span>
+              <span className="text-sm font-bold" style={{ color: entry.color }}>
+                {formatCurrency(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
+
+  // Custom axis tick for better formatting
+  const CustomAxisTick = ({ x, y, payload }: any) => {
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text 
+          x={0} 
+          y={0} 
+          dy={16} 
+          textAnchor="middle" 
+          fill="#666"
+          fontSize={12}
+          fontWeight={500}
+        >
+          {payload.value}
+        </text>
+      </g>
+    )
+  }
+
+  // Custom Y-axis tick for currency formatting
+  const CustomYTick = ({ x, y, payload }: any) => {
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text 
+          x={0} 
+          y={0} 
+          dy={4} 
+          textAnchor="end" 
+          fill="#666"
+          fontSize={11}
+        >
+          {formatCurrency(payload.value)}
+        </text>
+      </g>
+    )
   }
 
   // Custom label renderer for pie chart
@@ -439,18 +509,114 @@ export default function Dashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Summary Statistics */}
+                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-600">Avg Income</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1))}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-600">Avg Expenses</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1))}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-600">Avg Net</p>
+                      <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1))}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={getMonthlyChartData()}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                        <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={2} name="Income" />
-                        <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} name="Expenses" />
-                        <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} name="Net" />
+                        <defs>
+                          <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid 
+                          strokeDasharray="3 3" 
+                          stroke="#e5e7eb" 
+                          strokeWidth={1}
+                          opacity={0.5}
+                        />
+                        <XAxis
+                          dataKey="month"
+                          tickFormatter={(str) => {
+                            return str.split(' ')[0]
+                          }}
+                          tick={CustomAxisTick}
+                          axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={CustomYTick}
+                          axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                          tickLine={false}
+                          tickMargin={10}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="income" 
+                          stroke="#22c55e" 
+                          strokeWidth={3} 
+                          name="Income"
+                          dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="expenses" 
+                          stroke="#ef4444" 
+                          strokeWidth={3} 
+                          name="Expenses"
+                          dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="net" 
+                          stroke="#3b82f6" 
+                          strokeWidth={3} 
+                          name="Net"
+                          dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+                        />
                       </LineChart>
                     </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Chart Legend */}
+                  <div className="mt-4 flex justify-center">
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium text-gray-700">Income</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span className="text-sm font-medium text-gray-700">Expenses</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-sm font-medium text-gray-700">Net</span>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
