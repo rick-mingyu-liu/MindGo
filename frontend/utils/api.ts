@@ -11,6 +11,14 @@ const api = axios.create({
   },
 })
 
+// Logout function
+export const logout = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  window.location.href = '/login'
+  toast.success('Logged out successfully')
+}
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
@@ -35,10 +43,7 @@ api.interceptors.response.use(
 
     if (response?.status === 401) {
       // Unauthorized - redirect to login
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
-      toast.error('Session expired. Please login again.')
+      logout()
     } else if (response?.status === 403) {
       toast.error('Access denied. You do not have permission to perform this action.')
     } else if (response?.status === 404) {

@@ -198,7 +198,23 @@ const investmentController = {
 
     } catch (error) {
       console.error('Get market overview error:', error);
-      res.status(500).json({ error: 'Failed to get market overview' });
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Clear all watchlist items for user (for testing)
+  async clearAllWatchlist(req, res) {
+    try {
+      await db.query(
+        'DELETE FROM watchlist WHERE user_id = $1',
+        [req.user.userId]
+      );
+
+      res.json({ message: 'All watchlist items cleared successfully' });
+
+    } catch (error) {
+      console.error('Clear watchlist error:', error);
+      res.status(500).json({ error: 'Server error' });
     }
   }
 };

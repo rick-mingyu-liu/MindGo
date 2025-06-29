@@ -196,6 +196,22 @@ const transactionController = {
       console.error('Get categories error:', error);
       res.status(500).json({ error: 'Server error' });
     }
+  },
+
+  // Clear all transactions for user (for testing)
+  async clearAllTransactions(req, res) {
+    try {
+      await db.query(
+        'DELETE FROM transactions WHERE user_id = $1',
+        [req.user.userId]
+      );
+
+      res.json({ message: 'All transactions cleared successfully' });
+
+    } catch (error) {
+      console.error('Clear transactions error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 };
 

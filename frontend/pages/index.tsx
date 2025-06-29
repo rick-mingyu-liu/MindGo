@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { 
@@ -9,15 +9,21 @@ import {
   Plus,
   ArrowRight,
   Brain,
-  BarChart3
+  BarChart3,
+  LogOut,
+  Sparkles,
+  Info,
+  RefreshCw,
+  Eye
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { api } from '@/utils/api'
+import { api, logout } from '@/utils/api'
 import { formatCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { toast } from 'react-hot-toast'
 
 interface FinancialSummary {
   period: string
@@ -34,6 +40,14 @@ interface FinancialSummary {
     total: number
     count: number
     average: number
+  }>
+  transactions?: Array<{
+    id: number
+    description: string
+    amount: number
+    type: 'income' | 'expense'
+    category: string
+    date: string
   }>
 }
 
@@ -62,7 +76,75 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isNewUser, setIsNewUser] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true)
+      
+      const [summaryRes, goalsRes, watchlistRes, transactionsRes] = await Promise.all([
+        api.get('/summary/rolling?months=4'),
+        api.get('/goals'),
+        api.get('/investments/watchlist'),
+        api.get('/transactions?limit=10')
+      ])
+
+      setSummary(summaryRes.data)
+      setGoals(goalsRes.data.goals)
+      setWatchlist(watchlistRes.data.watchlist)
+      setTransactions(transactionsRes.data.transactions)
+
+      // Check if this is a new user (has very little data or sample data)
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      const hasSampleData = summaryRes.data.transactions?.some((t: any) => 
+        t.description.includes('Sample')
+      )
+      const hasVeryLittleData = summaryRes.data.transactions?.length <= 6 && 
+                               goalsRes.data.goals.length <= 1 && 
+                               watchlistRes.data.watchlist.length <= 3
+      
+      // Show welcome message for users with sample data or very little data
+      setIsNewUser(hasSampleData || hasVeryLittleData)
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await fetchDashboardData()
+    setRefreshing(false)
+  }
+
+  const handleClearData = async () => {
+    if (confirm('This will clear all your data for testing purposes. Are you sure?')) {
+      try {
+        setRefreshing(true)
+        
+        // Clear all user data
+        await Promise.all([
+          api.delete('/transactions/clear-all'),
+          api.delete('/goals/clear-all'),
+          api.delete('/investments/watchlist/clear-all')
+        ])
+        
+        // Refresh dashboard
+        await fetchDashboardData()
+        toast.success('Data cleared for testing')
+      } catch (error) {
+        console.error('Error clearing data:', error)
+        toast.error('Failed to clear data')
+      } finally {
+        setRefreshing(false)
+      }
+    }
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -72,27 +154,21 @@ export default function Dashboard() {
     }
 
     fetchDashboardData()
-  }, [router])
+  }, [router, fetchDashboardData])
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      
-      const [summaryRes, goalsRes, watchlistRes] = await Promise.all([
-        api.get('/summary/rolling?months=4'),
-        api.get('/goals'),
-        api.get('/investments/watchlist')
-      ])
-
-      setSummary(summaryRes.data)
-      setGoals(goalsRes.data.goals)
-      setWatchlist(watchlistRes.data.watchlist)
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-    } finally {
-      setLoading(false)
+  // Listen for navigation events to refresh data when returning to dashboard
+  useEffect(() => {
+    const handleRouteChange = () => {
+      if (router.pathname === '/') {
+        fetchDashboardData()
+      }
     }
-  }
+
+    router.events.on('routeChangeComplete', handleRouteChange)
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChange)
+    }
+  }, [router, fetchDashboardData])
 
   const getCategoryChartData = () => {
     if (!summary?.categories) return []
@@ -141,6 +217,14 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => router.push('/ai-planning')}
                 >
                   <Brain className="w-4 h-4 mr-2" />
@@ -152,12 +236,72 @@ export default function Dashboard() {
                   <Plus className="w-4 h-4 mr-2" />
                   Add Transaction
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleClearData}
+                  disabled={refreshing}
+                >
+                  Clear Data
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={logout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
               </div>
             </div>
           </div>
         </header>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Welcome Message for New Users */}
+          {isNewUser && (
+            <Card className="mb-8 border-blue-200 bg-blue-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                      Welcome to Personal Finance App! 🎉
+                    </h3>
+                    <p className="text-blue-800 mb-4">
+                      We've created some sample data to help you get started. You can:
+                    </p>
+                    <ul className="text-blue-800 space-y-1 mb-4">
+                      <li>• <strong>Add your own transactions</strong> by clicking "Add Transaction"</li>
+                      <li>• <strong>Create savings goals</strong> to track your financial targets</li>
+                      <li>• <strong>Set up your investment watchlist</strong> to monitor stocks</li>
+                      <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
+                    </ul>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => router.push('/transactions/new')}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Your First Transaction
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push('/goals')}
+                      >
+                        <Target className="w-4 h-4 mr-2" />
+                        Create a Goal
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
@@ -220,68 +364,145 @@ export default function Dashboard() {
           </div>
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Monthly Trend Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  4-Month Income vs Expenses
-                </CardTitle>
-                <CardDescription>
-                  Track your financial trends over time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getMonthlyChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                      <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={2} name="Income" />
-                      <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} name="Expenses" />
-                      <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} name="Net" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          {summary && summary.monthlyBreakdown && summary.monthlyBreakdown.length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              {/* Monthly Trend Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    4-Month Income vs Expenses
+                  </CardTitle>
+                  <CardDescription>
+                    Track your financial trends over time
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={getMonthlyChartData()}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={2} name="Income" />
+                        <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} name="Expenses" />
+                        <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} name="Net" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Category Breakdown */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Spending by Category</CardTitle>
-                <CardDescription>
-                  Breakdown of your expenses by category
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={getCategoryChartData()}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {getCategoryChartData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                    </PieChart>
-                  </ResponsiveContainer>
+              {/* Category Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Spending by Category</CardTitle>
+                  <CardDescription>
+                    Breakdown of your expenses by category
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={getCategoryChartData()}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {getCategoryChartData().map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card className="mb-8">
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <Info className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Financial Data Yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start by adding your first transaction to see your financial overview
+                  </p>
+                  <Button onClick={() => router.push('/transactions/new')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Transaction
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          </div>
+          )}
+
+          {/* Recent Transactions */}
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Transactions</CardTitle>
+                  <CardDescription>Your latest financial activities</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/transactions')}
+                >
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {transactions.length > 0 ? (
+                <div className="space-y-3">
+                  {transactions.slice(0, 5).map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <div>
+                          <p className="font-medium">{transaction.description}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                          {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                        </p>
+                        <Badge variant="secondary" className="text-xs">
+                          {transaction.type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <DollarSign className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground mb-4">No transactions yet</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/transactions/new')}
+                  >
+                    Add Your First Transaction
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Goals and Watchlist */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -298,43 +519,49 @@ export default function Dashboard() {
                     size="sm"
                     onClick={() => router.push('/goals')}
                   >
-                    View All <ArrowRight className="w-4 h-4 ml-1" />
+                    View All
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                {goals.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No savings goals yet. Create your first goal!</p>
-                  </div>
-                ) : (
+                {goals.length > 0 ? (
                   <div className="space-y-4">
                     {goals.slice(0, 3).map((goal) => {
-                      const progress = (goal.current_amount / goal.target_amount) * 100
+                      const progress = (goal.current_amount / goal.target_amount) * 100;
                       return (
                         <div key={goal.id} className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium">{goal.name}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
-                              </p>
-                            </div>
-                            <Badge variant="secondary">
-                              {progress.toFixed(1)}%
-                            </Badge>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{goal.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
+                            </span>
                           </div>
                           <Progress value={progress} className="h-2" />
+                          <p className="text-xs text-muted-foreground">
+                            {progress.toFixed(1)}% complete
+                          </p>
                         </div>
-                      )
+                      );
                     })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground mb-4">No savings goals yet</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/goals')}
+                    >
+                      Create Your First Goal
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Watchlist */}
+            {/* Investment Watchlist */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -347,36 +574,44 @@ export default function Dashboard() {
                     size="sm"
                     onClick={() => router.push('/investments')}
                   >
-                    View All <ArrowRight className="w-4 h-4 ml-1" />
+                    View All
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                {watchlist.length === 0 ? (
-                  <div className="text-center py-8">
-                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No stocks in watchlist. Add some stocks to track!</p>
-                  </div>
-                ) : (
+                {watchlist.length > 0 ? (
                   <div className="space-y-3">
-                    {watchlist.slice(0, 5).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    {watchlist.slice(0, 3).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{item.symbol}</p>
-                          <p className="text-sm text-muted-foreground">{item.company_name}</p>
+                          <div className="font-medium">{item.symbol}</div>
+                          <div className="text-sm text-muted-foreground">{item.company_name}</div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium">
+                          <div className="font-medium">
                             {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
-                          </p>
-                          {item.changePercent && (
-                            <Badge variant={item.changePercent >= 0 ? "default" : "destructive"}>
+                          </div>
+                          {item.changePercent !== null && (
+                            <Badge variant={item.changePercent >= 0 ? 'default' : 'destructive'}>
                               {item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%
                             </Badge>
                           )}
                         </div>
                       </div>
                     ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground mb-4">No stocks in watchlist</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/investments')}
+                    >
+                      Add Your First Stock
+                    </Button>
                   </div>
                 )}
               </CardContent>

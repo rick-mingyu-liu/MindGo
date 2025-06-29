@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search } from 'lucide-react'
-import { api } from '@/utils/api'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut } from 'lucide-react'
+import { api, logout } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -154,75 +154,84 @@ export default function Investments() {
                   <p className="text-muted-foreground">Track your favorite stocks and investments</p>
                 </div>
               </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Stock
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingItem ? 'Edit Stock' : 'Add to Watchlist'}
-                    </DialogTitle>
-                    <DialogDescription>
-                      Add a new stock to your watchlist
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="symbol">Stock Symbol</Label>
-                      <Input
-                        id="symbol"
-                        placeholder="e.g., AAPL, GOOGL, TSLA"
-                        {...register('symbol', {
-                          required: 'Stock symbol is required',
-                          pattern: {
-                            value: /^[A-Z]{1,5}$/,
-                            message: 'Please enter a valid stock symbol (1-5 uppercase letters)',
-                          },
-                        })}
-                      />
-                      {errors.symbol && (
-                        <p className="text-sm text-destructive">{errors.symbol.message}</p>
-                      )}
-                    </div>
+              <div className="flex gap-2">
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Stock
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingItem ? 'Edit Stock' : 'Add to Watchlist'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Add a new stock to your watchlist
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="symbol">Stock Symbol</Label>
+                        <Input
+                          id="symbol"
+                          placeholder="e.g., AAPL, GOOGL, TSLA"
+                          {...register('symbol', {
+                            required: 'Stock symbol is required',
+                            pattern: {
+                              value: /^[A-Z]{1,5}$/,
+                              message: 'Please enter a valid stock symbol (1-5 uppercase letters)',
+                            },
+                          })}
+                        />
+                        {errors.symbol && (
+                          <p className="text-sm text-destructive">{errors.symbol.message}</p>
+                        )}
+                      </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="company_name">Company Name</Label>
-                      <Input
-                        id="company_name"
-                        placeholder="e.g., Apple Inc., Alphabet Inc."
-                        {...register('company_name', {
-                          required: 'Company name is required',
-                        })}
-                      />
-                      {errors.company_name && (
-                        <p className="text-sm text-destructive">{errors.company_name.message}</p>
-                      )}
-                    </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="company_name">Company Name</Label>
+                        <Input
+                          id="company_name"
+                          placeholder="e.g., Apple Inc., Alphabet Inc."
+                          {...register('company_name', {
+                            required: 'Company name is required',
+                          })}
+                        />
+                        {errors.company_name && (
+                          <p className="text-sm text-destructive">{errors.company_name.message}</p>
+                        )}
+                      </div>
 
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsDialogOpen(false)
-                          reset()
-                          setEditingItem(null)
-                        }}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" className="flex-1">
-                        {editingItem ? 'Update Stock' : 'Add Stock'}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            reset()
+                            setEditingItem(null)
+                          }}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1">
+                          {editingItem ? 'Update Stock' : 'Add Stock'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  variant="ghost"
+                  onClick={logout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
         </header>

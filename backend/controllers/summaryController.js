@@ -71,8 +71,8 @@ const summaryController = {
       const { months = 4 } = req.query;
       const currentDate = new Date();
       
-      // Calculate date range for the last N months
-      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      // Calculate date range for the last N months (including current month)
+      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1); // First day of next month
       const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - parseInt(months) + 1, 1);
 
       // Get transactions for the rolling period
@@ -95,7 +95,8 @@ const summaryController = {
         totalExpenses: 0,
         netIncome: 0,
         monthlyBreakdown: [],
-        categories: {}
+        categories: {},
+        transactions: transactions.rows
       };
 
       transactions.rows.forEach(transaction => {

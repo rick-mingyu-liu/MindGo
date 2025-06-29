@@ -18,6 +18,7 @@ const watchlistValidation = [
 router.get('/snapshot/:symbol', investmentController.getStockSnapshot);
 router.get('/watchlist', investmentController.getWatchlist);
 router.post('/watchlist', watchlistValidation, investmentController.addToWatchlist);
+router.delete('/watchlist/clear-all', investmentController.clearAllWatchlist);
 router.delete('/watchlist/:id', investmentController.removeFromWatchlist);
 router.get('/historical/:symbol', investmentController.getHistoricalData);
 router.get('/market-overview', investmentController.getMarketOverview);

@@ -20,8 +20,9 @@ const transactionValidation = [
 // Routes
 router.get('/', transactionController.getTransactions);
 router.post('/', transactionValidation, transactionController.createTransaction);
+router.get('/categories', transactionController.getCategories);
+router.delete('/clear-all', transactionController.clearAllTransactions);
 router.put('/:id', transactionValidation, transactionController.updateTransaction);
 router.delete('/:id', transactionController.deleteTransaction);
-router.get('/categories', transactionController.getCategories);
 
 module.exports = router; 

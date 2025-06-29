@@ -177,6 +177,22 @@ const goalController = {
       console.error('Get goal stats error:', error);
       res.status(500).json({ error: 'Server error' });
     }
+  },
+
+  // Clear all goals for user (for testing)
+  async clearAllGoals(req, res) {
+    try {
+      await db.query(
+        'DELETE FROM savings_goals WHERE user_id = $1',
+        [req.user.userId]
+      );
+
+      res.json({ message: 'All goals cleared successfully' });
+
+    } catch (error) {
+      console.error('Clear goals error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 };
 

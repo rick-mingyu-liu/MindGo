@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2 } from 'lucide-react'
-import { api } from '@/utils/api'
+import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut } from 'lucide-react'
+import { api, logout } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -161,122 +161,131 @@ export default function Goals() {
                   <p className="text-muted-foreground">Track and manage your financial goals</p>
                 </div>
               </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Goal
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingGoal ? 'Edit Goal' : 'Create New Goal'}
-                    </DialogTitle>
-                    <DialogDescription>
-                      Set up a new savings goal with target amount and timeline
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Goal Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="e.g., Emergency Fund, House Down Payment"
-                        {...register('name', {
-                          required: 'Goal name is required',
-                        })}
-                      />
-                      {errors.name && (
-                        <p className="text-sm text-destructive">{errors.name.message}</p>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+              <div className="flex gap-2">
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Goal
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingGoal ? 'Edit Goal' : 'Create New Goal'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Set up a new savings goal with target amount and timeline
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="target_amount">Target Amount ($)</Label>
+                        <Label htmlFor="name">Goal Name</Label>
                         <Input
-                          id="target_amount"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...register('target_amount', {
-                            required: 'Target amount is required',
-                            min: {
-                              value: 0.01,
-                              message: 'Target amount must be greater than 0',
-                            },
+                          id="name"
+                          placeholder="e.g., Emergency Fund, House Down Payment"
+                          {...register('name', {
+                            required: 'Goal name is required',
                           })}
                         />
-                        {errors.target_amount && (
-                          <p className="text-sm text-destructive">{errors.target_amount.message}</p>
+                        {errors.name && (
+                          <p className="text-sm text-destructive">{errors.name.message}</p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="target_amount">Target Amount ($)</Label>
+                          <Input
+                            id="target_amount"
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...register('target_amount', {
+                              required: 'Target amount is required',
+                              min: {
+                                value: 0.01,
+                                message: 'Target amount must be greater than 0',
+                              },
+                            })}
+                          />
+                          {errors.target_amount && (
+                            <p className="text-sm text-destructive">{errors.target_amount.message}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="current_amount">Current Amount ($)</Label>
+                          <Input
+                            id="current_amount"
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...register('current_amount', {
+                              required: 'Current amount is required',
+                              min: {
+                                value: 0,
+                                message: 'Current amount cannot be negative',
+                              },
+                            })}
+                          />
+                          {errors.current_amount && (
+                            <p className="text-sm text-destructive">{errors.current_amount.message}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="target_date">Target Date</Label>
+                        <Input
+                          id="target_date"
+                          type="date"
+                          {...register('target_date', {
+                            required: 'Target date is required',
+                          })}
+                        />
+                        {errors.target_date && (
+                          <p className="text-sm text-destructive">{errors.target_date.message}</p>
                         )}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="current_amount">Current Amount ($)</Label>
-                        <Input
-                          id="current_amount"
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...register('current_amount', {
-                            required: 'Current amount is required',
-                            min: {
-                              value: 0,
-                              message: 'Current amount cannot be negative',
-                            },
-                          })}
+                        <Label htmlFor="description">Description (optional)</Label>
+                        <Textarea
+                          id="description"
+                          placeholder="Additional details about your goal..."
+                          {...register('description')}
                         />
-                        {errors.current_amount && (
-                          <p className="text-sm text-destructive">{errors.current_amount.message}</p>
-                        )}
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="target_date">Target Date</Label>
-                      <Input
-                        id="target_date"
-                        type="date"
-                        {...register('target_date', {
-                          required: 'Target date is required',
-                        })}
-                      />
-                      {errors.target_date && (
-                        <p className="text-sm text-destructive">{errors.target_date.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description (optional)</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Additional details about your goal..."
-                        {...register('description')}
-                      />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsDialogOpen(false)
-                          reset()
-                          setEditingGoal(null)
-                        }}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                      <Button type="submit" className="flex-1">
-                        {editingGoal ? 'Update Goal' : 'Create Goal'}
-                      </Button>
-                    </div>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            reset()
+                            setEditingGoal(null)
+                          }}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="flex-1">
+                          {editingGoal ? 'Update Goal' : 'Create Goal'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  variant="ghost"
+                  onClick={logout}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
         </header>

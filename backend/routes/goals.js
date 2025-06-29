@@ -23,9 +23,10 @@ const progressValidation = [
 // Routes
 router.get('/', goalController.getGoals);
 router.post('/', goalValidation, goalController.createGoal);
+router.get('/stats', goalController.getGoalStats);
+router.delete('/clear-all', goalController.clearAllGoals);
 router.put('/:id', goalValidation, goalController.updateGoal);
 router.delete('/:id', goalController.deleteGoal);
 router.put('/:id/progress', progressValidation, goalController.updateProgress);
-router.get('/stats', goalController.getGoalStats);
 
 module.exports = router; 
