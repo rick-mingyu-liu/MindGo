@@ -211,7 +211,11 @@ export function StockDetailModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Building className="w-6 h-6 text-primary" />
+              {stockData?.companyInfo?.logo ? (
+                <img src={stockData.companyInfo.logo} alt="Logo" className="w-8 h-8 rounded bg-white border object-contain" />
+              ) : (
+                <Building className="w-6 h-6 text-primary" />
+              )}
               <div>
                 <h2 className="text-xl font-bold">{symbol}</h2>
                 <p className="text-sm text-muted-foreground">{companyName}</p>
@@ -258,11 +262,11 @@ export function StockDetailModal({
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Change</p>
-                        <p className="font-medium">{stockData?.quote?.d !== undefined ? stockData.quote.d : 'N/A'}</p>
+                        <p className="font-medium">{stockData?.quote?.d !== undefined ? stockData.quote.d : '0.00'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Change %</p>
-                        <p className="font-medium">{stockData?.quote?.dp !== undefined ? stockData.quote.dp + '%' : 'N/A'}</p>
+                        <p className="font-medium">{stockData?.quote?.dp !== undefined ? stockData.quote.dp + '%' : '0.00%'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Day Range</p>
@@ -346,7 +350,7 @@ export function StockDetailModal({
                 ) : errorFinancials ? (
                   <div className="text-center py-8 text-red-600">{errorFinancials}</div>
                 ) : financials ? (
-                  <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(financials, null, 2)}</pre>
+                  <FinancialsTable financials={financials} />
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">No financials available.</div>
                 )}
@@ -431,5 +435,63 @@ export function StockDetailModal({
         </Tabs>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function FinancialsTable({ financials }: { financials: any }) {
+  const [type, setType] = React.useState<'annual' | 'quarterly'>('annual')
+  // Assume financials.annualReports and financials.quarterlyReports are arrays
+  const reports = type === 'annual' ? financials.annualReports || [] : financials.quarterlyReports || []
+  const columns = [
+    { key: 'period', label: 'Period' },
+    { key: 'revenue', label: 'Revenue' },
+    { key: 'netIncome', label: 'Net Income' },
+    { key: 'eps', label: 'EPS' },
+    { key: 'assets', label: 'Assets' },
+    { key: 'liabilities', label: 'Liabilities' },
+  ]
+  return (
+    <div>
+      <div className="flex gap-2 mb-4">
+        <button
+          className={`px-3 py-1 rounded ${type === 'annual' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-800'}`}
+          onClick={() => setType('annual')}
+        >
+          Annual
+        </button>
+        <button
+          className={`px-3 py-1 rounded ${type === 'quarterly' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-800'}`}
+          onClick={() => setType('quarterly')}
+        >
+          Quarterly
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-xs border">
+          <thead>
+            <tr>
+              {columns.map(col => (
+                <th key={col.key} className="px-2 py-1 border-b text-left font-semibold">{col.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {reports.length === 0 ? (
+              <tr><td colSpan={columns.length} className="text-center py-4">No data</td></tr>
+            ) : (
+              reports.map((row: any, idx: number) => (
+                <tr key={idx} className="border-b">
+                  {columns.map(col => (
+                    <td key={col.key} className="px-2 py-1">
+                      {row[col.key] !== undefined ? row[col.key] : 'N/A'}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 } 

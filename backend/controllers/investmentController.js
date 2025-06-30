@@ -287,8 +287,39 @@ const investmentController = {
   async getStockFinancials(req, res) {
     try {
       const { symbol } = req.params;
-      const financials = await finnhubService.getFinancials(symbol);
-      res.json({ symbol: symbol.toUpperCase(), financials });
+      const finnhubData = await finnhubService.getFinancials(symbol);
+      console.log('Raw Finnhub financials for', symbol, JSON.stringify(finnhubData, null, 2)); // Debug log
+      // Finnhub returns { data: [ ... ], symbol: ... }
+      // We'll split by periodType (FY = annual, Q = quarterly)
+      const annualReports = [];
+      const quarterlyReports = [];
+      if (finnhubData && Array.isArray(finnhubData.data)) {
+        for (const report of finnhubData.data) {
+          const period = report.period;
+          // Find the main financials object (first in report.report)
+          const main = report.report && Array.isArray(report.report) && report.report[0] ? report.report[0] : {};
+          const row = {
+            period,
+            revenue: main['TotalRevenue'] || main['Revenue'] || 'N/A',
+            netIncome: main['NetIncome'] || 'N/A',
+            eps: main['EPS'] || 'N/A',
+            assets: main['TotalAssets'] || 'N/A',
+            liabilities: main['TotalLiabilities'] || 'N/A',
+          };
+          if (report.form === '10-K' || report.periodType === 'FY') {
+            annualReports.push(row);
+          } else if (report.form === '10-Q' || report.periodType === 'QTR') {
+            quarterlyReports.push(row);
+          }
+        }
+      }
+      res.json({
+        symbol: symbol.toUpperCase(),
+        financials: {
+          annualReports,
+          quarterlyReports
+        }
+      });
     } catch (error) {
       console.error('Get stock financials error:', error);
       res.status(500).json({ error: 'Failed to get stock financials' });
