@@ -119,6 +119,173 @@
   .badge-primary {
     @apply badge bg-primary-100 text-primary-800;
   }
+
+  /* Aurora-inspired decorative elements */
+  .aurora-bg {
+    background: linear-gradient(135deg, 
+      rgba(34, 197, 94, 0.1) 0%, 
+      rgba(59, 130, 246, 0.1) 25%, 
+      rgba(168, 85, 247, 0.1) 50%, 
+      rgba(236, 72, 153, 0.1) 75%, 
+      rgba(34, 197, 94, 0.1) 100%);
+    background-size: 400% 400%;
+    animation: aurora-shift 8s ease-in-out infinite;
+  }
+
+  .aurora-bg-dark {
+    background: linear-gradient(135deg, 
+      rgba(34, 197, 94, 0.15) 0%, 
+      rgba(59, 130, 246, 0.15) 25%, 
+      rgba(168, 85, 247, 0.15) 50%, 
+      rgba(236, 72, 153, 0.15) 75%, 
+      rgba(34, 197, 94, 0.15) 100%);
+    background-size: 400% 400%;
+    animation: aurora-shift 8s ease-in-out infinite;
+  }
+
+  .aurora-border {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aurora-border::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent, 
+      rgba(34, 197, 94, 0.3), 
+      rgba(59, 130, 246, 0.3), 
+      rgba(168, 85, 247, 0.3), 
+      transparent);
+    animation: aurora-sweep 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .aurora-border > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .aurora-glow {
+    box-shadow: 
+      0 0 20px rgba(34, 197, 94, 0.2),
+      0 0 40px rgba(59, 130, 246, 0.1),
+      0 0 60px rgba(168, 85, 247, 0.05);
+  }
+
+  .aurora-glow-dark {
+    box-shadow: 
+      0 0 20px rgba(34, 197, 94, 0.3),
+      0 0 40px rgba(59, 130, 246, 0.2),
+      0 0 60px rgba(168, 85, 247, 0.1);
+  }
+
+  .aurora-particles {
+    position: relative;
+  }
+
+  .aurora-particles::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
+    animation: aurora-pulse 6s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .aurora-particles > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .aurora-text {
+    background: linear-gradient(135deg, 
+      #22c55e 0%, 
+      #3b82f6 25%, 
+      #a855f7 50%, 
+      #ec4899 75%, 
+      #22c55e 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: aurora-shift 4s ease-in-out infinite;
+  }
+
+  .aurora-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aurora-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(
+      from 0deg,
+      transparent,
+      rgba(34, 197, 94, 0.1),
+      transparent,
+      rgba(59, 130, 246, 0.1),
+      transparent,
+      rgba(168, 85, 247, 0.1),
+      transparent
+    );
+    animation: aurora-rotate 10s linear infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .aurora-card:hover::before {
+    opacity: 1;
+  }
+
+  .aurora-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .aurora-header {
+    background: linear-gradient(135deg, 
+      rgba(34, 197, 94, 0.05) 0%, 
+      rgba(59, 130, 246, 0.05) 50%, 
+      rgba(168, 85, 247, 0.05) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aurora-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+      transparent, 
+      #22c55e, 
+      #3b82f6, 
+      #a855f7, 
+      transparent);
+    animation: aurora-sweep 4s ease-in-out infinite;
+  }
 }
 
 @layer utilities {
@@ -136,7 +303,44 @@
   }
 }
 
+/* Aurora animations */
+@keyframes aurora-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
 
+@keyframes aurora-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes aurora-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes aurora-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 @layer base {
   * {

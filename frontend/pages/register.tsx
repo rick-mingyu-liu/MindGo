@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from 'lucide-react'
 import { api } from '@/utils/api'
@@ -44,7 +45,7 @@ export default function Register() {
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
       
-      toast.success('Registration successful! Welcome to Personal Finance App.')
+      toast.success('Registration successful! Welcome to Finora.')
       router.push('/')
       
     } catch (error) {
@@ -58,25 +59,32 @@ export default function Register() {
   return (
     <>
       <Head>
-        <title>Register - Personal Finance App</title>
-        <meta name="description" content="Create your account" />
+        <title>Register - Finora</title>
+        <meta name="description" content="Create your Finora account" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 bg-primary rounded-full flex items-center justify-center mb-4">
-              <span className="text-white font-bold text-xl">💰</span>
+            <div className="mx-auto mb-4 flex justify-center">
+              <Image
+                src="/Finora.png"
+                alt="Finora Logo"
+                width={120}
+                height={120}
+                className="h-16 w-auto aurora-glow"
+                priority
+              />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">Personal Finance</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white aurora-text">Finora</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
               Create your account
             </p>
           </div>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <Card className="shadow-xl">
+          <Card className="shadow-xl aurora-card">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">Create account</CardTitle>
               <CardDescription className="text-center">

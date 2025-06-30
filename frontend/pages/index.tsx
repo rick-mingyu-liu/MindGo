@@ -206,15 +206,15 @@ export default function Dashboard() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white p-4 border rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-800 mb-2">{label}</p>
+        <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
+          <p className="font-semibold text-foreground mb-2">{label}</p>
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center space-x-2 mb-1">
               <div 
                 className="w-3 h-3 rounded-full" 
                 style={{ backgroundColor: entry.color }}
               />
-              <span className="text-sm font-medium text-gray-600">
+              <span className="text-sm font-medium text-muted-foreground">
                 {entry.name}:
               </span>
               <span className="text-sm font-bold" style={{ color: entry.color }}>
@@ -237,7 +237,7 @@ export default function Dashboard() {
           y={0} 
           dy={16} 
           textAnchor="middle" 
-          fill="#666"
+          fill="hsl(var(--muted-foreground))"
           fontSize={12}
           fontWeight={500}
         >
@@ -256,7 +256,7 @@ export default function Dashboard() {
           y={0} 
           dy={4} 
           textAnchor="end" 
-          fill="#666"
+          fill="hsl(var(--muted-foreground))"
           fontSize={11}
         >
           {formatCurrency(payload.value)}
@@ -292,7 +292,7 @@ export default function Dashboard() {
           y1={y}
           x2={labelX}
           y2={labelY}
-          stroke="#666"
+          stroke="hsl(var(--muted-foreground))"
           strokeWidth={1}
           opacity={0.6}
         />
@@ -300,7 +300,7 @@ export default function Dashboard() {
         <text
           x={labelX}
           y={labelY}
-          fill="#333"
+          fill="hsl(var(--foreground))"
           textAnchor={textAnchor}
           dominantBaseline={dominantBaseline}
           fontSize={12}
@@ -312,7 +312,7 @@ export default function Dashboard() {
         <text
           x={labelX}
           y={labelY + 15}
-          fill="#666"
+          fill="hsl(var(--muted-foreground))"
           textAnchor={textAnchor}
           dominantBaseline={dominantBaseline}
           fontSize={10}
@@ -340,11 +340,11 @@ export default function Dashboard() {
 
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="border-b bg-card">
+        <header className="border-b bg-card aurora-header">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div>
-                <h1 className="text-3xl font-bold">Dashboard</h1>
+                <h1 className="text-3xl font-bold aurora-text">Finora</h1>
                 <p className="text-muted-foreground">Your financial overview</p>
               </div>
               <div className="flex gap-2">
@@ -353,6 +353,7 @@ export default function Dashboard() {
                   variant="outline"
                   onClick={handleRefresh}
                   disabled={refreshing}
+                  className="aurora-border"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                   Refresh
@@ -360,12 +361,14 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/ai-planning')}
+                  className="aurora-border"
                 >
                   <Brain className="w-4 h-4 mr-2" />
                   AI Planning
                 </Button>
                 <Button
                   onClick={() => router.push('/transactions/new')}
+                  className="aurora-glow"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Transaction
@@ -373,6 +376,7 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/settings')}
+                  className="aurora-border"
                 >
                   <SettingsIcon className="w-4 h-4 mr-2" />
                   Settings
@@ -381,6 +385,7 @@ export default function Dashboard() {
                   variant="outline"
                   onClick={handleClearData}
                   disabled={refreshing}
+                  className="aurora-border"
                 >
                   Clear Data
                 </Button>
@@ -445,7 +450,7 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
+            <Card className="aurora-card aurora-bg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
@@ -460,7 +465,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="aurora-card aurora-bg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
@@ -475,7 +480,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="aurora-card aurora-bg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Net Income</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
@@ -490,7 +495,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="aurora-card aurora-bg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
                 <Target className="h-4 w-4 text-orange-600" />
@@ -508,7 +513,7 @@ export default function Dashboard() {
           {summary && summary.monthlyBreakdown && summary.monthlyBreakdown.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Monthly Trend Chart */}
-              <Card>
+              <Card className="aurora-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
@@ -520,21 +525,21 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg aurora-particles">
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Avg Income</p>
+                      <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1))}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Avg Expenses</p>
+                      <p className="text-sm font-medium text-muted-foreground">Avg Expenses</p>
                       <p className="text-lg font-bold text-red-600">
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1))}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-600">Avg Net</p>
+                      <p className="text-sm font-medium text-muted-foreground">Avg Net</p>
                       <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1))}
                       </p>
@@ -560,7 +565,7 @@ export default function Dashboard() {
                         </defs>
                         <CartesianGrid 
                           strokeDasharray="3 3" 
-                          stroke="#e5e7eb" 
+                          stroke="hsl(var(--border))" 
                           strokeWidth={1}
                           opacity={0.5}
                         />
@@ -570,12 +575,12 @@ export default function Dashboard() {
                             return str.split(' ')[0]
                           }}
                           tick={CustomAxisTick}
-                          axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
                           tickLine={false}
                         />
                         <YAxis
                           tick={CustomYTick}
-                          axisLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
+                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
                           tickLine={false}
                           tickMargin={10}
                         />
@@ -616,15 +621,15 @@ export default function Dashboard() {
                     <div className="flex items-center space-x-6">
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-sm font-medium text-gray-700">Income</span>
+                        <span className="text-sm font-medium text-foreground">Income</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-sm font-medium text-gray-700">Expenses</span>
+                        <span className="text-sm font-medium text-foreground">Expenses</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="text-sm font-medium text-gray-700">Net</span>
+                        <span className="text-sm font-medium text-foreground">Net</span>
                       </div>
                     </div>
                   </div>
@@ -632,7 +637,7 @@ export default function Dashboard() {
               </Card>
 
               {/* Category Breakdown */}
-              <Card>
+              <Card className="aurora-card">
                 <CardHeader>
                   <CardTitle>Spending by Category</CardTitle>
                   <CardDescription>
@@ -672,7 +677,7 @@ export default function Dashboard() {
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: COLORS[index % COLORS.length] }}
                             />
-                            <span className="truncate">{entry.name}</span>
+                            <span className="truncate text-foreground">{entry.name}</span>
                             <span className="text-muted-foreground ml-auto">
                               {formatCurrency(entry.value)}
                             </span>

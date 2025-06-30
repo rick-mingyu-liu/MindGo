@@ -179,7 +179,7 @@ export default function Settings() {
 
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="border-b bg-card">
+        <div className="border-b bg-card aurora-header">
           <div className="container mx-auto px-4 py-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -187,12 +187,13 @@ export default function Settings() {
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push('/')}
+                  className="aurora-border"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Dashboard
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Settings</h1>
+                  <h1 className="text-3xl font-bold aurora-text">Settings</h1>
                   <p className="text-muted-foreground">
                     Manage your app preferences and data retention
                   </p>
@@ -201,7 +202,8 @@ export default function Settings() {
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
-                  onClick={() => logout(router)}
+                  onClick={() => logout()}
+                  className="aurora-border"
                 >
                   Logout
                 </Button>
@@ -213,7 +215,7 @@ export default function Settings() {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Theme Settings */}
-            <Card>
+            <Card className="aurora-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
@@ -602,12 +604,14 @@ export default function Settings() {
                   })
                   toast.success('Preferences reset to defaults')
                 }}
+                className="aurora-border"
               >
                 Reset to Defaults
               </Button>
               <Button
                 onClick={handleSavePreferences}
                 disabled={saving}
+                className="aurora-glow"
               >
                 <Save className="w-4 h-4 mr-2" />
                 {saving ? 'Saving...' : 'Save All Preferences'}
