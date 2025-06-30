@@ -16,7 +16,7 @@ import {
   RefreshCw,
   Eye,
   Edit,
-  Settings
+  Settings as SettingsIcon
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api, logout } from '@/utils/api'
@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { toast } from 'react-hot-toast'
 
 interface FinancialSummary {
@@ -347,6 +348,7 @@ export default function Dashboard() {
                 <p className="text-muted-foreground">Your financial overview</p>
               </div>
               <div className="flex gap-2">
+                <ThemeToggle />
                 <Button
                   variant="outline"
                   onClick={handleRefresh}
@@ -372,7 +374,7 @@ export default function Dashboard() {
                   variant="outline"
                   onClick={() => router.push('/settings')}
                 >
-                  <Settings className="w-4 h-4 mr-2" />
+                  <SettingsIcon className="w-4 h-4 mr-2" />
                   Settings
                 </Button>
                 <Button
