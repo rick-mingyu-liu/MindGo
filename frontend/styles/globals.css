@@ -355,4 +355,32 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.dynamic-bg {
+  background: linear-gradient(120deg, #0f2027, #2c5364 60%, #1a2980 100%);
+  animation: gradientMove 12s ease-in-out infinite alternate;
+  background-size: 200% 200%;
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+.dynamic-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('https://www.transparenttextures.com/patterns/noise.png');
+  opacity: 0.08;
+  animation: noiseMove 2s linear infinite alternate;
+}
+
+@keyframes noiseMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 100px 100px; }
 } 

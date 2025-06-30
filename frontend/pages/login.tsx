@@ -58,7 +58,7 @@ export default function Login() {
         <meta name="description" content="Sign in to your Finora account" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
+      <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 dynamic-bg">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="mx-auto mb-4 flex justify-center">
