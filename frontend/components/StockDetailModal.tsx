@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogTrigger 
+  DialogTrigger,
+  DialogDescription
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -248,6 +249,9 @@ export function StockDetailModal({
               </div>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            Detailed information and analysis for the selected stock.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -428,46 +432,6 @@ export function StockDetailModal({
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-4">
-            {/* Key Indicators Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  Key Indicators
-                </CardTitle>
-                <CardDescription>
-                  Latest technical indicators (SMA, EMA, RSI, MACD)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingAnalysis ? (
-                  <div className="text-center py-8">Loading...</div>
-                ) : errorAnalysis ? (
-                  <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
-                ) : analysis && analysis.indicators ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">SMA</p>
-                      <p className="font-bold">{analysis.indicators.sma ?? 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">EMA</p>
-                      <p className="font-bold">{analysis.indicators.ema ?? 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">RSI</p>
-                      <p className="font-bold">{analysis.indicators.rsi ?? 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">MACD</p>
-                      <p className="font-bold">{analysis.indicators.macd ?? 'N/A'}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">No indicator data available.</div>
-                )}
-              </CardContent>
-            </Card>
             {/* Recommendation Trends Card */}
             <Card>
               <CardHeader>
@@ -499,6 +463,94 @@ export function StockDetailModal({
                   </ResponsiveContainer>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">No recommendation data available.</div>
+                )}
+              </CardContent>
+            </Card>
+            {/* EPS Surprises Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  EPS Surprises (Last 4 Quarters)
+                </CardTitle>
+                <CardDescription>
+                  Actual vs. estimated EPS for the last 4 quarters
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAnalysis ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorAnalysis ? (
+                  <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
+                ) : analysis && analysis.epsSurprises && analysis.epsSurprises.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs border">
+                      <thead>
+                        <tr>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Period</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Actual EPS</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Estimate</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Surprise</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analysis.epsSurprises.map((row: any, idx: number) => (
+                          <tr key={idx} className="border-b">
+                            <td className="px-2 py-1">{row.period || row.date || 'N/A'}</td>
+                            <td className="px-2 py-1">{row.actual !== undefined ? row.actual : 'N/A'}</td>
+                            <td className="px-2 py-1">{row.estimate !== undefined ? row.estimate : 'N/A'}</td>
+                            <td className="px-2 py-1">{row.surprise !== undefined ? row.surprise : (row.actual !== undefined && row.estimate !== undefined ? (row.actual - row.estimate).toFixed(2) : 'N/A')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No EPS surprise data available.</div>
+                )}
+              </CardContent>
+            </Card>
+            {/* Earnings Calendar Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Earnings Calendar (Next Month)
+                </CardTitle>
+                <CardDescription>
+                  Upcoming earnings events (US only)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAnalysis ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorAnalysis ? (
+                  <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
+                ) : analysis && analysis.earningsCalendar && analysis.earningsCalendar.earnings && analysis.earningsCalendar.earnings.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs border">
+                      <thead>
+                        <tr>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Date</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Time</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">EPS Estimate</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">Actual EPS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analysis.earningsCalendar.earnings.map((row: any, idx: number) => (
+                          <tr key={idx} className="border-b">
+                            <td className="px-2 py-1">{row.date || 'N/A'}</td>
+                            <td className="px-2 py-1">{row.hour || row.time || 'N/A'}</td>
+                            <td className="px-2 py-1">{row.epsEstimate !== undefined ? row.epsEstimate : 'N/A'}</td>
+                            <td className="px-2 py-1">{row.epsActual !== undefined ? row.epsActual : 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No upcoming earnings events.</div>
                 )}
               </CardContent>
             </Card>

@@ -304,10 +304,10 @@ const investmentController = {
           const cf = reportData.cf || {};
   
           // Log what you're seeing from Finnhub
-          console.log('--- Report for period:', period);
-          console.log('BS:', bs);
-          console.log('IC:', ic);
-          console.log('CF:', cf);
+          // console.log('--- Report for period:', period);
+          // console.log('BS:', bs);
+          // console.log('IC:', ic);
+          // console.log('CF:', cf);
   
           // Helper to find value by concept or label in an array
           function findValue(arr, concepts = [], labels = []) {
@@ -450,14 +450,17 @@ const investmentController = {
   async getStockAnalysis(req, res) {
     try {
       const { symbol } = req.params;
-      // Fetch key indicators (e.g., SMA, EMA, RSI, MACD)
-      const indicators = await finnhubService.getKeyIndicators(symbol);
       // Fetch recommendation trends
       const recommendations = await finnhubService.getRecommendationTrends(symbol);
+      // Fetch EPS surprises (last 4 quarters)
+      const epsSurprises = await finnhubService.getEpsSurprises(symbol);
+      // Fetch earnings calendar (1 month, US only)
+      const earningsCalendar = await finnhubService.getEarningsCalendar(symbol);
       res.json({
         symbol: symbol.toUpperCase(),
-        indicators,
-        recommendations
+        recommendations,
+        epsSurprises,
+        earningsCalendar
       });
     } catch (error) {
       console.error('Get stock analysis error:', error);

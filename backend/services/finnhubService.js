@@ -1,3 +1,5 @@
+
+
 const axios = require('axios');
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -105,6 +107,24 @@ class FinnhubService {
   async getRecommendationTrends(symbol) {
     const url = `https://finnhub.io/api/v1/stock/recommendation?symbol=${symbol}&token=${FINNHUB_TOKEN}`;
     const { data } = await axios.get(url);
+    return data;
+  }
+
+  // EPS Surprises (last 4 quarters)
+  async getEpsSurprises(symbol) {
+    const url = `${FINNHUB_BASE_URL}/stock/earnings`;
+    const { data } = await axios.get(url, {
+      params: { symbol, token: FINNHUB_API_KEY }
+    });
+    return data;
+  }
+
+  // Earnings Calendar (1 month, US only)
+  async getEarningsCalendar(symbol) {
+    const url = `${FINNHUB_BASE_URL}/calendar/earnings`;
+    const { data } = await axios.get(url, {
+      params: { symbol, token: FINNHUB_API_KEY }
+    });
     return data;
   }
 }
