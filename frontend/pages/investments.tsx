@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface WatchlistItem {
@@ -34,27 +34,21 @@ export default function Investments() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [searchAddQuery, setSearchAddQuery] = useState('')
   const [searchAddResults, setSearchAddResults] = useState<any[]>([])
   const [searchAddLoading, setSearchAddLoading] = useState(false)
   const [searchAddError, setSearchAddError] = useState('')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<WatchlistForm>()
-
   useEffect(() => {
     fetchWatchlist()
   }, [])
 
   // Debounced search for Add Stock dialog
   useEffect(() => {
-    if (!isDialogOpen || editingItem) {
+    if (!isDialogOpen) {
       setSearchAddResults([])
       setSearchAddError('')
       return
@@ -78,7 +72,7 @@ export default function Investments() {
       }
     }, 400)
     return () => clearTimeout(timeout)
-  }, [searchAddQuery, isDialogOpen, editingItem])
+  }, [searchAddQuery, isDialogOpen])
 
   const fetchWatchlist = async () => {
     try {
@@ -92,44 +86,22 @@ export default function Investments() {
     }
   }
 
-  const onSubmit = async (data: WatchlistForm) => {
-    try {
-      if (editingItem) {
-        await api.put(`/investments/watchlist/${editingItem.id}`, data)
-        toast.success('Stock updated successfully!')
-      } else {
-        await api.post('/investments/watchlist', data)
-        toast.success('Stock added to watchlist!')
-      }
-      
-      setIsDialogOpen(false)
-      reset()
-      setEditingItem(null)
-      fetchWatchlist()
-      
-    } catch (error) {
-      console.error('Watchlist error:', error)
-    }
-  }
-
-  const handleEdit = (item: WatchlistItem) => {
-    setEditingItem(item)
-    reset({
-      symbol: item.symbol,
-      company_name: item.company_name,
-    })
-    setIsDialogOpen(true)
-  }
-
   const handleDelete = async (itemId: number) => {
-    if (confirm('Are you sure you want to remove this stock from your watchlist?')) {
-      try {
-        await api.delete(`/investments/watchlist/${itemId}`)
-        toast.success('Stock removed from watchlist!')
-        fetchWatchlist()
-      } catch (error) {
-        console.error('Error removing stock:', error)
-      }
+    setPendingDeleteId(itemId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (pendingDeleteId == null) return
+    try {
+      await api.delete(`/investments/watchlist/${pendingDeleteId}`)
+      toast.success('Stock removed from watchlist!')
+      fetchWatchlist()
+    } catch (error) {
+      console.error('Error removing stock:', error)
+    } finally {
+      setDeleteDialogOpen(false)
+      setPendingDeleteId(null)
     }
   }
 
@@ -211,102 +183,50 @@ export default function Investments() {
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>
-                        {editingItem ? 'Edit Stock' : 'Add to Watchlist'}
+                        Add to Watchlist
                       </DialogTitle>
                       <DialogDescription>
-                        {editingItem ? 'Edit stock details' : 'Add a new stock to your watchlist'}
+                        Add a new stock to your watchlist
                       </DialogDescription>
                     </DialogHeader>
-                    {editingItem ? (
-                      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="symbol">Stock Symbol</Label>
-                          <Input
-                            id="symbol"
-                            placeholder="e.g., AAPL, GOOGL, TSLA"
-                            {...register('symbol', {
-                              required: 'Stock symbol is required',
-                              pattern: {
-                                value: /^[A-Z]{1,5}$/,
-                                message: 'Please enter a valid stock symbol (1-5 uppercase letters)',
-                              },
-                            })}
-                          />
-                          {errors.symbol && (
-                            <p className="text-sm text-destructive">{errors.symbol.message}</p>
-                          )}
+                    <div className="space-y-4">
+                      <Label htmlFor="add-search">Search by Symbol or Company Name</Label>
+                      <Input
+                        id="add-search"
+                        placeholder="Type symbol or company name..."
+                        value={searchAddQuery}
+                        onChange={e => setSearchAddQuery(e.target.value)}
+                        autoFocus
+                      />
+                      {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
+                      {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
+                      {searchAddResults.length > 0 && (
+                        <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
+                          {searchAddResults.map((result, idx) => (
+                            <div
+                              key={result.symbol + idx}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer"
+                              onClick={() => handleAddStockFromSearch(result.symbol, result.description)}
+                            >
+                              <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
+                            </div>
+                          ))}
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="company_name">Company Name</Label>
-                          <Input
-                            id="company_name"
-                            placeholder="e.g., Apple Inc., Alphabet Inc."
-                            {...register('company_name', {
-                              required: 'Company name is required',
-                            })}
-                          />
-                          {errors.company_name && (
-                            <p className="text-sm text-destructive">{errors.company_name.message}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setIsDialogOpen(false)
-                              reset()
-                              setEditingItem(null)
-                            }}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" className="flex-1">
-                            Update Stock
-                          </Button>
-                        </div>
-                      </form>
-                    ) : (
-                      <div className="space-y-4">
-                        <Label htmlFor="add-search">Search by Symbol or Company Name</Label>
-                        <Input
-                          id="add-search"
-                          placeholder="Type symbol or company name..."
-                          value={searchAddQuery}
-                          onChange={e => setSearchAddQuery(e.target.value)}
-                          autoFocus
-                        />
-                        {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
-                        {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
-                        {searchAddResults.length > 0 && (
-                          <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
-                            {searchAddResults.map((result, idx) => (
-                              <div
-                                key={result.symbol + idx}
-                                className="px-3 py-2 hover:bg-muted cursor-pointer"
-                                onClick={() => handleAddStockFromSearch(result.symbol, result.description)}
-                              >
-                                <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <div className="flex gap-2 mt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setIsDialogOpen(false)
-                              setSearchAddQuery('')
-                              setSearchAddResults([])
-                            }}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
+                      )}
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            setSearchAddQuery('')
+                            setSearchAddResults([])
+                          }}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
                       </div>
-                    )}
+                    </div>
                   </DialogContent>
                 </Dialog>
               </div>
@@ -419,13 +339,6 @@ export default function Investments() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleEdit(item)}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
                               onClick={() => handleDelete(item.id)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -439,6 +352,26 @@ export default function Investments() {
               </CardContent>
             </Card>
           )}
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Remove Stock</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to remove this stock from your watchlist? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmDelete}>
+                  Remove
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </>
