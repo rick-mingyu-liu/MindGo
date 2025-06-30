@@ -89,7 +89,7 @@ export const enhancedStockAPI = {
 
 // Add searchStocks for investments
 export const investmentAPI = {
-  searchStocks: (query: string) => api.get(`/investments/search?q=${encodeURIComponent(query)}`),
+  searchStocks: (query: string) => api.get(`/investments/search?query=${encodeURIComponent(query)}`),
 }
 
 export { api } 

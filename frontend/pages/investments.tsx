@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { api, logout, investmentAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +36,10 @@ export default function Investments() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchAddQuery, setSearchAddQuery] = useState('')
+  const [searchAddResults, setSearchAddResults] = useState<any[]>([])
+  const [searchAddLoading, setSearchAddLoading] = useState(false)
+  const [searchAddError, setSearchAddError] = useState('')
   
   const {
     register,
@@ -47,6 +51,34 @@ export default function Investments() {
   useEffect(() => {
     fetchWatchlist()
   }, [])
+
+  // Debounced search for Add Stock dialog
+  useEffect(() => {
+    if (!isDialogOpen || editingItem) {
+      setSearchAddResults([])
+      setSearchAddError('')
+      return
+    }
+    if (!searchAddQuery.trim()) {
+      setSearchAddResults([])
+      setSearchAddError('')
+      return
+    }
+    setSearchAddLoading(true)
+    setSearchAddError('')
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await investmentAPI.searchStocks(searchAddQuery.trim())
+        setSearchAddResults(res.data.results.result || [])
+      } catch (err) {
+        setSearchAddError('Failed to search stocks')
+        setSearchAddResults([])
+      } finally {
+        setSearchAddLoading(false)
+      }
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [searchAddQuery, isDialogOpen, editingItem])
 
   const fetchWatchlist = async () => {
     try {
@@ -120,6 +152,20 @@ export default function Investments() {
     item.company_name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Add stock directly from search result
+  const handleAddStockFromSearch = async (symbol: string, companyName: string) => {
+    try {
+      await api.post('/investments/watchlist', { symbol, company_name: companyName })
+      toast.success('Stock added to watchlist!')
+      setIsDialogOpen(false)
+      setSearchAddQuery('')
+      setSearchAddResults([])
+      fetchWatchlist()
+    } catch (error) {
+      toast.error('Failed to add stock')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -168,60 +214,99 @@ export default function Investments() {
                         {editingItem ? 'Edit Stock' : 'Add to Watchlist'}
                       </DialogTitle>
                       <DialogDescription>
-                        Add a new stock to your watchlist
+                        {editingItem ? 'Edit stock details' : 'Add a new stock to your watchlist'}
                       </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="symbol">Stock Symbol</Label>
+                    {editingItem ? (
+                      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="symbol">Stock Symbol</Label>
+                          <Input
+                            id="symbol"
+                            placeholder="e.g., AAPL, GOOGL, TSLA"
+                            {...register('symbol', {
+                              required: 'Stock symbol is required',
+                              pattern: {
+                                value: /^[A-Z]{1,5}$/,
+                                message: 'Please enter a valid stock symbol (1-5 uppercase letters)',
+                              },
+                            })}
+                          />
+                          {errors.symbol && (
+                            <p className="text-sm text-destructive">{errors.symbol.message}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="company_name">Company Name</Label>
+                          <Input
+                            id="company_name"
+                            placeholder="e.g., Apple Inc., Alphabet Inc."
+                            {...register('company_name', {
+                              required: 'Company name is required',
+                            })}
+                          />
+                          {errors.company_name && (
+                            <p className="text-sm text-destructive">{errors.company_name.message}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setIsDialogOpen(false)
+                              reset()
+                              setEditingItem(null)
+                            }}
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" className="flex-1">
+                            Update Stock
+                          </Button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="space-y-4">
+                        <Label htmlFor="add-search">Search by Symbol or Company Name</Label>
                         <Input
-                          id="symbol"
-                          placeholder="e.g., AAPL, GOOGL, TSLA"
-                          {...register('symbol', {
-                            required: 'Stock symbol is required',
-                            pattern: {
-                              value: /^[A-Z]{1,5}$/,
-                              message: 'Please enter a valid stock symbol (1-5 uppercase letters)',
-                            },
-                          })}
+                          id="add-search"
+                          placeholder="Type symbol or company name..."
+                          value={searchAddQuery}
+                          onChange={e => setSearchAddQuery(e.target.value)}
+                          autoFocus
                         />
-                        {errors.symbol && (
-                          <p className="text-sm text-destructive">{errors.symbol.message}</p>
+                        {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
+                        {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
+                        {searchAddResults.length > 0 && (
+                          <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
+                            {searchAddResults.map((result, idx) => (
+                              <div
+                                key={result.symbol + idx}
+                                className="px-3 py-2 hover:bg-muted cursor-pointer"
+                                onClick={() => handleAddStockFromSearch(result.symbol, result.description)}
+                              >
+                                <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
+                              </div>
+                            ))}
+                          </div>
                         )}
+                        <div className="flex gap-2 mt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsDialogOpen(false)
+                              setSearchAddQuery('')
+                              setSearchAddResults([])
+                            }}
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="company_name">Company Name</Label>
-                        <Input
-                          id="company_name"
-                          placeholder="e.g., Apple Inc., Alphabet Inc."
-                          {...register('company_name', {
-                            required: 'Company name is required',
-                          })}
-                        />
-                        {errors.company_name && (
-                          <p className="text-sm text-destructive">{errors.company_name.message}</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setIsDialogOpen(false)
-                            reset()
-                            setEditingItem(null)
-                          }}
-                          className="flex-1"
-                        >
-                          Cancel
-                        </Button>
-                        <Button type="submit" className="flex-1">
-                          {editingItem ? 'Update Stock' : 'Add Stock'}
-                        </Button>
-                      </div>
-                    </form>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
@@ -240,11 +325,10 @@ export default function Investments() {
               </div>
               <div>
                 <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  Two Watchlist Views Available
+                  Watchlist
                 </h3>
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Basic View:</strong> Simple table with essential stock data. 
-                  <strong className="ml-2">Enhanced View:</strong> Detailed analysis, financial reports, news, and comprehensive metrics.
+                  Track your favorite stocks and investments in a simple table with essential stock data.
                 </p>
               </div>
             </div>
