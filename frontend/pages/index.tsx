@@ -438,7 +438,7 @@ export default function Dashboard() {
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold">
                   {formatCurrency(summary?.totalIncome || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -453,7 +453,7 @@ export default function Dashboard() {
                 <TrendingDown className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-2xl font-bold">
                   {formatCurrency(summary?.totalExpenses || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -689,75 +689,6 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Recent Transactions */}
-          <Card className="mb-8">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Recent Transactions</CardTitle>
-                  <CardDescription>Your latest financial activities</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/transactions')}
-                >
-                  View All
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {transactions.length > 0 ? (
-                <div className="space-y-3">
-                  {transactions.slice(0, 5).map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
-                        <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="text-right">
-                          <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                          </p>
-                          <Badge variant="secondary" className="text-xs">
-                            {transaction.type}
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <DollarSign className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground mb-4">No transactions yet</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push('/transactions/new')}
-                  >
-                    Add Your First Transaction
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Goals and Watchlist */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Savings Goals */}
@@ -864,6 +795,75 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Recent Transactions */}
+          <Card className="mb-8 mt-8">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Transactions</CardTitle>
+                  <CardDescription>Your latest financial activities</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/transactions')}
+                >
+                  View All
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {transactions.length > 0 ? (
+                <div className="space-y-3">
+                  {transactions.slice(0, 5).map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <div>
+                          <p className="font-medium">{transaction.description}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-right">
+                          <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                          </p>
+                          <Badge variant="secondary" className="text-xs">
+                            {transaction.type}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <DollarSign className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground mb-4">No transactions yet</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/transactions/new')}
+                  >
+                    Add Your First Transaction
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </main>
       </div>
     </>
