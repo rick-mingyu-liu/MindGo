@@ -309,23 +309,54 @@ const investmentController = {
           console.log('IC:', ic);
           console.log('CF:', cf);
   
+          // Helper to find value by concept or label in an array
+          function findValue(arr, concepts = [], labels = []) {
+            if (!Array.isArray(arr)) return null;
+            for (const item of arr) {
+              if ((concepts.length && concepts.includes(item.concept)) ||
+                  (labels.length && labels.includes(item.label))) {
+                return item.value;
+              }
+            }
+            return null;
+          }
+
           // Fallback for period/year
           let reportPeriod = report.period;
           if (!reportPeriod) {
             reportPeriod = report.filedDate || report.endDate || report.startDate || null;
           }
-          // Try to extract year if reportPeriod is a date string
           if (reportPeriod && typeof reportPeriod === 'string') {
             const match = reportPeriod.match(/(\d{4})/);
             reportPeriod = match ? match[1] : reportPeriod;
           }
+
+          // Map all fields robustly
+          const revenue = findValue(ic, ['us-gaap_Revenues', 'us-gaap_SalesRevenueNet', 'Revenues', 'Revenue'], ['Revenue', 'Sales Revenue, Net'])
+            ?? findValue(cf, ['us-gaap_Revenues', 'us-gaap_SalesRevenueNet', 'Revenues', 'Revenue'], ['Revenue', 'Sales Revenue, Net']);
+          const netIncome = findValue(ic, ['us-gaap_NetIncomeLoss', 'NetIncomeLoss', 'NetIncome'], ['Net income', 'Net loss'])
+            ?? findValue(cf, ['us-gaap_NetIncomeLoss', 'NetIncomeLoss', 'NetIncome'], ['Net income', 'Net loss']);
+          const eps = findValue(ic, [
+            'us-gaap_EarningsPerShareBasicAndDiluted',
+            'us-gaap_EarningsPerShareBasic',
+            'us-gaap_EarningsPerShareDiluted',
+            'EarningsPerShareBasic',
+            'EarningsPerShareDiluted'
+          ], [
+            'Net loss per share attributable to common stockholders, basic and diluted (in dollars per share)',
+            'Basic net income (loss) per share',
+            'Diluted net income (loss) per share'
+          ]);
+          const assets = findValue(bs, ['us-gaap_Assets', 'Assets'], ['Assets', 'Total current assets']);
+          const liabilities = findValue(bs, ['us-gaap_Liabilities', 'Liabilities'], ['Liabilities', 'Total current liabilities']);
+
           const row = {
             period: reportPeriod,
-            revenue: ic['Revenue'] ?? ic['Revenues'] ?? cf['Revenue'] ?? null,
-            netIncome: ic['NetIncomeLoss'] ?? ic['NetIncome'] ?? cf['NetIncomeLoss'] ?? null,
-            eps: ic['EPS'] ?? ic['EarningsPerShareBasic'] ?? ic['EarningsPerShareDiluted'] ?? null,
-            assets: bs['Assets'] ?? null,
-            liabilities: bs['Liabilities'] ?? null,
+            revenue,
+            netIncome,
+            eps,
+            assets,
+            liabilities,
             form: report.form,
             filedDate: report.filedDate,
             accessNumber: report.accessNumber,
