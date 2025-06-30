@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info } from 'lucide-react'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info, Eye } from 'lucide-react'
 import { api, logout, investmentAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { StockDetailModal } from '@/components/StockDetailModal'
 
 interface WatchlistItem {
   id: number
@@ -41,6 +42,7 @@ export default function Investments() {
   const [searchAddError, setSearchAddError] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
+  const [detailModalOpenId, setDetailModalOpenId] = useState<number | null>(null)
   
   useEffect(() => {
     fetchWatchlist()
@@ -336,6 +338,17 @@ export default function Investments() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <StockDetailModal
+                              symbol={item.symbol}
+                              companyName={item.company_name}
+                              currentPrice={item.currentPrice}
+                              change={item.change}
+                              changePercent={item.changePercent}
+                            >
+                              <Button variant="ghost" size="sm">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </StockDetailModal>
                             <Button
                               variant="ghost"
                               size="sm"
