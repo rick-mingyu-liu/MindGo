@@ -90,6 +90,10 @@ export const enhancedStockAPI = {
 // Add searchStocks for investments
 export const investmentAPI = {
   searchStocks: (query: string) => api.get(`/investments/search?query=${encodeURIComponent(query)}`),
+  getStockSnapshot: (symbol: string) => api.get(`/investments/snapshot/${symbol}`),
+  getStockNews: (symbol: string) => api.get(`/investments/news/${symbol}`),
+  getStockFinancials: (symbol: string) => api.get(`/investments/financials/${symbol}`),
+  getMarketOverview: () => api.get('/investments/market-overview'),
 }
 
 export { api } 

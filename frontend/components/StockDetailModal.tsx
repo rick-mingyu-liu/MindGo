@@ -29,7 +29,7 @@ import {
   Minus
 } from 'lucide-react'
 import { formatCurrency } from '@/utils/formatters'
-import { enhancedStockAPI } from '@/utils/api'
+import { investmentAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
 
 interface StockDetailModalProps {
@@ -111,35 +111,80 @@ export function StockDetailModal({
 }: StockDetailModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [stockData, setStockData] = useState<StockData | null>(null)
-  const [financialReports, setFinancialReports] = useState<FinancialReport[]>([])
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [analystRatings, setAnalystRatings] = useState<AnalystRating[]>([])
-  const [analystSummary, setAnalystSummary] = useState<AnalystSummary | null>(null)
+  const [stockData, setStockData] = useState<any | null>(null)
+  const [news, setNews] = useState<any[]>([])
+  const [financials, setFinancials] = useState<any | null>(null)
+  const [marketOverview, setMarketOverview] = useState<any | null>(null)
+  const [loadingNews, setLoadingNews] = useState(false)
+  const [loadingFinancials, setLoadingFinancials] = useState(false)
+  const [loadingMarket, setLoadingMarket] = useState(false)
+  const [errorNews, setErrorNews] = useState('')
+  const [errorFinancials, setErrorFinancials] = useState('')
+  const [errorMarket, setErrorMarket] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
 
   // Fetch stock data when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchStockData()
+      fetchNews()
+      fetchFinancials()
+      fetchMarketOverview()
     }
   }, [isOpen, symbol])
 
   const fetchStockData = async () => {
     try {
       setLoading(true)
-      const response = await enhancedStockAPI.getStockData(symbol)
-      
-      setStockData(response.data.stock)
-      setFinancialReports(response.data.financialReports)
-      setNews(response.data.news)
-      setAnalystRatings(response.data.analystRatings)
-      setAnalystSummary(response.data.analystSummary)
+      const response = await investmentAPI.getStockSnapshot(symbol)
+      setStockData(response.data)
     } catch (error) {
       console.error('Error fetching stock data:', error)
       toast.error('Failed to load stock details')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchNews = async () => {
+    setLoadingNews(true)
+    setErrorNews('')
+    try {
+      const res = await investmentAPI.getStockNews(symbol)
+      setNews(res.data.news || [])
+    } catch (err) {
+      setErrorNews('Failed to load news')
+      setNews([])
+    } finally {
+      setLoadingNews(false)
+    }
+  }
+
+  const fetchFinancials = async () => {
+    setLoadingFinancials(true)
+    setErrorFinancials('')
+    try {
+      const res = await investmentAPI.getStockFinancials(symbol)
+      setFinancials(res.data.financials || null)
+    } catch (err) {
+      setErrorFinancials('Failed to load financials')
+      setFinancials(null)
+    } finally {
+      setLoadingFinancials(false)
+    }
+  }
+
+  const fetchMarketOverview = async () => {
+    setLoadingMarket(true)
+    setErrorMarket('')
+    try {
+      const res = await investmentAPI.getMarketOverview()
+      setMarketOverview(res.data || null)
+    } catch (err) {
+      setErrorMarket('Failed to load market overview')
+      setMarketOverview(null)
+    } finally {
+      setLoadingMarket(false)
     }
   }
 
@@ -195,9 +240,9 @@ export function StockDetailModal({
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : (
+            ) : stockData ? (
               <>
-                {/* Key Metrics */}
+                {/* Key Metrics - Only show what is available */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -207,35 +252,27 @@ export function StockDetailModal({
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Market Cap</p>
-                        <p className="text-lg font-bold">
-                          {stockData?.market_cap ? formatCurrency(stockData.market_cap) : 'N/A'}
-                        </p>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Current Price</p>
+                        <p className="font-medium">{stockData?.quote?.c !== undefined ? stockData.quote.c : 'N/A'}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">P/E Ratio</p>
-                        <p className="text-lg font-bold">
-                          {stockData?.pe_ratio?.toFixed(2) || 'N/A'}
-                        </p>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Change</p>
+                        <p className="font-medium">{stockData?.quote?.d !== undefined ? stockData.quote.d : 'N/A'}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Dividend Yield</p>
-                        <p className="text-lg font-bold">
-                          {stockData?.dividend_yield ? `${stockData.dividend_yield.toFixed(2)}%` : 'N/A'}
-                        </p>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Change %</p>
+                        <p className="font-medium">{stockData?.quote?.dp !== undefined ? stockData.quote.dp + '%' : 'N/A'}</p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Beta</p>
-                        <p className="text-lg font-bold">
-                          {stockData?.beta?.toFixed(2) || 'N/A'}
-                        </p>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Day Range</p>
+                        <p className="font-medium">{stockData?.tradingInfo?.dayRange || 'N/A'}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Company Information */}
+                {/* Company Information - Now using Finnhub profile data */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -246,78 +283,49 @@ export function StockDetailModal({
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Sector</p>
-                        <p className="font-medium">{stockData?.sector || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">Name</p>
+                        <p className="font-medium">{stockData?.companyInfo?.name || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Market Cap</p>
+                        <p className="font-medium">{stockData?.tradingInfo?.marketCap !== undefined && stockData?.tradingInfo?.marketCap !== null ? stockData.tradingInfo.marketCap : 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Industry</p>
-                        <p className="font-medium">{stockData?.industry || 'N/A'}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.industry || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Employees</p>
-                        <p className="font-medium">
-                          {stockData?.employees ? stockData.employees.toLocaleString() : 'N/A'}
-                        </p>
+                        <p className="text-sm text-muted-foreground">Country</p>
+                        <p className="font-medium">{stockData?.companyInfo?.country || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Website</p>
-                        {stockData?.website ? (
-                          <a 
-                            href={stockData.website} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="font-medium text-primary hover:underline flex items-center gap-1"
-                          >
-                            Visit Website <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <p className="font-medium">N/A</p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Description</p>
-                      <p className="text-sm leading-relaxed">
-                        {stockData?.description || 'No description available.'}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Trading Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5" />
-                      Trading Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Volume</p>
                         <p className="font-medium">
-                          {stockData?.volume ? stockData.volume.toLocaleString() : 'N/A'}
+                          {stockData?.companyInfo?.website ? (
+                            <a href={stockData.companyInfo.website} target="_blank" rel="noopener noreferrer" className="underline">
+                              {stockData.companyInfo.website}
+                            </a>
+                          ) : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Volume</p>
-                        <p className="font-medium">
-                          {stockData?.avg_volume ? stockData.avg_volume.toLocaleString() : 'N/A'}
-                        </p>
+                        <p className="text-sm text-muted-foreground">Exchange</p>
+                        <p className="font-medium">{stockData?.companyInfo?.exchange || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Day Range</p>
-                        <p className="font-medium">{stockData?.day_range || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">IPO Date</p>
+                        <p className="font-medium">{stockData?.companyInfo?.ipo || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">52 Week Range</p>
-                        <p className="font-medium">{stockData?.year_range || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">Ticker</p>
+                        <p className="font-medium">{stockData?.companyInfo?.ticker || 'N/A'}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">No data available.</div>
             )}
           </TabsContent>
 
@@ -333,28 +341,14 @@ export function StockDetailModal({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {financialReports.length > 0 ? (
-                  <div className="space-y-4">
-                    {financialReports.map((report) => (
-                      <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{report.title}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            Released {new Date(report.release_date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <FileText className="w-4 h-4 mr-2" />
-                          View Report
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                {loadingFinancials ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorFinancials ? (
+                  <div className="text-center py-8 text-red-600">{errorFinancials}</div>
+                ) : financials ? (
+                  <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(financials, null, 2)}</pre>
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">No financial reports available</p>
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">No financials available.</div>
                 )}
               </CardContent>
             </Card>
@@ -372,37 +366,39 @@ export function StockDetailModal({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {news.length > 0 ? (
+                {loadingNews ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorNews ? (
+                  <div className="text-center py-8 text-red-600">{errorNews}</div>
+                ) : news.length > 0 ? (
                   <div className="space-y-4">
-                    {news.map((item) => (
-                      <div key={item.id} className="p-4 border rounded-lg">
+                    {news.map((item, idx) => (
+                      <div key={item.id || idx} className="p-4 border rounded-lg">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <Badge className={getSentimentColor(item.sentiment)}>
-                                {item.sentiment}
-                              </Badge>
                               <span className="text-sm text-muted-foreground">{item.source}</span>
                               <span className="text-sm text-muted-foreground">
-                                {new Date(item.published_at).toLocaleDateString()}
+                                {item.published_at ? new Date(item.published_at).toLocaleDateString() : ''}
                               </span>
                             </div>
                             <h4 className="font-medium mb-2">{item.title}</h4>
                             <p className="text-sm text-muted-foreground mb-3">{item.summary}</p>
-                            <Button variant="outline" size="sm">
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              Read More
-                            </Button>
+                            {item.url && (
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="w-4 h-4 mr-2" />
+                                  Read More
+                                </a>
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <Newspaper className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">No news available</p>
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">No news available.</div>
                 )}
               </CardContent>
             </Card>
@@ -412,77 +408,23 @@ export function StockDetailModal({
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  Analyst Ratings
+                  <BarChart3 className="w-5 h-5" />
+                  Market Overview
                 </CardTitle>
                 <CardDescription>
-                  Professional analyst recommendations and price targets
+                  Market summary and movers
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {analystSummary ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{analystSummary.buy}</div>
-                        <div className="text-sm text-muted-foreground">Buy</div>
-                      </div>
-                      <div className="p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">{analystSummary.hold}</div>
-                        <div className="text-sm text-muted-foreground">Hold</div>
-                      </div>
-                      <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-                        <div className="text-2xl font-bold text-red-600">{analystSummary.sell}</div>
-                        <div className="text-sm text-muted-foreground">Sell</div>
-                      </div>
-                    </div>
-                    {analystSummary.averagePriceTarget && (
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Average Price Target</p>
-                        <p className="text-2xl font-bold text-primary">
-                          {formatCurrency(analystSummary.averagePriceTarget)}
-                        </p>
-                        <p className="text-sm text-green-600">
-                          +{((analystSummary.averagePriceTarget - currentPrice) / currentPrice * 100).toFixed(1)}% from current price
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                {loadingMarket ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorMarket ? (
+                  <div className="text-center py-8 text-red-600">{errorMarket}</div>
+                ) : marketOverview ? (
+                  <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(marketOverview, null, 2)}</pre>
                 ) : (
-                  <div className="text-center py-8">
-                    <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">No analyst ratings available</p>
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">No market overview available.</div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5" />
-                  Risk Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Market Risk</span>
-                    <Badge variant="secondary">Medium</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Volatility</span>
-                    <Badge variant="secondary">Low</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Liquidity</span>
-                    <Badge variant="secondary">High</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Regulatory Risk</span>
-                    <Badge variant="destructive">High</Badge>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

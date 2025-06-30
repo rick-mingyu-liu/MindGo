@@ -11,11 +11,53 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      const quote = await finnhubService.getQuote(symbol);
+      // Fetch quote and profile from Finnhub
+      const [quote, profile] = await Promise.all([
+        finnhubService.getQuote(symbol),
+        finnhubService.getProfile(symbol)
+      ]);
+      // Optionally, fetch from Moomoo as well if you want trading info
+      // const moomoo = await moomooService.getStockSnapshot(symbol);
 
+      // Fallback logic for sector
+      let sector = profile.gsector;
+      if (!sector || sector === 'N/A') {
+        sector = profile.finnhubIndustry || profile.exchange || profile.country || 'N/A';
+      }
+      // Fallbacks for trading info
+      let volume = quote.v !== undefined ? quote.v : 'N/A';
+      let dayRange = (quote.l !== undefined && quote.h !== undefined) ? `${quote.l} - ${quote.h}` : null;
+      if (!dayRange || dayRange === 'N/A' || dayRange === 'null - null') {
+        dayRange = quote.c !== undefined ? `${quote.c}` : 'N/A';
+      }
+      let yearRange = (profile['52WeekLow'] !== undefined && profile['52WeekHigh'] !== undefined) ? `${profile['52WeekLow']} - ${profile['52WeekHigh']}` : null;
+      if (!yearRange || yearRange === 'N/A' || yearRange === 'null - null') {
+        yearRange = 'N/A';
+      }
       res.json({
         symbol: symbol.toUpperCase(),
-        quote
+        quote,
+        companyInfo: {
+          name: profile.name,
+          country: profile.country,
+          industry: profile.finnhubIndustry,
+          sector: sector,
+          employees: profile.employeeTotal,
+          website: profile.weburl,
+          description: profile.description,
+          logo: profile.logo,
+          exchange: profile.exchange,
+          ipo: profile.ipo,
+          phone: profile.phone,
+          ticker: profile.ticker
+        },
+        tradingInfo: {
+          volume: volume,
+          marketCap: profile.marketCapitalization !== undefined ? profile.marketCapitalization : null,
+          dayRange: dayRange,
+          yearRange: yearRange
+        }
+        // tradingInfo: moomoo ? { volume: moomoo.volume, marketCap: moomoo.marketCap } : undefined
       });
 
     } catch (error) {

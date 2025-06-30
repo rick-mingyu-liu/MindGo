@@ -74,6 +74,19 @@ class FinnhubService {
       throw new Error('Failed to search symbol');
     }
   }
+
+  // Get company profile for a stock
+  async getProfile(symbol) {
+    try {
+      const response = await axios.get(`${FINNHUB_BASE_URL}/stock/profile2`, {
+        params: { symbol, token: FINNHUB_API_KEY }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching profile from Finnhub:', error.response?.data || error.message);
+      throw new Error('Failed to fetch profile');
+    }
+  }
 }
 
 module.exports = new FinnhubService(); 
