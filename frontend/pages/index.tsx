@@ -360,13 +360,6 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/watchlist')}
-                >
-                  <Star className="w-4 h-4 mr-2" />
-                  Watchlist
-                </Button>
-                <Button
-                  variant="outline"
                   onClick={() => router.push('/ai-planning')}
                 >
                   <Brain className="w-4 h-4 mr-2" />
@@ -412,7 +405,6 @@ export default function Dashboard() {
                     <ul className="text-blue-800 space-y-1 mb-4">
                       <li>• <strong>Add your own transactions</strong> by clicking "Add Transaction"</li>
                       <li>• <strong>Create savings goals</strong> to track your financial targets</li>
-                      <li>• <strong>Set up your investment watchlist</strong> to monitor stocks</li>
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
                     </ul>
                     <div className="flex gap-2">
@@ -834,7 +826,7 @@ export default function Dashboard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push('/watchlist')}
+                    onClick={() => router.push('/investments')}
                   >
                     View All
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -867,13 +859,6 @@ export default function Dashboard() {
                   <div className="text-center py-6">
                     <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                     <p className="text-muted-foreground mb-4">No stocks in watchlist</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push('/watchlist')}
-                    >
-                      Add Your First Stock
-                    </Button>
                   </div>
                 )}
               </CardContent>

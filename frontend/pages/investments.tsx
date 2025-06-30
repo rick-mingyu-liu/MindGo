@@ -155,13 +155,6 @@ export default function Investments() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/watchlist')}
-                >
-                  <Star className="w-4 h-4 mr-2" />
-                  Enhanced View
-                </Button>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -231,13 +224,6 @@ export default function Investments() {
                     </form>
                   </DialogContent>
                 </Dialog>
-                <Button
-                  variant="ghost"
-                  onClick={logout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Button>
               </div>
             </div>
           </div>

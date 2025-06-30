@@ -53,8 +53,51 @@ app.use('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 API available at http://localhost:${PORT}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log('🧪 Testable API endpoints:');
+  // Auth
+  console.log(`  POST   http://localhost:${PORT}/auth/login                (authController.login)`);
+  console.log(`  POST   http://localhost:${PORT}/auth/register             (authController.register)`);
+  // Transactions
+  console.log(`  GET    http://localhost:${PORT}/transactions              (transactionController.getTransactions)`);
+  console.log(`  POST   http://localhost:${PORT}/transactions             (transactionController.createTransaction)`);
+  console.log(`  GET    http://localhost:${PORT}/transactions/categories  (transactionController.getCategories)`);
+  console.log(`  DELETE http://localhost:${PORT}/transactions/clear-all    (transactionController.clearAllTransactions)`);
+  console.log(`  DELETE http://localhost:${PORT}/transactions/auto-delete  (transactionController.autoDeleteOldTransactions)`);
+  console.log(`  GET    http://localhost:${PORT}/transactions/retention-settings (transactionController.getDataRetentionSettings)`);
+  console.log(`  PUT    http://localhost:${PORT}/transactions/retention-settings (transactionController.updateDataRetentionSettings)`);
+  console.log(`  PUT    http://localhost:${PORT}/transactions/:id          (transactionController.updateTransaction)`);
+  console.log(`  DELETE http://localhost:${PORT}/transactions/:id          (transactionController.deleteTransaction)`);
+  // Summary
+  console.log(`  GET    http://localhost:${PORT}/summary/monthly           (summaryController.getMonthlySummary)`);
+  console.log(`  GET    http://localhost:${PORT}/summary/rolling           (summaryController.getRollingSummary)`);
+  console.log(`  GET    http://localhost:${PORT}/summary/trends            (summaryController.getSpendingTrends)`);
+  // Goals
+  console.log(`  GET    http://localhost:${PORT}/goals                     (goalController.getGoals)`);
+  console.log(`  POST   http://localhost:${PORT}/goals                     (goalController.createGoal)`);
+  console.log(`  GET    http://localhost:${PORT}/goals/stats               (goalController.getGoalStats)`);
+  console.log(`  DELETE http://localhost:${PORT}/goals/clear-all           (goalController.clearAllGoals)`);
+  console.log(`  PUT    http://localhost:${PORT}/goals/:id                 (goalController.updateGoal)`);
+  console.log(`  DELETE http://localhost:${PORT}/goals/:id                 (goalController.deleteGoal)`);
+  console.log(`  PUT    http://localhost:${PORT}/goals/:id/progress        (goalController.updateProgress)`);
+  // Investments
+  console.log(`  GET    http://localhost:${PORT}/investments/snapshot/:symbol      (investmentController.getStockSnapshot)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/watchlist            (investmentController.getWatchlist)`);
+  console.log(`  POST   http://localhost:${PORT}/investments/watchlist           (investmentController.addToWatchlist)`);
+  console.log(`  DELETE http://localhost:${PORT}/investments/watchlist/clear-all  (investmentController.clearAllWatchlist)`);
+  console.log(`  DELETE http://localhost:${PORT}/investments/watchlist/:id        (investmentController.removeFromWatchlist)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/historical/:symbol   (investmentController.getHistoricalData)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/market-overview      (investmentController.getMarketOverview)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/news/:symbol         (investmentController.getStockNews)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/financials/:symbol   (investmentController.getStockFinancials)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/watchlist/ai-summary (investmentController.getWatchlistAISummary)`);
+  console.log(`  GET    http://localhost:${PORT}/investments/search?q=apple       (investmentController.searchStocks)`);
+  // AI
+  console.log(`  POST   http://localhost:${PORT}/ai/plan                        (aiController.generatePlan)`);
+  console.log(`  GET    http://localhost:${PORT}/ai/plans                       (aiController.getPlanHistory)`);
+  console.log(`  GET    http://localhost:${PORT}/ai/plans/:id                   (aiController.getPlan)`);
+  console.log(`  POST   http://localhost:${PORT}/ai/budget-recommendations      (aiController.generateBudgetRecommendations)`);
+  console.log(`  POST   http://localhost:${PORT}/ai/investment-advice           (aiController.generateInvestmentAdvice)`);
 });
 
 module.exports = app; 

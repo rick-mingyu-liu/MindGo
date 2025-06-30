@@ -278,13 +278,6 @@ export default function Goals() {
                     </form>
                   </DialogContent>
                 </Dialog>
-                <Button
-                  variant="ghost"
-                  onClick={logout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Button>
               </div>
             </div>
           </div>

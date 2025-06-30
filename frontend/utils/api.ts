@@ -60,4 +60,36 @@ api.interceptors.response.use(
   }
 )
 
+// Enhanced Stock API functions
+export const enhancedStockAPI = {
+  // Get enhanced watchlist
+  getWatchlist: () => api.get('/enhanced-stocks/watchlist'),
+  
+  // Get detailed stock data
+  getStockData: (symbol: string) => api.get(`/enhanced-stocks/stock/${symbol}`),
+  
+  // Add stock to watchlist
+  addToWatchlist: (symbol: string, companyName: string) => 
+    api.post('/enhanced-stocks/watchlist', { symbol, companyName }),
+  
+  // Remove stock from watchlist
+  removeFromWatchlist: (symbol: string) => 
+    api.delete(`/enhanced-stocks/watchlist/${symbol}`),
+  
+  // Search stocks
+  searchStocks: (query: string) => 
+    api.get(`/enhanced-stocks/search?q=${encodeURIComponent(query)}`),
+  
+  // Get market overview
+  getMarketOverview: () => api.get('/enhanced-stocks/market-overview'),
+  
+  // Seed sample data (for development)
+  seedSampleData: () => api.post('/enhanced-stocks/seed-sample-data')
+}
+
+// Add searchStocks for investments
+export const investmentAPI = {
+  searchStocks: (query: string) => api.get(`/investments/search?q=${encodeURIComponent(query)}`),
+}
+
 export { api } 

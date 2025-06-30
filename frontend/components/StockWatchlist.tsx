@@ -22,8 +22,11 @@ import {
 } from 'lucide-react'
 import { StockDetailModal } from './StockDetailModal'
 import { formatCurrency } from '@/utils/formatters'
+import { enhancedStockAPI, investmentAPI } from '@/utils/api'
+import toast from 'react-hot-toast'
 
 interface Stock {
+  id: number
   symbol: string
   companyName: string
   currentPrice: number
@@ -31,7 +34,10 @@ interface Stock {
   changePercent: number
   marketCap: number
   volume: number
-  isWatched: boolean
+  sector: string
+  industry: string
+  addedAt: string
+  lastUpdated: string
 }
 
 export function StockWatchlist() {
@@ -40,92 +46,90 @@ export function StockWatchlist() {
   const [loading, setLoading] = useState(true)
   const [showAddStock, setShowAddStock] = useState(false)
   const [newStockSymbol, setNewStockSymbol] = useState('')
+  const [newStockCompany, setNewStockCompany] = useState('')
+  const [addingStock, setAddingStock] = useState(false)
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchError, setSearchError] = useState('')
 
-  // Mock data - in real implementation, this would come from API
-  useEffect(() => {
-    setTimeout(() => {
-      setStocks([
-        {
-          symbol: 'AAPL',
-          companyName: 'Apple Inc.',
-          currentPrice: 175.43,
-          change: 2.15,
-          changePercent: 1.24,
-          marketCap: 2500000000000,
-          volume: 45000000,
-          isWatched: true
-        },
-        {
-          symbol: 'MSFT',
-          companyName: 'Microsoft Corporation',
-          currentPrice: 378.85,
-          change: -1.23,
-          changePercent: -0.32,
-          marketCap: 2800000000000,
-          volume: 22000000,
-          isWatched: true
-        },
-        {
-          symbol: 'GOOGL',
-          companyName: 'Alphabet Inc.',
-          currentPrice: 142.56,
-          change: 0.89,
-          changePercent: 0.63,
-          marketCap: 1800000000000,
-          volume: 18000000,
-          isWatched: true
-        },
-        {
-          symbol: 'AMZN',
-          companyName: 'Amazon.com Inc.',
-          currentPrice: 155.20,
-          change: -0.45,
-          changePercent: -0.29,
-          marketCap: 1600000000000,
-          volume: 35000000,
-          isWatched: true
-        },
-        {
-          symbol: 'TSLA',
-          companyName: 'Tesla Inc.',
-          currentPrice: 248.50,
-          change: 5.20,
-          changePercent: 2.14,
-          marketCap: 790000000000,
-          volume: 65000000,
-          isWatched: true
-        }
-      ])
+  // Fetch watchlist data
+  const fetchWatchlist = async () => {
+    try {
+      setLoading(true)
+      const response = await enhancedStockAPI.getWatchlist()
+      setStocks(response.data.watchlist)
+    } catch (error) {
+      console.error('Error fetching watchlist:', error)
+      toast.error('Failed to load watchlist')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
+  }
+
+  useEffect(() => {
+    fetchWatchlist()
   }, [])
+
+  // Debounced search for stocks/companies
+  useEffect(() => {
+    if (!showAddStock || !searchQuery.trim()) {
+      setSearchResults([])
+      setSearchError('')
+      return
+    }
+    setSearching(true)
+    setSearchError('')
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await investmentAPI.searchStocks(searchQuery.trim())
+        setSearchResults(res.data.results.result || [])
+      } catch (err) {
+        setSearchError('Failed to search stocks')
+        setSearchResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 400)
+    return () => clearTimeout(timeout)
+  }, [searchQuery, showAddStock])
 
   const filteredStocks = stocks.filter(stock =>
     stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
     stock.companyName.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddStock = () => {
-    if (newStockSymbol.trim()) {
-      // In real implementation, this would validate the symbol and fetch stock data
-      const newStock: Stock = {
-        symbol: newStockSymbol.toUpperCase(),
-        companyName: `${newStockSymbol.toUpperCase()} Company`,
-        currentPrice: 100.00,
-        change: 0,
-        changePercent: 0,
-        marketCap: 1000000000,
-        volume: 1000000,
-        isWatched: true
-      }
-      setStocks([...stocks, newStock])
+  const handleAddStock = async () => {
+    if (!newStockSymbol.trim() || !newStockCompany.trim()) {
+      toast.error('Please enter both symbol and company name')
+      return
+    }
+
+    try {
+      setAddingStock(true)
+      await enhancedStockAPI.addToWatchlist(newStockSymbol.trim(), newStockCompany.trim())
+      toast.success('Stock added to watchlist')
       setNewStockSymbol('')
+      setNewStockCompany('')
       setShowAddStock(false)
+      fetchWatchlist() // Refresh the list
+    } catch (error) {
+      console.error('Error adding stock:', error)
+      // Error message is handled by the API interceptor
+    } finally {
+      setAddingStock(false)
     }
   }
 
-  const handleRemoveStock = (symbol: string) => {
-    setStocks(stocks.filter(stock => stock.symbol !== symbol))
+  const handleRemoveStock = async (symbol: string) => {
+    try {
+      await enhancedStockAPI.removeFromWatchlist(symbol)
+      toast.success('Stock removed from watchlist')
+      fetchWatchlist() // Refresh the list
+    } catch (error) {
+      console.error('Error removing stock:', error)
+      // Error message is handled by the API interceptor
+    }
   }
 
   const getChangeColor = (change: number) => {
@@ -193,21 +197,68 @@ export function StockWatchlist() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-background p-6 rounded-lg shadow-lg w-96">
               <h3 className="text-lg font-semibold mb-4">Add Stock to Watchlist</h3>
-              <Input
-                placeholder="Enter stock symbol (e.g., AAPL)"
-                value={newStockSymbol}
-                onChange={(e) => setNewStockSymbol(e.target.value)}
-                className="mb-4"
-                onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
-              />
-              <div className="flex gap-2">
-                <Button onClick={handleAddStock} className="flex-1">
-                  Add Stock
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Search by Symbol or Company Name</label>
+                  <Input
+                    placeholder="Type symbol or company name..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                  {searching && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
+                  {searchError && <div className="text-xs text-red-600 mt-1">{searchError}</div>}
+                  {searchResults.length > 0 && (
+                    <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
+                      {searchResults.map((result, idx) => (
+                        <div
+                          key={result.symbol + idx}
+                          className="px-3 py-2 hover:bg-muted cursor-pointer"
+                          onClick={() => {
+                            setNewStockSymbol(result.symbol)
+                            setNewStockCompany(result.description)
+                            setSearchQuery(result.symbol + ' - ' + result.description)
+                            setSearchResults([])
+                          }}
+                        >
+                          <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Stock Symbol</label>
+                  <Input
+                    placeholder="Enter stock symbol (e.g., AAPL)"
+                    value={newStockSymbol}
+                    onChange={(e) => setNewStockSymbol(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Company Name</label>
+                  <Input
+                    placeholder="Enter company name (e.g., Apple Inc.)"
+                    value={newStockCompany}
+                    onChange={(e) => setNewStockCompany(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <Button 
+                  onClick={handleAddStock} 
+                  className="flex-1"
+                  disabled={addingStock}
+                >
+                  {addingStock ? 'Adding...' : 'Add Stock'}
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => setShowAddStock(false)}
                   className="flex-1"
+                  disabled={addingStock}
                 >
                   Cancel
                 </Button>
@@ -225,102 +276,46 @@ export function StockWatchlist() {
                 <TableHead>Company</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">Market Cap</TableHead>
-                <TableHead className="text-right">Volume</TableHead>
+                <TableHead className="text-right">% Change</TableHead>
                 <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStocks.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     {searchTerm ? 'No stocks found matching your search.' : 'No stocks in your watchlist.'}
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredStocks.map((stock) => (
-                  <TableRow key={stock.symbol} className="hover:bg-muted/50">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="font-mono">
-                          {stock.symbol}
-                        </Badge>
-                        {stock.isWatched && <Star className="w-4 h-4 text-yellow-500 fill-current" />}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{stock.companyName}</p>
-                      </div>
-                    </TableCell>
+                  <TableRow key={stock.id}>
+                    <TableCell className="font-mono font-semibold">{stock.symbol}</TableCell>
+                    <TableCell>{stock.companyName}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(stock.currentPrice)}
+                      {stock.currentPrice ? formatCurrency(stock.currentPrice) : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className={`flex items-center justify-end gap-1 ${getChangeColor(stock.change)}`}>
-                        {getChangeIcon(stock.change)}
-                        <span className="font-mono">
-                          {stock.change >= 0 ? '+' : ''}{formatCurrency(stock.change)} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
-                        </span>
-                      </div>
+                    <TableCell className={`text-right font-mono ${stock.change > 0 ? 'text-green-600' : stock.change < 0 ? 'text-red-600' : ''}`}>
+                      {stock.change !== null ? `${stock.change > 0 ? '+' : ''}${stock.change.toFixed(2)}` : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {stock.marketCap >= 1000000000000 
-                        ? `$${(stock.marketCap / 1000000000000).toFixed(1)}T`
-                        : `$${(stock.marketCap / 1000000000).toFixed(1)}B`
-                      }
+                    <TableCell className={`text-right font-mono ${stock.changePercent > 0 ? 'text-green-600' : stock.changePercent < 0 ? 'text-red-600' : ''}`}>
+                      {stock.changePercent !== null ? `${stock.changePercent > 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {(stock.volume / 1000000).toFixed(1)}M
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        <StockDetailModal
-                          symbol={stock.symbol}
-                          companyName={stock.companyName}
-                          currentPrice={stock.currentPrice}
-                          change={stock.change}
-                          changePercent={stock.changePercent}
-                        >
-                          <Button variant="ghost" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </StockDetailModal>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => handleRemoveStock(stock.symbol)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                    <TableCell className="text-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleRemoveStock(stock.symbol)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        Remove
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
-        </div>
-
-        {/* Summary Stats */}
-        <div className="mt-6 grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-bold text-primary">{filteredStocks.length}</p>
-            <p className="text-sm text-muted-foreground">Stocks</p>
-          </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-bold text-green-600">
-              {filteredStocks.filter(s => s.change > 0).length}
-            </p>
-            <p className="text-sm text-muted-foreground">Gaining</p>
-          </div>
-          <div className="text-center p-4 bg-muted rounded-lg">
-            <p className="text-2xl font-bold text-red-600">
-              {filteredStocks.filter(s => s.change < 0).length}
-            </p>
-            <p className="text-sm text-muted-foreground">Declining</p>
-          </div>
         </div>
       </CardContent>
     </Card>

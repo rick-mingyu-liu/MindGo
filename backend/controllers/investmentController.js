@@ -1,5 +1,5 @@
 const db = require('../db/connection');
-const moomooService = require('../services/moomooService');
+const finnhubService = require('../services/finnhubService');
 
 const investmentController = {
   // Get stock snapshot
@@ -11,11 +11,11 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      const snapshot = await moomooService.getStockSnapshot(symbol);
+      const quote = await finnhubService.getQuote(symbol);
 
       res.json({
         symbol: symbol.toUpperCase(),
-        snapshot
+        quote
       });
 
     } catch (error) {
@@ -36,12 +36,12 @@ const investmentController = {
       const watchlistWithPrices = await Promise.all(
         watchlist.rows.map(async (item) => {
           try {
-            const snapshot = await moomooService.getStockSnapshot(item.symbol);
+            const quote = await finnhubService.getQuote(item.symbol);
             return {
               ...item,
-              currentPrice: snapshot.price,
-              change: snapshot.change,
-              changePercent: snapshot.changePercent
+              currentPrice: quote.c,
+              change: quote.d,
+              changePercent: quote.dp
             };
           } catch (error) {
             console.error(`Error getting price for ${item.symbol}:`, error);
@@ -136,12 +136,40 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      const historicalData = await moomooService.getHistoricalData(symbol, period);
+      // Map period to Finnhub resolution and time range
+      const now = Math.floor(Date.now() / 1000);
+      let from;
+      let resolution = 'D';
+      switch (period) {
+        case '1d':
+          from = now - 60 * 60 * 24;
+          resolution = '5';
+          break;
+        case '5d':
+          from = now - 60 * 60 * 24 * 5;
+          resolution = '15';
+          break;
+        case '1m':
+          from = now - 60 * 60 * 24 * 30;
+          break;
+        case '3m':
+          from = now - 60 * 60 * 24 * 90;
+          break;
+        case '6m':
+          from = now - 60 * 60 * 24 * 180;
+          break;
+        case '1y':
+          from = now - 60 * 60 * 24 * 365;
+          break;
+        default:
+          from = now - 60 * 60 * 24 * 30;
+      }
+      const data = await finnhubService.getHistoricalData(symbol, resolution, from, now);
 
       res.json({
         symbol: symbol.toUpperCase(),
         period,
-        data: historicalData
+        data
       });
 
     } catch (error) {
@@ -155,17 +183,16 @@ const investmentController = {
     try {
       // Get popular stocks for market overview
       const popularStocks = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'META', 'NVDA', 'NFLX'];
-      
       const marketData = await Promise.all(
         popularStocks.map(async (symbol) => {
           try {
-            const snapshot = await moomooService.getStockSnapshot(symbol);
+            const quote = await finnhubService.getQuote(symbol);
             return {
               symbol,
-              price: snapshot.price,
-              change: snapshot.change,
-              changePercent: snapshot.changePercent,
-              volume: snapshot.volume
+              price: quote.c,
+              change: quote.d,
+              changePercent: quote.dp,
+              volume: quote.v
             };
           } catch (error) {
             console.error(`Error getting data for ${symbol}:`, error);
@@ -179,12 +206,10 @@ const investmentController = {
           }
         })
       );
-
       // Calculate market sentiment (simple implementation)
       const upCount = marketData.filter(stock => stock.changePercent > 0).length;
       const downCount = marketData.filter(stock => stock.changePercent < 0).length;
       const flatCount = marketData.filter(stock => stock.changePercent === 0).length;
-
       res.json({
         marketData,
         sentiment: {
@@ -195,10 +220,61 @@ const investmentController = {
         },
         timestamp: new Date().toISOString()
       });
-
     } catch (error) {
       console.error('Get market overview error:', error);
       res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Get news for a stock
+  async getStockNews(req, res) {
+    try {
+      const { symbol } = req.params;
+      const now = new Date();
+      const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const to = now.toISOString().split('T')[0];
+      const news = await finnhubService.getNews(symbol, from, to);
+      res.json({ symbol: symbol.toUpperCase(), news });
+    } catch (error) {
+      console.error('Get stock news error:', error);
+      res.status(500).json({ error: 'Failed to get stock news' });
+    }
+  },
+
+  // Get financials for a stock
+  async getStockFinancials(req, res) {
+    try {
+      const { symbol } = req.params;
+      const financials = await finnhubService.getFinancials(symbol);
+      res.json({ symbol: symbol.toUpperCase(), financials });
+    } catch (error) {
+      console.error('Get stock financials error:', error);
+      res.status(500).json({ error: 'Failed to get stock financials' });
+    }
+  },
+
+  // Get AI summary for watchlist (placeholder, to be implemented)
+  async getWatchlistAISummary(req, res) {
+    try {
+      // Placeholder: fetch all news for watchlist and return a summary string
+      const watchlist = await db.query(
+        'SELECT symbol FROM watchlist WHERE user_id = $1',
+        [req.user.userId]
+      );
+      const now = new Date();
+      const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const to = now.toISOString().split('T')[0];
+      let allNews = [];
+      for (const item of watchlist.rows) {
+        const news = await finnhubService.getNews(item.symbol, from, to);
+        allNews = allNews.concat(news);
+      }
+      // TODO: Call AI service to summarize allNews
+      const summary = 'AI summary of recent news for your watchlist (to be implemented)';
+      res.json({ summary, news: allNews });
+    } catch (error) {
+      console.error('Get watchlist AI summary error:', error);
+      res.status(500).json({ error: 'Failed to get AI summary' });
     }
   },
 
@@ -215,6 +291,21 @@ const investmentController = {
     } catch (error) {
       console.error('Clear watchlist error:', error);
       res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Search for stocks/companies by name or symbol
+  async searchStocks(req, res) {
+    try {
+      const { query } = req.query;
+      if (!query) {
+        return res.status(400).json({ error: 'Query is required' });
+      }
+      const results = await finnhubService.searchSymbol(query);
+      res.json({ results });
+    } catch (error) {
+      console.error('Search stocks error:', error);
+      res.status(500).json({ error: 'Failed to search stocks' });
     }
   }
 };

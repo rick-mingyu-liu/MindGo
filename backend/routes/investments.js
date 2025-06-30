@@ -22,5 +22,9 @@ router.delete('/watchlist/clear-all', investmentController.clearAllWatchlist);
 router.delete('/watchlist/:id', investmentController.removeFromWatchlist);
 router.get('/historical/:symbol', investmentController.getHistoricalData);
 router.get('/market-overview', investmentController.getMarketOverview);
+router.get('/news/:symbol', investmentController.getStockNews);
+router.get('/financials/:symbol', investmentController.getStockFinancials);
+router.get('/watchlist/ai-summary', investmentController.getWatchlistAISummary);
+router.get('/search', investmentController.searchStocks);
 
 module.exports = router; 
