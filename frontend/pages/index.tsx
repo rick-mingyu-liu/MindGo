@@ -387,7 +387,7 @@ export default function Dashboard() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Welcome Message for New Users */}
           {isNewUser && (
-            <Card className="mb-8 border-blue-200 bg-blue-50">
+            <Card className="mb-8 border-blue-200 bg-blue-50 transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
@@ -432,7 +432,7 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
@@ -447,7 +447,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
@@ -462,7 +462,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Net Income</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
@@ -477,7 +477,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
                 <Target className="h-4 w-4 text-orange-600" />
@@ -495,7 +495,7 @@ export default function Dashboard() {
           {summary && summary.monthlyBreakdown && summary.monthlyBreakdown.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Monthly Trend Chart */}
-              <Card className="aurora-card">
+              <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
@@ -619,7 +619,7 @@ export default function Dashboard() {
               </Card>
 
               {/* Category Breakdown */}
-              <Card className="aurora-card">
+              <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
                 <CardHeader>
                   <CardTitle>Spending by Category</CardTitle>
                   <CardDescription>
@@ -672,7 +672,7 @@ export default function Dashboard() {
               </Card>
             </div>
           ) : (
-            <Card className="mb-8">
+            <Card className="mb-8 transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardContent className="pt-6">
                 <div className="text-center py-8">
                   <Info className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -692,7 +692,7 @@ export default function Dashboard() {
           {/* Goals and Watchlist */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Savings Goals */}
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -747,7 +747,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Investment Watchlist */}
-            <Card>
+            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -797,7 +797,7 @@ export default function Dashboard() {
           </div>
 
           {/* Recent Transactions */}
-          <Card className="mb-8 mt-8">
+          <Card className="mb-8 mt-8 transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
