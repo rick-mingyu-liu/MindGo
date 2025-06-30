@@ -43,7 +43,7 @@ export default function Investments() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const [detailModalOpenId, setDetailModalOpenId] = useState<number | null>(null)
-  
+
   useEffect(() => {
     fetchWatchlist()
   }, [])
@@ -95,12 +95,12 @@ export default function Investments() {
 
   const confirmDelete = async () => {
     if (pendingDeleteId == null) return
-    try {
+      try {
       await api.delete(`/investments/watchlist/${pendingDeleteId}`)
-      toast.success('Stock removed from watchlist!')
-      fetchWatchlist()
-    } catch (error) {
-      console.error('Error removing stock:', error)
+        toast.success('Stock removed from watchlist!')
+        fetchWatchlist()
+      } catch (error) {
+        console.error('Error removing stock:', error)
     } finally {
       setDeleteDialogOpen(false)
       setPendingDeleteId(null)
@@ -193,7 +193,7 @@ export default function Investments() {
                     </DialogHeader>
                     <div className="space-y-4">
                       <Label htmlFor="add-search">Search by Symbol or Company Name</Label>
-                      <Input
+                        <Input
                         id="add-search"
                         placeholder="Type symbol or company name..."
                         value={searchAddQuery}
@@ -213,7 +213,7 @@ export default function Investments() {
                               <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
                             </div>
                           ))}
-                        </div>
+                      </div>
                       )}
                       <div className="flex gap-2 mt-4">
                         <Button
@@ -347,7 +347,7 @@ export default function Investments() {
                             >
                               <Button variant="ghost" size="sm">
                                 <Eye className="w-4 h-4" />
-                              </Button>
+                            </Button>
                             </StockDetailModal>
                             <Button
                               variant="ghost"

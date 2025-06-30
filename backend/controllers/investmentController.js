@@ -288,23 +288,30 @@ const investmentController = {
     try {
       const { symbol } = req.params;
       const finnhubData = await finnhubService.getFinancials(symbol);
-      console.log('Raw Finnhub financials for', symbol, JSON.stringify(finnhubData, null, 2)); // Debug log
-      // Finnhub returns { data: [ ... ], symbol: ... }
-      // We'll split by periodType (FY = annual, Q = quarterly)
       const annualReports = [];
-      const quarterlyReports = [];
       if (finnhubData && Array.isArray(finnhubData.data)) {
         for (const report of finnhubData.data) {
           const period = report.period;
-          // Find the main financials object (first in report.report)
           const main = report.report && Array.isArray(report.report) && report.report[0] ? report.report[0] : {};
+          // Construct SEC filing URL if possible
+          let filingUrl = null;
+          if (report.cik && report.accessNumber) {
+            const cik = report.cik.replace(/^0+/, ''); // Remove leading zeros
+            const accessNumberNoDash = report.accessNumber.replace(/-/g, '');
+            filingUrl = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessNumberNoDash}/${report.accessNumber}-index.htm`;
+          }
           const row = {
             period,
-            revenue: main['TotalRevenue'] || main['Revenue'] || 'N/A',
+            revenue: main['TotalRevenue'] || main['Revenue'] || main['Revenues'] || 'N/A',
             netIncome: main['NetIncome'] || 'N/A',
             eps: main['EPS'] || 'N/A',
             assets: main['TotalAssets'] || 'N/A',
             liabilities: main['TotalLiabilities'] || 'N/A',
+            form: report.form,
+            filedDate: report.filedDate,  
+            accessNumber: report.accessNumber,
+            cik: report.cik,
+            filingUrl
           };
           if (report.form === '10-K' || report.periodType === 'FY') {
             annualReports.push(row);
@@ -316,8 +323,7 @@ const investmentController = {
       res.json({
         symbol: symbol.toUpperCase(),
         financials: {
-          annualReports,
-          quarterlyReports
+          annualReports
         }
       });
     } catch (error) {

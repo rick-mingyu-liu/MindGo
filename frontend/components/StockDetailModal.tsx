@@ -439,9 +439,8 @@ export function StockDetailModal({
 }
 
 function FinancialsTable({ financials }: { financials: any }) {
-  const [type, setType] = React.useState<'annual' | 'quarterly'>('annual')
-  // Assume financials.annualReports and financials.quarterlyReports are arrays
-  const reports = type === 'annual' ? financials.annualReports || [] : financials.quarterlyReports || []
+  // Only show annual reports
+  const reports = financials.annualReports || []
   const columns = [
     { key: 'period', label: 'Period' },
     { key: 'revenue', label: 'Revenue' },
@@ -449,23 +448,10 @@ function FinancialsTable({ financials }: { financials: any }) {
     { key: 'eps', label: 'EPS' },
     { key: 'assets', label: 'Assets' },
     { key: 'liabilities', label: 'Liabilities' },
+    { key: 'filingUrl', label: 'Filing' },
   ]
   return (
     <div>
-      <div className="flex gap-2 mb-4">
-        <button
-          className={`px-3 py-1 rounded ${type === 'annual' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-800'}`}
-          onClick={() => setType('annual')}
-        >
-          Annual
-        </button>
-        <button
-          className={`px-3 py-1 rounded ${type === 'quarterly' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-800'}`}
-          onClick={() => setType('quarterly')}
-        >
-          Quarterly
-        </button>
-      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs border">
           <thead>
@@ -483,7 +469,16 @@ function FinancialsTable({ financials }: { financials: any }) {
                 <tr key={idx} className="border-b">
                   {columns.map(col => (
                     <td key={col.key} className="px-2 py-1">
-                      {row[col.key] !== undefined ? row[col.key] : 'N/A'}
+                      {col.key === 'filingUrl' ? (
+                        row.filingUrl ? (
+                          <a href={row.filingUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 flex items-center gap-1">
+                            View Filing
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-10 10m0 0h7m-7 0v-7" /></svg>
+                          </a>
+                        ) : 'N/A'
+                      ) : (
+                        row[col.key] !== undefined ? row[col.key] : 'N/A'
+                      )}
                     </td>
                   ))}
                 </tr>
