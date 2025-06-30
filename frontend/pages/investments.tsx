@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut } from 'lucide-react'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -155,6 +155,13 @@ export default function Investments() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/watchlist')}
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  Enhanced View
+                </Button>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -237,6 +244,26 @@ export default function Investments() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Info Section */}
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-1">
+                <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                  <Info className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                  Two Watchlist Views Available
+                </h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Basic View:</strong> Simple table with essential stock data. 
+                  <strong className="ml-2">Enhanced View:</strong> Detailed analysis, financial reports, news, and comprehensive metrics.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Search */}
           <div className="mb-6">
             <div className="relative max-w-md">

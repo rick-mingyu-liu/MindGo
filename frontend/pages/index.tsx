@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Eye,
   Edit,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Star
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api, logout } from '@/utils/api'
@@ -356,6 +357,13 @@ export default function Dashboard() {
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                   Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/watchlist')}
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  Watchlist
                 </Button>
                 <Button
                   variant="outline"
@@ -826,7 +834,7 @@ export default function Dashboard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push('/investments')}
+                    onClick={() => router.push('/watchlist')}
                   >
                     View All
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -862,7 +870,7 @@ export default function Dashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push('/investments')}
+                      onClick={() => router.push('/watchlist')}
                     >
                       Add Your First Stock
                     </Button>
