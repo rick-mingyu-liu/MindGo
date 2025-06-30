@@ -432,7 +432,7 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="aurora-card aurora-bg">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
@@ -447,7 +447,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="aurora-card aurora-bg">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
@@ -462,7 +462,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="aurora-card aurora-bg">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Net Income</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
@@ -477,7 +477,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="aurora-card aurora-bg">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
                 <Target className="h-4 w-4 text-orange-600" />
@@ -507,7 +507,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg aurora-particles">
+                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg">
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
