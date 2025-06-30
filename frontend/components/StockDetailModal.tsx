@@ -442,7 +442,7 @@ function FinancialsTable({ financials }: { financials: any }) {
   // Only show annual reports
   const reports = financials.annualReports || []
   const columns = [
-    { key: 'period', label: 'Period' },
+    { key: 'period', label: 'Year' },
     { key: 'revenue', label: 'Revenue' },
     { key: 'netIncome', label: 'Net Income' },
     { key: 'eps', label: 'EPS' },
@@ -450,6 +450,12 @@ function FinancialsTable({ financials }: { financials: any }) {
     { key: 'liabilities', label: 'Liabilities' },
     { key: 'filingUrl', label: 'Filing' },
   ]
+  const getYear = (period: any) => {
+    if (!period) return 'N/A';
+    // Try to extract year from YYYY-MM-DD or YYYYMMDD or YYYY
+    const match = String(period).match(/(\d{4})/);
+    return match ? match[1] : 'N/A';
+  }
   return (
     <div>
       <div className="overflow-x-auto">
@@ -476,8 +482,10 @@ function FinancialsTable({ financials }: { financials: any }) {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-10 10m0 0h7m-7 0v-7" /></svg>
                           </a>
                         ) : 'N/A'
+                      ) : col.key === 'period' ? (
+                        getYear(row.period)
                       ) : (
-                        row[col.key] !== undefined ? row[col.key] : 'N/A'
+                        row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : 'N/A'
                       )}
                     </td>
                   ))}

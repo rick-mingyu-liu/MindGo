@@ -289,41 +289,67 @@ const investmentController = {
       const { symbol } = req.params;
       const finnhubData = await finnhubService.getFinancials(symbol);
       const annualReports = [];
+      const quarterlyReports = [];
+  
       if (finnhubData && Array.isArray(finnhubData.data)) {
         for (const report of finnhubData.data) {
           const period = report.period;
-          const main = report.report && Array.isArray(report.report) && report.report[0] ? report.report[0] : {};
-          // Construct SEC filing URL if possible
-          let filingUrl = null;
-          if (report.cik && report.accessNumber) {
-            const cik = report.cik.replace(/^0+/, ''); // Remove leading zeros
-            const accessNumberNoDash = report.accessNumber.replace(/-/g, '');
-            filingUrl = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessNumberNoDash}/${report.accessNumber}-index.htm`;
+          const filingUrl = (report.cik && report.accessNumber)
+            ? `https://www.sec.gov/Archives/edgar/data/${report.cik.replace(/^0+/, '')}/${report.accessNumber.replace(/-/g, '')}/${report.accessNumber}-index.htm`
+            : null;
+  
+          const reportData = report.report || {};
+          const bs = reportData.bs || {};
+          const ic = reportData.ic || {};
+          const cf = reportData.cf || {};
+  
+          // Log what you're seeing from Finnhub
+          console.log('--- Report for period:', period);
+          console.log('BS:', bs);
+          console.log('IC:', ic);
+          console.log('CF:', cf);
+  
+          // Fallback for period/year
+          let reportPeriod = report.period;
+          if (!reportPeriod) {
+            reportPeriod = report.filedDate || report.endDate || report.startDate || null;
+          }
+          // Try to extract year if reportPeriod is a date string
+          if (reportPeriod && typeof reportPeriod === 'string') {
+            const match = reportPeriod.match(/(\d{4})/);
+            reportPeriod = match ? match[1] : reportPeriod;
           }
           const row = {
-            period,
-            revenue: main['TotalRevenue'] || main['Revenue'] || main['Revenues'] || 'N/A',
-            netIncome: main['NetIncome'] || 'N/A',
-            eps: main['EPS'] || 'N/A',
-            assets: main['TotalAssets'] || 'N/A',
-            liabilities: main['TotalLiabilities'] || 'N/A',
+            period: reportPeriod,
+            revenue: ic['Revenue'] ?? ic['Revenues'] ?? cf['Revenue'] ?? null,
+            netIncome: ic['NetIncomeLoss'] ?? ic['NetIncome'] ?? cf['NetIncomeLoss'] ?? null,
+            eps: ic['EPS'] ?? ic['EarningsPerShareBasic'] ?? ic['EarningsPerShareDiluted'] ?? null,
+            assets: bs['Assets'] ?? null,
+            liabilities: bs['Liabilities'] ?? null,
             form: report.form,
-            filedDate: report.filedDate,  
+            filedDate: report.filedDate,
             accessNumber: report.accessNumber,
             cik: report.cik,
-            filingUrl
+            filingUrl: (report.cik && report.accessNumber)
+              ? `https://www.sec.gov/Archives/edgar/data/${report.cik.replace(/^0+/, '')}/${report.accessNumber.replace(/-/g, '')}/${report.accessNumber}-index.htm`
+              : null
           };
+  
           if (report.form === '10-K' || report.periodType === 'FY') {
             annualReports.push(row);
           } else if (report.form === '10-Q' || report.periodType === 'QTR') {
             quarterlyReports.push(row);
           }
         }
+      } else {
+        console.warn('No data returned from Finnhub for:', symbol);
       }
+  
       res.json({
         symbol: symbol.toUpperCase(),
         financials: {
-          annualReports
+          annualReports,
+          quarterlyReports
         }
       });
     } catch (error) {
@@ -331,6 +357,7 @@ const investmentController = {
       res.status(500).json({ error: 'Failed to get stock financials' });
     }
   },
+
 
   // Get AI summary for watchlist (placeholder, to be implemented)
   async getWatchlistAISummary(req, res) {
