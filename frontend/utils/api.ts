@@ -94,6 +94,7 @@ export const investmentAPI = {
   getStockNews: (symbol: string) => api.get(`/investments/news/${symbol}`),
   getStockFinancials: (symbol: string) => api.get(`/investments/financials/${symbol}`),
   getMarketOverview: () => api.get('/investments/market-overview'),
+  getStockAnalysis: (symbol: string) => api.get(`/investments/analysis/${symbol}`),
 }
 
 export { api } 

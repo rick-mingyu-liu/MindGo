@@ -26,5 +26,6 @@ router.get('/news/:symbol', investmentController.getStockNews);
 router.get('/financials/:symbol', investmentController.getStockFinancials);
 router.get('/watchlist/ai-summary', investmentController.getWatchlistAISummary);
 router.get('/search', investmentController.searchStocks);
+router.get('/analysis/:symbol', investmentController.getStockAnalysis);
 
 module.exports = router; 

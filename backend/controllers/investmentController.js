@@ -444,7 +444,26 @@ const investmentController = {
       console.error('Search stocks error:', error);
       res.status(500).json({ error: 'Failed to search stocks' });
     }
-  }
+  },
+
+  // Get key indicators and recommendation trends for a stock
+  async getStockAnalysis(req, res) {
+    try {
+      const { symbol } = req.params;
+      // Fetch key indicators (e.g., SMA, EMA, RSI, MACD)
+      const indicators = await finnhubService.getKeyIndicators(symbol);
+      // Fetch recommendation trends
+      const recommendations = await finnhubService.getRecommendationTrends(symbol);
+      res.json({
+        symbol: symbol.toUpperCase(),
+        indicators,
+        recommendations
+      });
+    } catch (error) {
+      console.error('Get stock analysis error:', error);
+      res.status(500).json({ error: 'Failed to get stock analysis' });
+    }
+  },
 };
 
 module.exports = investmentController; 

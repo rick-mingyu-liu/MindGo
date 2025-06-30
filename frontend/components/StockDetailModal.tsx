@@ -31,6 +31,7 @@ import {
 import { formatCurrency } from '@/utils/formatters'
 import { investmentAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 interface StockDetailModalProps {
   symbol: string
@@ -122,6 +123,9 @@ export function StockDetailModal({
   const [errorFinancials, setErrorFinancials] = useState('')
   const [errorMarket, setErrorMarket] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
+  const [analysis, setAnalysis] = useState<any>(null)
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+  const [errorAnalysis, setErrorAnalysis] = useState('')
 
   // Fetch stock data when modal opens
   useEffect(() => {
@@ -130,6 +134,7 @@ export function StockDetailModal({
       fetchNews()
       fetchFinancials()
       fetchMarketOverview()
+      fetchAnalysis()
     }
   }, [isOpen, symbol])
 
@@ -185,6 +190,20 @@ export function StockDetailModal({
       setMarketOverview(null)
     } finally {
       setLoadingMarket(false)
+    }
+  }
+
+  const fetchAnalysis = async () => {
+    setLoadingAnalysis(true)
+    setErrorAnalysis('')
+    try {
+      const res = await investmentAPI.getStockAnalysis(symbol)
+      setAnalysis(res.data || null)
+    } catch (err) {
+      setErrorAnalysis('Failed to load analysis')
+      setAnalysis(null)
+    } finally {
+      setLoadingAnalysis(false)
     }
   }
 
@@ -409,25 +428,77 @@ export function StockDetailModal({
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-4">
+            {/* Key Indicators Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  Market Overview
+                  <Target className="w-5 h-5" />
+                  Key Indicators
                 </CardTitle>
                 <CardDescription>
-                  Market summary and movers
+                  Latest technical indicators (SMA, EMA, RSI, MACD)
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loadingMarket ? (
+                {loadingAnalysis ? (
                   <div className="text-center py-8">Loading...</div>
-                ) : errorMarket ? (
-                  <div className="text-center py-8 text-red-600">{errorMarket}</div>
-                ) : marketOverview ? (
-                  <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(marketOverview, null, 2)}</pre>
+                ) : errorAnalysis ? (
+                  <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
+                ) : analysis && analysis.indicators ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">SMA</p>
+                      <p className="font-bold">{analysis.indicators.sma ?? 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">EMA</p>
+                      <p className="font-bold">{analysis.indicators.ema ?? 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">RSI</p>
+                      <p className="font-bold">{analysis.indicators.rsi ?? 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">MACD</p>
+                      <p className="font-bold">{analysis.indicators.macd ?? 'N/A'}</p>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No market overview available.</div>
+                  <div className="text-center py-8 text-muted-foreground">No indicator data available.</div>
+                )}
+              </CardContent>
+            </Card>
+            {/* Recommendation Trends Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Recommendation Trends
+                </CardTitle>
+                <CardDescription>
+                  Analyst recommendations over time
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAnalysis ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : errorAnalysis ? (
+                  <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
+                ) : analysis && analysis.recommendations && analysis.recommendations.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={analysis.recommendations} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="period" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="buy" fill="#22c55e" name="Buy" />
+                      <Bar dataKey="hold" fill="#f59e0b" name="Hold" />
+                      <Bar dataKey="sell" fill="#ef4444" name="Sell" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No recommendation data available.</div>
                 )}
               </CardContent>
             </Card>
