@@ -45,7 +45,7 @@ export default function Register() {
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
       
-      toast.success('Registration successful! Welcome to Finora.')
+      toast.success('Registration successful! Welcome to MindGo.')
       router.push('/')
       
     } catch (error) {
@@ -59,34 +59,34 @@ export default function Register() {
   return (
     <>
       <Head>
-        <title>Register - Finora</title>
-        <meta name="description" content="Create your Finora account" />
+        <title>Register - MindGo</title>
+        <meta name="description" content="Create your MindGo account" />
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
+      <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="mx-auto mb-4 flex justify-center">
               <Image
                 src="/Finora.png"
-                alt="Finora Logo"
+                alt="MindGo Logo"
                 width={120}
                 height={120}
                 className="h-16 w-auto aurora-glow"
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white aurora-text">Finora</h1>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            <h1 className="text-3xl font-bold text-green-700 aurora-text">MindGo</h1>
+            <p className="mt-2 text-sm text-gray-600">
               Create your account
             </p>
           </div>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <Card className="shadow-xl aurora-card">
+          <Card className="shadow-xl bg-white border border-gray-200">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center">Create account</CardTitle>
+              <CardTitle className="text-2xl text-center text-green-700">Create account</CardTitle>
               <CardDescription className="text-center">
                 Enter your information to create your account
               </CardDescription>
@@ -101,7 +101,7 @@ export default function Register() {
                       <Input
                         id="first_name"
                         placeholder="First name"
-                        className="pl-10"
+                        className="pl-10 bg-gray-50 border-gray-300 text-gray-900"
                         {...register('first_name', {
                           required: 'First name is required',
                           minLength: {
@@ -123,7 +123,7 @@ export default function Register() {
                       <Input
                         id="last_name"
                         placeholder="Last name"
-                        className="pl-10"
+                        className="pl-10 bg-gray-50 border-gray-300 text-gray-900"
                         {...register('last_name', {
                           required: 'Last name is required',
                           minLength: {
@@ -147,7 +147,7 @@ export default function Register() {
                       id="email"
                       type="email"
                       placeholder="Enter your email"
-                      className="pl-10"
+                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900"
                       {...register('email', {
                         required: 'Email is required',
                         pattern: {
@@ -170,7 +170,7 @@ export default function Register() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Create a password"
-                      className="pl-10 pr-10"
+                      className="pl-10 pr-10 bg-gray-50 border-gray-300 text-gray-900"
                       {...register('password', {
                         required: 'Password is required',
                         minLength: {
@@ -206,7 +206,7 @@ export default function Register() {
                       id="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="Confirm your password"
-                      className="pl-10 pr-10"
+                      className="pl-10 pr-10 bg-gray-50 border-gray-300 text-gray-900"
                       {...register('confirmPassword', {
                         required: 'Please confirm your password',
                         validate: (value) =>
@@ -232,7 +232,7 @@ export default function Register() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
                   {loading ? 'Creating account...' : 'Create account'}
                 </Button>
               </form>
@@ -240,10 +240,10 @@ export default function Register() {
               <div className="mt-6">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t" />
+                    <div className="w-full border-t border-yellow-400" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
+                    <span className="bg-background px-2 text-yellow-700">
                       Already have an account?
                     </span>
                   </div>
@@ -251,7 +251,7 @@ export default function Register() {
 
                 <Button
                   variant="outline"
-                  className="w-full mt-4"
+                  className="w-full mt-4 border-yellow-400 text-yellow-700"
                   onClick={() => router.push('/login')}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />

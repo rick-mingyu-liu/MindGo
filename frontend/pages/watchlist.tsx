@@ -12,7 +12,7 @@ export default function WatchlistPage() {
   return (
     <>
       <Head>
-        <title>Stock Watchlist - Finora</title>
+        <title>Stock Watchlist - MindGo</title>
         <meta name="description" content="Track your favorite stocks and get detailed financial information" />
       </Head>
 
@@ -47,7 +47,7 @@ export default function WatchlistPage() {
                   <div className="aurora-logo">
                     <img 
                       src="/Finora.png" 
-                      alt="Finora" 
+                      alt="MindGo" 
                       className="h-8 w-auto"
                     />
                   </div>

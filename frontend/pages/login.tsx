@@ -54,24 +54,24 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - Finora</title>
-        <meta name="description" content="Sign in to your Finora account" />
+        <title>Login - MindGo</title>
+        <meta name="description" content="Sign in to your MindGo account" />
       </Head>
 
-      <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 dynamic-bg">
+      <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-white">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="mx-auto mb-4 flex justify-center">
               <Image
-                src="/Finora.png"
-                alt="Finora Logo"
-                width={120}
-                height={120}
-                className="h-16 w-auto aurora-glow"
+                src="/MindGo.png"
+                alt="MindGo Logo"
+                width={160}
+                height={160}
+                className="h-24 w-auto aurora-glow"
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white aurora-text">Finora</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white aurora-text">MindGo</h1>
             <button
               onClick={() => setShowIntro(true)}
               className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer transition-colors"
@@ -82,9 +82,9 @@ export default function Login() {
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <Card className="shadow-xl aurora-card">
+          <Card className="shadow-xl bg-white border border-gray-200">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
+              <CardTitle className="text-2xl text-center text-green-700">Welcome back</CardTitle>
               <CardDescription className="text-center">
                 Enter your credentials to access your account
               </CardDescription>
@@ -99,7 +99,7 @@ export default function Login() {
                       id="email"
                       type="email"
                       placeholder="Enter your email"
-                      className="pl-10"
+                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900"
                       {...register('email', {
                         required: 'Email is required',
                         pattern: {
@@ -122,7 +122,7 @@ export default function Login() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password"
-                      className="pl-10 pr-10"
+                      className="pl-10 pr-10 bg-gray-50 border-gray-300 text-gray-900"
                       {...register('password', {
                         required: 'Password is required',
                         minLength: {
@@ -150,7 +150,7 @@ export default function Login() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
                   {loading ? 'Signing in...' : 'Sign in'}
                 </Button>
               </form>
@@ -158,7 +158,7 @@ export default function Login() {
               <div className="mt-6">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t" />
+                    <div className="w-full border-t border-yellow-400" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
@@ -169,7 +169,7 @@ export default function Login() {
 
                 <Button
                   variant="outline"
-                  className="w-full mt-4"
+                  className="w-full mt-4 border-yellow-400 text-yellow-700"
                   onClick={() => router.push('/register')}
                 >
                   Create new account
@@ -180,7 +180,7 @@ export default function Login() {
               {/* Demo credentials */}
               <div className="mt-6 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary">Demo Account</Badge>
+                  <Badge variant="secondary" className="bg-yellow-400 text-yellow-900">Demo Account</Badge>
                 </div>
                 <div className="space-y-1 text-sm">
                   <p className="text-muted-foreground">
@@ -198,18 +198,18 @@ export default function Login() {
 
       {/* Who are we Modal */}
       <Dialog open={showIntro} onOpenChange={setShowIntro}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-yellow-400 shadow-2xl text-gray-900">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Image
-                src="/Finora.png"
-                alt="Finora Logo"
+                src="/MindGo.png"
+                alt="MindGo Logo"
                 width={40}
                 height={40}
                 className="h-10 w-auto"
               />
               <div>
-                <h2 className="text-2xl font-bold">Welcome to Finora</h2>
+                <h2 className="text-2xl font-bold text-green-700">Welcome to MindGo</h2>
                 <p className="text-sm text-muted-foreground">Your AI-Powered Personal Finance Companion</p>
               </div>
             </DialogTitle>
@@ -218,7 +218,7 @@ export default function Login() {
           <div className="space-y-6">
             {/* Mission Statement */}
             <div className="text-center py-4">
-              <h3 className="text-xl font-semibold mb-2">Our Mission</h3>
+              <h3 className="text-xl font-semibold mb-2 text-green-700">Our Mission</h3>
               <p className="text-muted-foreground">
                 To democratize financial intelligence by providing everyone with AI-powered tools 
                 to make smarter financial decisions, track their progress, and achieve their goals.
@@ -233,7 +233,7 @@ export default function Login() {
                     <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Smart Investment Tracking</h4>
+                    <h4 className="font-semibold text-green-700">Smart Investment Tracking</h4>
                     <p className="text-sm text-muted-foreground">
                       Real-time stock analysis, K-charts, and AI-powered investment insights to help you make informed decisions.
                     </p>
@@ -245,7 +245,7 @@ export default function Login() {
                     <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Goal Setting & Tracking</h4>
+                    <h4 className="font-semibold text-green-700">Goal Setting & Tracking</h4>
                     <p className="text-sm text-muted-foreground">
                       Set financial goals, track your progress, and get personalized recommendations to stay on target.
                     </p>
@@ -257,7 +257,7 @@ export default function Login() {
                     <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Expense Analytics</h4>
+                    <h4 className="font-semibold text-green-700">Expense Analytics</h4>
                     <p className="text-sm text-muted-foreground">
                       Comprehensive spending analysis with AI-powered insights to identify saving opportunities.
                     </p>
@@ -271,7 +271,7 @@ export default function Login() {
                     <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">AI Financial Planning</h4>
+                    <h4 className="font-semibold text-green-700">AI Financial Planning</h4>
                     <p className="text-sm text-muted-foreground">
                       Get personalized financial plans, budget recommendations, and investment advice powered by AI.
                     </p>
@@ -283,7 +283,7 @@ export default function Login() {
                     <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Secure & Private</h4>
+                    <h4 className="font-semibold text-green-700">Secure & Private</h4>
                     <p className="text-sm text-muted-foreground">
                       Bank-level security with end-to-end encryption to keep your financial data safe and private.
                     </p>
@@ -295,7 +295,7 @@ export default function Login() {
                     <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">Community Driven</h4>
+                    <h4 className="font-semibold text-green-700">Community Driven</h4>
                     <p className="text-sm text-muted-foreground">
                       Join a community of financially conscious individuals sharing insights and strategies.
                     </p>
@@ -307,7 +307,7 @@ export default function Login() {
             {/* Call to Action */}
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                Ready to take control of your financial future? Start your journey with Finora today.
+                Ready to take control of your financial future? Start your journey with MindGo today.
               </p>
               <div className="flex gap-3 justify-center">
                 <Button onClick={() => router.push('/register')}>

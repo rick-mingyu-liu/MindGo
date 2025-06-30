@@ -2,10 +2,14 @@ import type { AppProps } from 'next/app'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import '@/styles/globals.css'
+import Head from 'next/head'
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider>
+      <Head>
+        <link rel="icon" href="/logo_pure.jpg" />
+      </Head>
       <Component {...pageProps} />
       <Toaster
         position="top-right"
