@@ -32,7 +32,7 @@ import {
 import { formatCurrency } from '@/utils/formatters'
 import { investmentAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { BarChart, Bar, Legend, ResponsiveContainer, CartesianGrid, XAxis as RechartsXAxis, YAxis as RechartsYAxis, Tooltip, LineChart, Line } from 'recharts';
 
 interface StockDetailModalProps {
   symbol: string
@@ -127,6 +127,9 @@ export function StockDetailModal({
   const [analysis, setAnalysis] = useState<any>(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
   const [errorAnalysis, setErrorAnalysis] = useState('')
+  const [historicalData, setHistoricalData] = useState<any>(null)
+  const [loadingHistorical, setLoadingHistorical] = useState(false)
+  const [errorHistorical, setErrorHistorical] = useState('')
 
   // Fetch stock data when modal opens
   useEffect(() => {
@@ -136,6 +139,7 @@ export function StockDetailModal({
       fetchFinancials()
       fetchMarketOverview()
       fetchAnalysis()
+      fetchHistoricalData()
     }
   }, [isOpen, symbol])
 
@@ -205,6 +209,20 @@ export function StockDetailModal({
       setAnalysis(null)
     } finally {
       setLoadingAnalysis(false)
+    }
+  }
+
+  const fetchHistoricalData = async () => {
+    setLoadingHistorical(true)
+    setErrorHistorical('')
+    try {
+      const res = await investmentAPI.getStockHistoricalData(symbol)
+      setHistoricalData(res.data || null)
+    } catch (err) {
+      setErrorHistorical('Failed to load historical data')
+      setHistoricalData(null)
+    } finally {
+      setLoadingHistorical(false)
     }
   }
 
@@ -350,6 +368,35 @@ export function StockDetailModal({
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Stock Trend Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5" />
+                      Price Trend (1 Month)
+                    </CardTitle>
+                    <CardDescription>
+                      Historical price movement for {symbol}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingHistorical ? (
+                      <div className="text-center py-8">Loading...</div>
+                    ) : errorHistorical ? (
+                      <div className="text-center py-8 text-red-600">{errorHistorical}</div>
+                    ) : historicalData && historicalData.data && historicalData.data.o && historicalData.data.o.length > 0 ? (
+                      <div className="h-80">
+                        <CandlestickChart 
+                          data={historicalData.data}
+                          symbol={symbol}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">No historical data available.</div>
+                    )}
+                  </CardContent>
+                </Card>
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">No data available.</div>
@@ -452,8 +499,8 @@ export function StockDetailModal({
                   <ResponsiveContainer width="100%" height={250}>
                     <BarChart data={analysis.recommendations} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis allowDecimals={false} />
+                      <RechartsXAxis dataKey="period" />
+                      <RechartsYAxis />
                       <Tooltip />
                       <Legend />
                       <Bar dataKey="buy" fill="#22c55e" name="Buy" />
@@ -620,4 +667,70 @@ function FinancialsTable({ financials }: { financials: any }) {
       </div>
     </div>
   )
-} 
+}
+
+// OHLC Chart Component
+const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
+  // Transform Finnhub data to the format expected by Recharts
+  const chartData = data.t.map((timestamp: number, index: number) => ({
+    date: new Date(timestamp * 1000).toLocaleDateString(),
+    open: data.o[index],
+    high: data.h[index],
+    low: data.l[index],
+    close: data.c[index],
+    volume: data.v ? data.v[index] : 0
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+        <RechartsXAxis 
+          dataKey="date" 
+          tick={{ fontSize: 12 }}
+          tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        />
+        <RechartsYAxis 
+          tick={{ fontSize: 12 }}
+          tickFormatter={(value) => `$${value.toFixed(2)}`}
+        />
+        <Tooltip 
+          formatter={(value: any, name: string) => [`$${value.toFixed(2)}`, name]}
+          labelFormatter={(label) => new Date(label).toLocaleDateString()}
+        />
+        <Line 
+          type="monotone" 
+          dataKey="open" 
+          stroke="#3b82f6" 
+          strokeWidth={2}
+          dot={false}
+          name="Open"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="high" 
+          stroke="#22c55e" 
+          strokeWidth={2}
+          dot={false}
+          name="High"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="low" 
+          stroke="#ef4444" 
+          strokeWidth={2}
+          dot={false}
+          name="Low"
+        />
+        <Line 
+          type="monotone" 
+          dataKey="close" 
+          stroke="#f59e0b" 
+          strokeWidth={2}
+          dot={false}
+          name="Close"
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};

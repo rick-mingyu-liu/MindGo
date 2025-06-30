@@ -1,5 +1,6 @@
 const db = require('../db/connection');
 const finnhubService = require('../services/finnhubService');
+const freeStockDataService = require('../services/freeStockDataService');
 
 const investmentController = {
   // Get stock snapshot
@@ -178,35 +179,33 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      // Map period to Finnhub resolution and time range
-      const now = Math.floor(Date.now() / 1000);
-      let from;
-      let resolution = 'D';
+      // Map period to Yahoo Finance format
+      let yahooPeriod = '1mo';
       switch (period) {
         case '1d':
-          from = now - 60 * 60 * 24;
-          resolution = '5';
+          yahooPeriod = '1d';
           break;
         case '5d':
-          from = now - 60 * 60 * 24 * 5;
-          resolution = '15';
+          yahooPeriod = '5d';
           break;
         case '1m':
-          from = now - 60 * 60 * 24 * 30;
+          yahooPeriod = '1mo';
           break;
         case '3m':
-          from = now - 60 * 60 * 24 * 90;
+          yahooPeriod = '3mo';
           break;
         case '6m':
-          from = now - 60 * 60 * 24 * 180;
+          yahooPeriod = '6mo';
           break;
         case '1y':
-          from = now - 60 * 60 * 24 * 365;
+          yahooPeriod = '1y';
           break;
         default:
-          from = now - 60 * 60 * 24 * 30;
+          yahooPeriod = '1mo';
       }
-      const data = await finnhubService.getHistoricalData(symbol, resolution, from, now);
+
+      // Use free data service instead of Finnhub
+      const data = await freeStockDataService.getHistoricalData(symbol, yahooPeriod);
 
       res.json({
         symbol: symbol.toUpperCase(),

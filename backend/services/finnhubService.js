@@ -1,10 +1,9 @@
-
-
 const axios = require('axios');
 
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_TOKEN = process.env.FINNHUB_TOKEN;
+const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'demo'; // Use demo key as fallback
 
 class FinnhubService {
   constructor() {
@@ -52,16 +51,71 @@ class FinnhubService {
     }
   }
 
-  // Get historical data for a stock
+  // Get historical data for a stock (try Alpha Vantage as fallback)
   async getHistoricalData(symbol, resolution = 'D', from, to) {
     try {
+      // First try Finnhub
       const response = await axios.get(`${FINNHUB_BASE_URL}/stock/candle`, {
         params: { symbol, resolution, from, to, token: FINNHUB_API_KEY }
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching historical data from Finnhub:', error.response?.data || error.message);
-      throw new Error('Failed to fetch historical data');
+      console.log('Finnhub historical data failed, trying Alpha Vantage...');
+      // Fallback to Alpha Vantage
+      return await this.getAlphaVantageHistoricalData(symbol);
+    }
+  }
+
+  // Get historical data from Alpha Vantage (free alternative)
+  async getAlphaVantageHistoricalData(symbol) {
+    try {
+      const response = await axios.get('https://www.alphavantage.co/query', {
+        params: {
+          function: 'TIME_SERIES_DAILY',
+          symbol: symbol,
+          apikey: ALPHA_VANTAGE_API_KEY,
+          outputsize: 'compact' // Last 100 data points
+        }
+      });
+
+      if (response.data['Error Message']) {
+        throw new Error(response.data['Error Message']);
+      }
+
+      if (response.data['Note']) {
+        throw new Error('API rate limit exceeded: ' + response.data['Note']);
+      }
+
+      const timeSeriesData = response.data['Time Series (Daily)'];
+      if (!timeSeriesData) {
+        throw new Error('No data available');
+      }
+
+      // Transform Alpha Vantage data to match Finnhub format
+      const dates = Object.keys(timeSeriesData).sort();
+      const data = {
+        t: [], // timestamps
+        o: [], // open
+        h: [], // high
+        l: [], // low
+        c: [], // close
+        v: []  // volume
+      };
+
+      dates.forEach(date => {
+        const dayData = timeSeriesData[date];
+        data.t.push(new Date(date).getTime() / 1000); // Convert to Unix timestamp
+        data.o.push(parseFloat(dayData['1. open']));
+        data.h.push(parseFloat(dayData['2. high']));
+        data.l.push(parseFloat(dayData['3. low']));
+        data.c.push(parseFloat(dayData['4. close']));
+        data.v.push(parseInt(dayData['5. volume']));
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching historical data from Alpha Vantage:', error.message);
+      throw new Error('Failed to fetch historical data from Alpha Vantage');
     }
   }
 

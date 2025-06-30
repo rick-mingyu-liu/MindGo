@@ -95,6 +95,7 @@ export const investmentAPI = {
   getStockFinancials: (symbol: string) => api.get(`/investments/financials/${symbol}`),
   getMarketOverview: () => api.get('/investments/market-overview'),
   getStockAnalysis: (symbol: string) => api.get(`/investments/analysis/${symbol}`),
+  getStockHistoricalData: (symbol: string, period: string = '1m') => api.get(`/investments/historical/${symbol}?period=${period}`),
 }
 
 export { api } 
