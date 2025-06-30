@@ -353,7 +353,6 @@ export default function Dashboard() {
                   variant="outline"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="aurora-border"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                   Refresh
@@ -361,7 +360,6 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/ai-planning')}
-                  className="aurora-border"
                 >
                   <Brain className="w-4 h-4 mr-2" />
                   AI Planning
@@ -376,25 +374,9 @@ export default function Dashboard() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/settings')}
-                  className="aurora-border"
                 >
                   <SettingsIcon className="w-4 h-4 mr-2" />
                   Settings
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleClearData}
-                  disabled={refreshing}
-                  className="aurora-border"
-                >
-                  Clear Data
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={logout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
                 </Button>
               </div>
             </div>

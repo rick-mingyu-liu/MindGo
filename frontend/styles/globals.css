@@ -164,6 +164,12 @@
     animation: aurora-sweep 3s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .aurora-border:hover::before {
+    opacity: 1;
   }
 
   .aurora-border > * {

@@ -18,7 +18,8 @@ import {
   Eye,
   EyeOff,
   Smartphone,
-  Globe
+  Globe,
+  LogOut
 } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -61,6 +62,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const [settings, setSettings] = useState<DataRetentionSettings>({
     autoDeleteEnabled: false,
     retentionMonths: 4,
@@ -162,6 +164,32 @@ export default function Settings() {
     }
   }
 
+  const handleClearData = async () => {
+    if (!confirm('This will permanently delete ALL your data including transactions, goals, and watchlist. This action cannot be undone. Are you sure?')) {
+      return
+    }
+
+    try {
+      setClearing(true)
+      
+      // Clear all data
+      await Promise.all([
+        api.delete('/transactions/clear-all'),
+        api.delete('/goals/clear-all'),
+        api.delete('/investments/clear-watchlist')
+      ])
+      
+      toast.success('All data cleared successfully')
+      router.push('/')
+      
+    } catch (error) {
+      console.error('Error clearing data:', error)
+      toast.error('Failed to clear data')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -205,6 +233,7 @@ export default function Settings() {
                   onClick={() => logout()}
                   className="aurora-border"
                 >
+                  <LogOut className="w-4 h-4 mr-2" />
                   Logout
                 </Button>
               </div>
@@ -486,6 +515,71 @@ export default function Settings() {
                       privacy: { ...preferences.privacy, analytics: checked }
                     })}
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Account Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Account Management
+                </CardTitle>
+                <CardDescription>
+                  Manage your account and data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                          Dangerous Actions
+                        </p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          These actions cannot be undone and will permanently delete your data.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Clear All Data</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Permanently delete all transactions, goals, and watchlist data
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleClearData}
+                      disabled={clearing}
+                      className="aurora-border"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {clearing ? 'Clearing...' : 'Clear All Data'}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Sign Out</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Sign out of your account
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => logout()}
+                      className="aurora-border"
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

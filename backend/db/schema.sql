@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    net_worth DECIMAL(12,2) DEFAULT 0.00
 );
 
 -- Transactions table
@@ -56,6 +57,15 @@ CREATE TABLE IF NOT EXISTS ai_plans (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create net_worth_history table for tracking net worth over time
+CREATE TABLE IF NOT EXISTS net_worth_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    net_worth DECIMAL(12,2) NOT NULL,
+    record_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
@@ -63,6 +73,8 @@ CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
+CREATE INDEX IF NOT EXISTS idx_net_worth_history_user_id ON net_worth_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_net_worth_history_date ON net_worth_history(record_date);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
