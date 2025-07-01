@@ -9,7 +9,7 @@ A comprehensive full-stack personal finance management application with AI-power
 - email notification for weekly personal financial report
 - guidence for first users
 - after 4 month keep data in blockchain but remove from db
-- autotracking from cards (maybe)
+- autotracking from cards or by giving the bank statments (maybe)
 
 ### Core Financial Management
 - **Dashboard Analytics**: 4-month rolling income/expense visualization with spending trends
