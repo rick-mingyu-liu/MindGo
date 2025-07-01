@@ -86,19 +86,20 @@ export default function Settings() {
       showCharts: true
     }
   })
-  const [planningPrefs, setPlanningPrefs] = useState(() => {
-    const saved = localStorage.getItem('planningPrefs')
-    return saved ? JSON.parse(saved) : {
-      riskTolerance: 'moderate',
-      lifeStage: 'worker',
-      investmentExperience: 'beginner'
-    }
+  const [planningPrefs, setPlanningPrefs] = useState({
+    riskTolerance: 'moderate',
+    lifeStage: 'worker',
+    investmentExperience: 'beginner'
   })
   const [savingPlanningPrefs, setSavingPlanningPrefs] = useState(false)
 
   useEffect(() => {
     fetchSettings()
     fetchPreferences()
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('planningPrefs') : null;
+    if (saved) {
+      setPlanningPrefs(JSON.parse(saved));
+    }
   }, [])
 
   const fetchSettings = async () => {
@@ -322,38 +323,6 @@ export default function Settings() {
                     Current theme: <span className="font-medium capitalize">{resolvedTheme}</span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Compact Mode</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Reduce spacing for more content on screen
-                    </p>
-                  </div>
-                  <Switch
-                    checked={preferences.display.compactMode}
-                    onCheckedChange={(checked) => setPreferences({
-                      ...preferences,
-                      display: { ...preferences.display, compactMode: checked }
-                    })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Show Charts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Display charts and visualizations
-                    </p>
-                  </div>
-                  <Switch
-                    checked={preferences.display.showCharts}
-                    onCheckedChange={(checked) => setPreferences({
-                      ...preferences,
-                      display: { ...preferences.display, showCharts: checked }
-                    })}
-                  />
-                </div>
               </CardContent>
             </Card>
 
@@ -575,72 +544,6 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleSavePlanningPrefs} disabled={savingPlanningPrefs}>
-                  {savingPlanningPrefs ? 'Saving...' : 'Save Preferences'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Account Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Account Management
-                </CardTitle>
-                <CardDescription>
-                  Manage your account and data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                      <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                          Dangerous Actions
-                        </p>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                          These actions cannot be undone and will permanently delete your data.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Clear All Data</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Permanently delete all transactions, goals, and watchlist data
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleClearData}
-                      disabled={clearing}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      {clearing ? 'Clearing...' : 'Clear All Data'}
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Sign Out</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Sign out of your account
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => logout()}
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Logout
-                    </Button>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -710,25 +613,68 @@ export default function Settings() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                {/* Action buttons */}
-                <div className="flex items-center justify-between pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={handleManualCleanup}
-                    disabled={deleting}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {deleting ? 'Cleaning up...' : 'Manual Cleanup Now'}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleSaveSettings}
-                    disabled={saving}
-                  >
-                    <Save className="w-4 h-4 mr-2" />
-                    {saving ? 'Saving...' : 'Save Settings'}
-                  </Button>
+            {/* Account Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Account Management
+                </CardTitle>
+                <CardDescription>
+                  Manage your account and data
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                          Dangerous Actions
+                        </p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          These actions cannot be undone and will permanently delete your data.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Clear All Data</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Permanently delete all transactions, goals, and watchlist data
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleClearData}
+                      disabled={clearing}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {clearing ? 'Clearing...' : 'Clear All Data'}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Sign Out</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Sign out of your account
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => logout()}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
