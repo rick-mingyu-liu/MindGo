@@ -408,14 +408,17 @@ export default function AIPlanning() {
                     </CardContent>
                   </Card>
                   <div className="flex justify-end mt-4">
-                    <Button variant="secondary" onClick={() => {
-                      setMoveGoalName(watch('financialGoal') || '')
-                      // Try to extract a number from the goal string for amount
-                      const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
-                      setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
-                      setMoveGoalDate('')
-                      setShowMoveGoal(true)
-                    }}>
+                    <Button
+                      className="bg-black text-white hover:bg-neutral-800 transition-colors duration-150"
+                      onClick={() => {
+                        setMoveGoalName(watch('financialGoal') || '')
+                        // Try to extract a number from the goal string for amount
+                        const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
+                        setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
+                        setMoveGoalDate('')
+                        setShowMoveGoal(true)
+                      }}
+                    >
                       Move to Active Goals
                     </Button>
                   </div>
