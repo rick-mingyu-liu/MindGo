@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut } from 'lucide-react'
+import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut, Eye } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize';
+import React from 'react'
 
 interface Goal {
   id: number
@@ -33,12 +34,48 @@ interface GoalForm {
   description: string
 }
 
+function GoalDescription({ description }: { description: string }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const isLong = description && description.length > 220;
+  return (
+    <div className="mt-1 prose prose-sm max-w-none relative">
+      <div className={expanded ? '' : 'clamp-5-lines'}>
+        {React.createElement(ReactMarkdown as any, {}, description)}
+      </div>
+      {isLong && (
+        <button
+          type="button"
+          className="text-xs text-primary underline mt-1 absolute right-0 bg-background px-1"
+          style={{ bottom: '-1.5em' }}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function GoalDescriptionPreview({ description }: { description: string }) {
+  return (
+    <div className="mt-1 prose prose-sm max-w-none relative">
+      <div className="clamp-5-lines relative pr-2">
+        {React.createElement(ReactMarkdown as any, {}, description)}
+        <div className="fade-bottom pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
 export default function Goals() {
   const router = useRouter()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  const [viewingGoal, setViewingGoal] = useState<Goal | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null)
   
   const {
     register,
@@ -261,18 +298,32 @@ export default function Goals() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setIsDialogOpen(false)
-                            reset()
-                            setEditingGoal(null)
-                          }}
-                          className="flex-1"
-                        >
-                          Cancel
-                        </Button>
+                        {editingGoal ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            className="flex-1"
+                            onClick={() => {
+                              setGoalToDelete(editingGoal);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            Delete Goal
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setIsDialogOpen(false)
+                              reset()
+                              setEditingGoal(null)
+                            }}
+                            className="flex-1"
+                          >
+                            Cancel
+                          </Button>
+                        )}
                         <Button type="submit" className="flex-1">
                           {editingGoal ? 'Update Goal' : 'Create Goal'}
                         </Button>
@@ -314,24 +365,22 @@ export default function Goals() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-lg">{goal.name}</CardTitle>
-                          <div className="mt-1 prose prose-sm max-w-none">
-                            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{goal.description || 'No description provided'}</ReactMarkdown>
-                          </div>
+                          <GoalDescriptionPreview description={goal.description || 'No description provided'} />
                         </div>
                         <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setViewingGoal(goal)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(goal)}
                           >
                             <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(goal.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -379,6 +428,128 @@ export default function Goals() {
           )}
         </main>
       </div>
+
+      <Dialog open={!!viewingGoal} onOpenChange={open => { if (!open) setViewingGoal(null) }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>View & Edit Goal</DialogTitle>
+            <DialogDescription>
+              View and edit your goal details
+            </DialogDescription>
+          </DialogHeader>
+          {viewingGoal && (
+            <form
+              onSubmit={handleSubmit(async (data) => {
+                await api.put(`/goals/${viewingGoal.id}`, {
+                  ...data,
+                  target_amount: parseFloat(data.target_amount),
+                  current_amount: parseFloat(data.current_amount),
+                })
+                toast.success('Goal updated successfully!')
+                setViewingGoal(null)
+                fetchGoals()
+              })}
+              className="space-y-6"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="name">Goal Name</Label>
+                <Input
+                  id="name"
+                  defaultValue={viewingGoal.name}
+                  {...register('name', { required: 'Goal name is required' })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="target_amount">Target Amount ($)</Label>
+                  <Input
+                    id="target_amount"
+                    type="number"
+                    step="0.01"
+                    defaultValue={viewingGoal.target_amount}
+                    {...register('target_amount', { required: 'Target amount is required', min: { value: 0.01, message: 'Target amount must be greater than 0' } })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="current_amount">Current Amount ($)</Label>
+                  <Input
+                    id="current_amount"
+                    type="number"
+                    step="0.01"
+                    defaultValue={viewingGoal.current_amount}
+                    {...register('current_amount', { required: 'Current amount is required', min: { value: 0, message: 'Current amount cannot be negative' } })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="target_date">Target Date</Label>
+                <Input
+                  id="target_date"
+                  type="date"
+                  defaultValue={viewingGoal.target_date}
+                  {...register('target_date', { required: 'Target date is required' })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (markdown supported)</Label>
+                <Textarea
+                  id="description"
+                  defaultValue={viewingGoal.description}
+                  {...register('description')}
+                  className="min-h-[360px]"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    setGoalToDelete(viewingGoal);
+                    setDeleteDialogOpen(true);
+                  }}
+                >
+                  Delete Goal
+                </Button>
+                <Button type="submit" className="flex-1">Save Changes</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Goal</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this goal? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (goalToDelete) {
+                  await api.delete(`/goals/${goalToDelete.id}`);
+                  toast.success('Goal deleted successfully!');
+                  setDeleteDialogOpen(false);
+                  setViewingGoal(null);
+                  setIsDialogOpen(false);
+                  setEditingGoal(null);
+                  setGoalToDelete(null);
+                  fetchGoals();
+                }
+              }}
+            >
+              Delete
+            </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 } 
