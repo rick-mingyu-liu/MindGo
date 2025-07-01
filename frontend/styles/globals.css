@@ -120,6 +120,13 @@
     @apply badge bg-primary-100 text-primary-800;
   }
 
+
+  /* Custom spacing for markdown headings in prose */
+  .prose h1, .prose h2, .prose h3, .prose h4 {
+    margin-top: 2.5em !important;
+    margin-bottom: 2.5em !important;
+  }
+
   /* Aurora-inspired decorative elements */
   .aurora-bg {
     background: linear-gradient(135deg, 

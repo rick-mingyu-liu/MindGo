@@ -42,11 +42,13 @@ Respond in the following format:
 
 # 📅 Timeline, make this bold and italic
 - Bullet points grouped by time (e.g., Month 1-2, Month 3-6, etc.)
+- Make the time periods start with "-"
 - Only include 3 groups max
 - Use short action-oriented phrases
 
 # ⚠️ Risks, make this bold and italic
 - 2–3 bullet points about potential risks or obstacles
+- each one start with "-"
 
 # 💡 Investment Ideas, make this bold and italic
 - 3–4 tailored ETF or stock tickers with 1-sentence explanations
@@ -59,7 +61,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
 
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
