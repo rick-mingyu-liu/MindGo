@@ -555,62 +555,17 @@ export default function Settings() {
                   Data Retention Settings
                 </CardTitle>
                 <CardDescription>
-                  Configure how long your transaction data is kept
+                  We will auto delete the data from the database after 4 months, but you can click <b>Save to Blockchain</b> so those will not disappear.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Auto-delete toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Auto-delete old transactions</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically delete transactions older than the specified period
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-base font-semibold mb-1">Blockchain Settings</h3>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      You can save your important financial data to the blockchain for permanent, tamper-proof storage. Once saved, your data will not be deleted, even if it is removed from our database after 4 months.
                     </p>
-                  </div>
-                  <Switch
-                    checked={settings.autoDeleteEnabled}
-                    onCheckedChange={(checked) => setSettings({ ...settings, autoDeleteEnabled: checked })}
-                  />
-                </div>
-
-                {/* Retention period */}
-                <div className="space-y-2">
-                  <Label htmlFor="retentionMonths">Retention Period (months)</Label>
-                  <Input
-                    id="retentionMonths"
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={settings.retentionMonths}
-                    onChange={(e) => setSettings({ ...settings, retentionMonths: parseInt(e.target.value) || 4 })}
-                    className="w-32"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Transactions older than this period will be automatically deleted
-                  </p>
-                </div>
-
-                {/* Last cleanup info */}
-                {settings.lastCleanup && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Last cleanup:</strong> {new Date(settings.lastCleanup).toLocaleDateString()}
-                    </p>
-                  </div>
-                )}
-
-                {/* Warning */}
-                <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <div className="flex items-start space-x-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                        Important Note
-                      </p>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                        Auto-deletion permanently removes old transaction data. This action cannot be undone and may affect your financial reports and analytics.
-                      </p>
-                    </div>
+                    <Button variant="default">Save to Blockchain</Button>
                   </div>
                 </div>
               </CardContent>

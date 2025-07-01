@@ -4,6 +4,13 @@ A comprehensive full-stack personal finance management application with AI-power
 
 ## 🚀 Features
 
+
+- ON PROGRESS
+- email notification for weekly personal financial report
+- guidence for first users
+- after 4 month keep data in blockchain but remove from db
+- autotracking from cards (maybe)
+
 ### Core Financial Management
 - **Dashboard Analytics**: 4-month rolling income/expense visualization with spending trends
 - **Transaction Management**: Track income and expenses with smart categorization and data retention policies
