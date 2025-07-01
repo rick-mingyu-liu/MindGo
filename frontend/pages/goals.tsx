@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import ReactMarkdown from 'react-markdown'
+import rehypeSanitize from 'rehype-sanitize';
 
 interface Goal {
   id: number
@@ -312,9 +314,9 @@ export default function Goals() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-lg">{goal.name}</CardTitle>
-                          <CardDescription className="mt-1">
-                            {goal.description || 'No description provided'}
-                          </CardDescription>
+                          <div className="mt-1 prose prose-sm max-w-none">
+                            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{goal.description || 'No description provided'}</ReactMarkdown>
+                          </div>
                         </div>
                         <div className="flex gap-1">
                           <Button
