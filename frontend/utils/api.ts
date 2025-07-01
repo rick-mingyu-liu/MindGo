@@ -98,4 +98,9 @@ export const investmentAPI = {
   getStockHistoricalData: (symbol: string, period: string = '1m') => api.get(`/investments/historical/${symbol}?period=${period}`),
 }
 
+export const goalAPI = {
+  createFromAIPlan: (data: { aiPlanId: number, name: string, target_amount: number, target_date?: string, description?: string }) =>
+    api.post('/goals/from-ai-plan', data),
+};
+
 export { api } 

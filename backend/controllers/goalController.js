@@ -193,6 +193,36 @@ const goalController = {
       console.error('Clear goals error:', error);
       res.status(500).json({ error: 'Server error' });
     }
+  },
+
+  // Create a goal from an AI plan
+  async createGoalFromAIPlan(req, res) {
+    try {
+      const { aiPlanId, name, target_amount, target_date, description } = req.body;
+      if (!aiPlanId || !name || !target_amount) {
+        return res.status(400).json({ error: 'aiPlanId, name, and target_amount are required' });
+      }
+      // Check if AI plan exists and belongs to user
+      const planResult = await db.query(
+        'SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2',
+        [aiPlanId, req.user.userId]
+      );
+      if (planResult.rows.length === 0) {
+        return res.status(404).json({ error: 'AI plan not found' });
+      }
+      // Insert new goal
+      const newGoal = await db.query(
+        'INSERT INTO savings_goals (user_id, name, target_amount, current_amount, target_date, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [req.user.userId, name, target_amount, 0, target_date || null, description || null]
+      );
+      res.status(201).json({
+        message: 'Goal created from AI plan successfully',
+        goal: newGoal.rows[0]
+      });
+    } catch (error) {
+      console.error('Create goal from AI plan error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 };
 

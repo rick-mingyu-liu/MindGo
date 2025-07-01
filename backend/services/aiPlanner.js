@@ -46,7 +46,7 @@ Structure your response with:
 Format your response in a clear, structured way with sections and bullet points where appropriate.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: "gpt-3.5-turbo",
         messages: [
           {
             role: "system",

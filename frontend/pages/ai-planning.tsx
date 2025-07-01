@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
 import { Brain, ArrowLeft, Send, Sparkles, LogOut } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { api, logout, goalAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,12 +27,20 @@ interface PlanningResponse {
   actionPlan: string[]
   estimatedTimeline: string
   riskFactors: string[]
+  plan?: {
+    id: number
+  }
 }
 
 export default function AIPlanning() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [planningResponse, setPlanningResponse] = useState<PlanningResponse | null>(null)
+  const [showMoveGoal, setShowMoveGoal] = useState(false)
+  const [moveGoalName, setMoveGoalName] = useState('')
+  const [moveGoalAmount, setMoveGoalAmount] = useState('')
+  const [moveGoalDate, setMoveGoalDate] = useState('')
+  const [moveGoalLoading, setMoveGoalLoading] = useState(false)
   
   const {
     register,
@@ -68,6 +76,32 @@ export default function AIPlanning() {
     setValue('financialGoal', prompt)
   }
 
+  const handleMoveGoal = async () => {
+    if (!planningResponse) return
+    setMoveGoalLoading(true)
+    try {
+      const aiPlanId = planningResponse.plan?.id
+      if (!aiPlanId) {
+        toast.error('AI plan ID not found. Please try again.')
+        setMoveGoalLoading(false)
+        return
+      }
+      await goalAPI.createFromAIPlan({
+        aiPlanId,
+        name: moveGoalName,
+        target_amount: parseFloat(moveGoalAmount),
+        target_date: moveGoalDate || undefined,
+        description: planningResponse.analysis || undefined
+      })
+      toast.success('Goal moved to active goals!')
+      setShowMoveGoal(false)
+    } catch (err) {
+      // Error handled by API interceptor
+    } finally {
+      setMoveGoalLoading(false)
+    }
+  }
+
   return (
     <>
       <Head>
@@ -94,13 +128,6 @@ export default function AIPlanning() {
                   <p className="text-muted-foreground">Get personalized financial advice powered by AI</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                onClick={logout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
             </div>
           </div>
         </header>
@@ -351,6 +378,21 @@ export default function AIPlanning() {
                       </CardContent>
                     </Card>
                   </div>
+
+                  <div className="flex justify-end mt-4">
+                    <Button variant="secondary" onClick={() => {
+                      if (planningResponse) {
+                        setMoveGoalName(watch('financialGoal') || '')
+                        // Try to extract a number from the goal string for amount
+                        const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
+                        setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
+                        setMoveGoalDate('')
+                      }
+                      setShowMoveGoal(true)
+                    }}>
+                      Move to Active Goals
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <Card>
@@ -374,6 +416,38 @@ export default function AIPlanning() {
           </div>
         </main>
       </div>
+
+      {showMoveGoal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Move to Active Goals</h2>
+            <div className="mb-3">
+              <Label>Goal Name</Label>
+              <Input value={moveGoalName} onChange={e => setMoveGoalName(e.target.value)} placeholder="Goal name" />
+            </div>
+            <div className="mb-3">
+              <Label>Target Amount ($)</Label>
+              <Input type="number" value={moveGoalAmount} onChange={e => setMoveGoalAmount(e.target.value)} placeholder="Target amount" />
+            </div>
+            <div className="mb-3">
+              <Label>Target Date</Label>
+              <Input type="date" value={moveGoalDate} onChange={e => setMoveGoalDate(e.target.value)} />
+            </div>
+            <div className="mb-3">
+              <Label>Description</Label>
+              <Textarea value={planningResponse?.analysis || ''} readOnly className="min-h-[80px]" />
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button onClick={handleMoveGoal} disabled={moveGoalLoading}>
+                {moveGoalLoading ? 'Saving...' : 'Save Goal'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowMoveGoal(false)} disabled={moveGoalLoading}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 } 

@@ -28,5 +28,6 @@ router.delete('/clear-all', goalController.clearAllGoals);
 router.put('/:id', goalValidation, goalController.updateGoal);
 router.delete('/:id', goalController.deleteGoal);
 router.put('/:id/progress', progressValidation, goalController.updateProgress);
+router.post('/from-ai-plan', goalController.createGoalFromAIPlan);
 
 module.exports = router; 
