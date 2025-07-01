@@ -391,7 +391,7 @@ export default function AIPlanning() {
 
             {/* AI Response */}
             <div className="space-y-6">
-              {planningResponse ? (
+              {planningResponse && (
                 <>
                   {/* Analysis */}
                   <Card>
@@ -403,137 +403,23 @@ export default function AIPlanning() {
                     </CardHeader>
                     <CardContent>
                       <div className="prose prose-sm max-w-none py-8">
-                        {/* <ReactMarkdown>{planningResponse.analysis}</ReactMarkdown> */}
                         {React.createElement(ReactMarkdown as any, {}, planningResponse.analysis)}
                       </div>
                     </CardContent>
                   </Card>
-
-                  {/* Recommendations */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Key Recommendations</CardTitle>
-                      <CardDescription>
-                        Actionable advice to help you achieve your goal
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {planningResponse.recommendations.map((recommendation, index) => (
-                          <div key={index} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                            <Badge variant="secondary" className="mt-1">
-                              {index + 1}
-                            </Badge>
-                            <p className="text-sm">{recommendation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Action Plan */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Action Plan</CardTitle>
-                      <CardDescription>
-                        Step-by-step plan to achieve your financial goal
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {planningResponse.actionPlan.map((action, index) => (
-                          <div key={index} className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-medium">
-                              {index + 1}
-                            </div>
-                            <p className="text-sm">{action}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Timeline & Risks */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Estimated Timeline</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm">{planningResponse.estimatedTimeline}</p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Risk Factors</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {planningResponse.riskFactors.map((risk, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <div className="w-2 h-2 bg-destructive rounded-full mt-2 flex-shrink-0"></div>
-                              <p className="text-sm">{risk}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Investment Suggestions */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Investment Suggestions</CardTitle>
-                      <CardDescription>
-                        Based on your preferences and financial situation, consider investigating these stocks or funds:
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {extractTickers(planningResponse.analysis).length > 0 ? (
-                        <ul className="list-disc pl-6">
-                          {extractTickers(planningResponse.analysis).map(ticker => (
-                            <li key={ticker} className="font-mono text-primary">{ticker}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-muted-foreground text-sm">Investment suggestions will appear here if relevant to your plan.</div>
-                      )}
-                    </CardContent>
-                  </Card>
-
                   <div className="flex justify-end mt-4">
                     <Button variant="secondary" onClick={() => {
-                      if (planningResponse) {
-                        setMoveGoalName(watch('financialGoal') || '')
-                        // Try to extract a number from the goal string for amount
-                        const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
-                        setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
-                        setMoveGoalDate('')
-                      }
+                      setMoveGoalName(watch('financialGoal') || '')
+                      // Try to extract a number from the goal string for amount
+                      const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
+                      setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
+                      setMoveGoalDate('')
                       setShowMoveGoal(true)
                     }}>
                       Move to Active Goals
                     </Button>
                   </div>
                 </>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>AI Analysis</CardTitle>
-                    <CardDescription>
-                      Your personalized financial analysis will appear here
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-12">
-                      <Brain className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">
-                        Fill out the form and submit to get your AI-powered financial analysis
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
               )}
             </div>
           </div>
