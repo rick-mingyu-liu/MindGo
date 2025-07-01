@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ReactMarkdown from 'react-markdown'
+import React from 'react'
 
 interface PlanningForm {
   financialGoal: string
@@ -401,8 +402,9 @@ export default function AIPlanning() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose prose-sm max-w-none" style={{ '--tw-prose-ol-margin-top': '1.25em', '--tw-prose-ul-margin-top': '1.25em' } as React.CSSProperties}>
-                        <ReactMarkdown>{planningResponse.analysis}</ReactMarkdown>
+                      <div className="prose prose-sm max-w-none py-8">
+                        {/* <ReactMarkdown>{planningResponse.analysis}</ReactMarkdown> */}
+                        {React.createElement(ReactMarkdown as any, {}, planningResponse.analysis)}
                       </div>
                     </CardContent>
                   </Card>
