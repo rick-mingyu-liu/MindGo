@@ -395,14 +395,14 @@ export default function AIPlanning() {
                 <>
                   {/* Analysis */}
                   <Card>
-                    <CardHeader>
+                    <CardHeader className="pb-0">
                       <CardTitle>Financial Analysis</CardTitle>
-                      <CardDescription>
+                      <CardDescription className="pb-0">
                         AI analysis of your financial situation and goal
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose prose-sm max-w-none py-8">
+                      <div className="prose prose-sm max-w-none pb-8">
                         {React.createElement(ReactMarkdown as any, {}, planningResponse.analysis)}
                       </div>
                     </CardContent>
