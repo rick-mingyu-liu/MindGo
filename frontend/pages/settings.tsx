@@ -86,6 +86,15 @@ export default function Settings() {
       showCharts: true
     }
   })
+  const [planningPrefs, setPlanningPrefs] = useState(() => {
+    const saved = localStorage.getItem('planningPrefs')
+    return saved ? JSON.parse(saved) : {
+      riskTolerance: 'moderate',
+      lifeStage: 'worker',
+      investmentExperience: 'beginner'
+    }
+  })
+  const [savingPlanningPrefs, setSavingPlanningPrefs] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -188,6 +197,13 @@ export default function Settings() {
     } finally {
       setClearing(false)
     }
+  }
+
+  const handleSavePlanningPrefs = async () => {
+    setSavingPlanningPrefs(true)
+    localStorage.setItem('planningPrefs', JSON.stringify(planningPrefs))
+    toast.success('Financial planning preferences saved!')
+    setSavingPlanningPrefs(false)
   }
 
   if (loading) {
@@ -514,6 +530,54 @@ export default function Settings() {
                     })}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Financial Planning Preferences */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Financial Planning Preferences</CardTitle>
+                <CardDescription>
+                  These preferences will be used to personalize your AI financial planning and investment suggestions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <Label>Risk Tolerance</Label>
+                  <Select value={planningPrefs.riskTolerance} onValueChange={v => setPlanningPrefs(p => ({ ...p, riskTolerance: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="moderate">Moderate</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mb-4">
+                  <Label>Life Stage</Label>
+                  <Select value={planningPrefs.lifeStage} onValueChange={v => setPlanningPrefs(p => ({ ...p, lifeStage: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="worker">Worker</SelectItem>
+                      <SelectItem value="retired">Retired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mb-4">
+                  <Label>Investment Experience</Label>
+                  <Select value={planningPrefs.investmentExperience} onValueChange={v => setPlanningPrefs(p => ({ ...p, investmentExperience: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleSavePlanningPrefs} disabled={savingPlanningPrefs}>
+                  {savingPlanningPrefs ? 'Saving...' : 'Save Preferences'}
+                </Button>
               </CardContent>
             </Card>
 

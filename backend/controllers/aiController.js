@@ -20,7 +20,10 @@ const aiController = {
         currentIncome,
         currentExpenses,
         timeline,
-        additionalContext
+        additionalContext,
+        riskTolerance,
+        lifeStage,
+        investmentExperience
       } = req.body;
 
       // Use new format if available, otherwise fall back to old format
@@ -58,14 +61,16 @@ const aiController = {
       }
       
       if (currentIncome && currentExpenses) {
-        comprehensivePrompt += `\n\nCurrent Financial Situation:
-- Monthly Income: $${currentIncome}
-- Monthly Expenses: $${currentExpenses}
-- Monthly Savings: $${currentIncome - currentExpenses}`;
+        comprehensivePrompt += `\n\nCurrent Financial Situation:\n- Monthly Income: $${currentIncome}\n- Monthly Expenses: $${currentExpenses}\n- Monthly Savings: $${currentIncome - currentExpenses}`;
       }
       
       if (additionalContext) {
         comprehensivePrompt += `\n\nAdditional Context: ${additionalContext}`;
+      }
+
+      // Add user preferences to the prompt
+      if (riskTolerance || lifeStage || investmentExperience) {
+        comprehensivePrompt += `\n\nUser Preferences for Planning:\n- Risk Tolerance: ${riskTolerance || 'Not specified'}\n- Life Stage: ${lifeStage || 'Not specified'}\n- Investment Experience: ${investmentExperience || 'Not specified'}`;
       }
 
       // Generate AI plan

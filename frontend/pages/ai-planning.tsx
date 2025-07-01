@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import ReactMarkdown from 'react-markdown'
 
 interface PlanningForm {
   financialGoal: string
@@ -32,6 +33,16 @@ interface PlanningResponse {
   }
 }
 
+// Helper to extract stock tickers from AI analysis
+function extractTickers(text: string): string[] {
+  // Simple regex for US stock tickers (all caps, 1-5 letters, not at start of line)
+  const matches = text.match(/\b[A-Z]{1,5}\b/g)
+  if (!matches) return []
+  // Filter out common English words and duplicates
+  const blacklist = ['AND', 'THE', 'FOR', 'WITH', 'FROM', 'THIS', 'THAT', 'YOUR', 'WILL', 'HAVE', 'ARE', 'NOT', 'BUT', 'CAN', 'HAS', 'ALL', 'YOU', 'ONE', 'TWO', 'FIVE', 'YEAR', 'YEARS', 'WEEK', 'WEEKS', 'SAVE', 'PLAN', 'RISK', 'HIGH', 'LOW', 'ETF', 'BOND', 'CASH', 'STOCK', 'GOAL', 'BUY', 'SELL', 'HOLD', 'USD']
+  return Array.from(new Set(matches.filter(t => !blacklist.includes(t))))
+}
+
 export default function AIPlanning() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -41,6 +52,10 @@ export default function AIPlanning() {
   const [moveGoalAmount, setMoveGoalAmount] = useState('')
   const [moveGoalDate, setMoveGoalDate] = useState('')
   const [moveGoalLoading, setMoveGoalLoading] = useState(false)
+  const [planningPrefs, setPlanningPrefs] = useState<{ riskTolerance: string, lifeStage: string, investmentExperience: string } | null>(null)
+  const [editingPrefs, setEditingPrefs] = useState(false)
+  const [prefsDraft, setPrefsDraft] = useState<{ riskTolerance: string, lifeStage: string, investmentExperience: string } | null>(null)
+  const [savingPrefs, setSavingPrefs] = useState(false)
   
   const {
     register,
@@ -50,20 +65,26 @@ export default function AIPlanning() {
     formState: { errors },
   } = useForm<PlanningForm>()
 
+  useEffect(() => {
+    const saved = localStorage.getItem('planningPrefs')
+    if (saved) setPlanningPrefs(JSON.parse(saved))
+  }, [])
+
   const onSubmit = async (data: PlanningForm) => {
     try {
       setLoading(true)
       setPlanningResponse(null)
-      
+      const planningPrefs = JSON.parse(localStorage.getItem('planningPrefs') || '{}')
       const response = await api.post('/ai/plan', {
         ...data,
         currentIncome: parseFloat(data.currentIncome),
         currentExpenses: parseFloat(data.currentExpenses),
+        riskTolerance: planningPrefs.riskTolerance,
+        lifeStage: planningPrefs.lifeStage,
+        investmentExperience: planningPrefs.investmentExperience,
       })
-      
       setPlanningResponse(response.data)
       toast.success('AI analysis completed!')
-      
     } catch (error) {
       console.error('AI planning error:', error)
       // Error handling is done in api interceptor
@@ -102,6 +123,23 @@ export default function AIPlanning() {
     }
   }
 
+  const handleEditPrefs = () => {
+    setPrefsDraft(planningPrefs)
+    setEditingPrefs(true)
+  }
+  const handleCancelPrefs = () => {
+    setEditingPrefs(false)
+  }
+  const handleSavePrefs = () => {
+    if (!prefsDraft) return
+    setSavingPrefs(true)
+    localStorage.setItem('planningPrefs', JSON.stringify(prefsDraft))
+    setPlanningPrefs(prefsDraft)
+    setEditingPrefs(false)
+    setSavingPrefs(false)
+    toast.success('Preferences updated!')
+  }
+
   return (
     <>
       <Head>
@@ -136,6 +174,68 @@ export default function AIPlanning() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Planning Form */}
             <div className="space-y-6">
+              {planningPrefs && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle>Your Financial Planning Preferences</CardTitle>
+                    <CardDescription>
+                      These preferences are used to personalize your AI financial planning and investment suggestions.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {editingPrefs && prefsDraft ? (
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <Label>Risk Tolerance</Label>
+                          <Select value={prefsDraft.riskTolerance} onValueChange={v => setPrefsDraft(p => p ? { ...p, riskTolerance: v } : p)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="moderate">Moderate</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Life Stage</Label>
+                          <Select value={prefsDraft.lifeStage} onValueChange={v => setPrefsDraft(p => p ? { ...p, lifeStage: v } : p)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Student</SelectItem>
+                              <SelectItem value="worker">Worker</SelectItem>
+                              <SelectItem value="retired">Retired</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Investment Experience</Label>
+                          <Select value={prefsDraft.investmentExperience} onValueChange={v => setPrefsDraft(p => p ? { ...p, investmentExperience: v } : p)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="beginner">Beginner</SelectItem>
+                              <SelectItem value="intermediate">Intermediate</SelectItem>
+                              <SelectItem value="advanced">Advanced</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? 'Saving...' : 'Save'}</Button>
+                          <Button variant="outline" onClick={handleCancelPrefs} disabled={savingPrefs}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <div><b>Risk Tolerance:</b> {planningPrefs.riskTolerance.charAt(0).toUpperCase() + planningPrefs.riskTolerance.slice(1)}</div>
+                        <div><b>Life Stage:</b> {planningPrefs.lifeStage.charAt(0).toUpperCase() + planningPrefs.lifeStage.slice(1)}</div>
+                        <div><b>Investment Experience:</b> {planningPrefs.investmentExperience.charAt(0).toUpperCase() + planningPrefs.investmentExperience.slice(1)}</div>
+                        <div className="flex justify-end mt-2">
+                          <Button size="sm" variant="outline" onClick={handleEditPrefs}>Edit</Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -301,8 +401,8 @@ export default function AIPlanning() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="prose prose-sm max-w-none">
-                        <p className="whitespace-pre-wrap">{planningResponse.analysis}</p>
+                      <div className="prose prose-sm max-w-none" style={{ '--tw-prose-ol-margin-top': '1.25em', '--tw-prose-ul-margin-top': '1.25em' } as React.CSSProperties}>
+                        <ReactMarkdown>{planningResponse.analysis}</ReactMarkdown>
                       </div>
                     </CardContent>
                   </Card>
@@ -378,6 +478,27 @@ export default function AIPlanning() {
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Investment Suggestions */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Investment Suggestions</CardTitle>
+                      <CardDescription>
+                        Based on your preferences and financial situation, consider investigating these stocks or funds:
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {extractTickers(planningResponse.analysis).length > 0 ? (
+                        <ul className="list-disc pl-6">
+                          {extractTickers(planningResponse.analysis).map(ticker => (
+                            <li key={ticker} className="font-mono text-primary">{ticker}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-muted-foreground text-sm">Investment suggestions will appear here if relevant to your plan.</div>
+                      )}
+                    </CardContent>
+                  </Card>
 
                   <div className="flex justify-end mt-4">
                     <Button variant="secondary" onClick={() => {
