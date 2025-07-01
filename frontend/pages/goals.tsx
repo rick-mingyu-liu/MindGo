@@ -209,7 +209,7 @@ export default function Goals() {
                       Add Goal
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
+                  <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>
                         {editingGoal ? 'Edit Goal' : 'Create New Goal'}
@@ -295,6 +295,7 @@ export default function Goals() {
                           id="description"
                           placeholder="Additional details about your goal..."
                           {...register('description')}
+                          className="min-h-[360px]"
                         />
                       </div>
 
