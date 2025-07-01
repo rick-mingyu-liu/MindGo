@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ReactMarkdown from 'react-markdown'
-import rehypeSanitize from 'rehype-sanitize';
 import React from 'react'
 
 interface Goal {
@@ -58,10 +57,12 @@ function GoalDescription({ description }: { description: string }) {
 
 function GoalDescriptionPreview({ description }: { description: string }) {
   return (
-    <div className="mt-1 prose prose-sm max-w-none relative">
-      <div className="clamp-5-lines relative pr-2">
-        {React.createElement(ReactMarkdown as any, {}, description)}
-        <div className="fade-bottom pointer-events-none" />
+    <div className="mt-1">
+      <div className="bg-muted/60 rounded-md px-3 py-2 prose prose-sm max-w-none relative">
+        <div className="clamp-5-lines relative pr-2">
+          {React.createElement(ReactMarkdown as any, {}, description)}
+          <div className="fade-bottom pointer-events-none" />
+        </div>
       </div>
     </div>
   );
@@ -129,15 +130,15 @@ export default function Goals() {
   }
 
   const handleEdit = (goal: Goal) => {
-    setEditingGoal(goal)
+    setEditingGoal(goal);
     reset({
       name: goal.name,
       target_amount: goal.target_amount.toString(),
       current_amount: goal.current_amount.toString(),
       target_date: goal.target_date,
       description: goal.description,
-    })
-    setIsDialogOpen(true)
+    });
+    setIsDialogOpen(true);
   }
 
   const handleDelete = async (goalId: number) => {
@@ -362,12 +363,9 @@ export default function Goals() {
                 return (
                   <Card key={goal.id} className="relative">
                     <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">{goal.name}</CardTitle>
-                          <GoalDescriptionPreview description={goal.description || 'No description provided'} />
-                        </div>
-                        <div className="flex gap-1">
+                      <div className="flex items-start justify-between w-full">
+                        <CardTitle className="text-lg flex-1">{goal.name}</CardTitle>
+                        <div className="flex gap-0">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -383,6 +381,9 @@ export default function Goals() {
                             <Edit className="w-4 h-4" />
                           </Button>
                         </div>
+                      </div>
+                      <div className="mt-2">
+                        <GoalDescriptionPreview description={goal.description || 'No description provided'} />
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -430,90 +431,40 @@ export default function Goals() {
       </div>
 
       <Dialog open={!!viewingGoal} onOpenChange={open => { if (!open) setViewingGoal(null) }}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>View & Edit Goal</DialogTitle>
+            <DialogTitle>Goal Details</DialogTitle>
             <DialogDescription>
-              View and edit your goal details
+              View your goal details
             </DialogDescription>
           </DialogHeader>
           {viewingGoal && (
-            <form
-              onSubmit={handleSubmit(async (data) => {
-                await api.put(`/goals/${viewingGoal.id}`, {
-                  ...data,
-                  target_amount: parseFloat(data.target_amount),
-                  current_amount: parseFloat(data.current_amount),
-                })
-                toast.success('Goal updated successfully!')
-                setViewingGoal(null)
-                fetchGoals()
-              })}
-              className="space-y-6"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="name">Goal Name</Label>
-                <Input
-                  id="name"
-                  defaultValue={viewingGoal.name}
-                  {...register('name', { required: 'Goal name is required' })}
-                />
+            <div className="space-y-6">
+              <div>
+                <Label className="font-semibold">Goal Name</Label>
+                <div className="mt-1 text-lg">{viewingGoal.name}</div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="target_amount">Target Amount ($)</Label>
-                  <Input
-                    id="target_amount"
-                    type="number"
-                    step="0.01"
-                    defaultValue={viewingGoal.target_amount}
-                    {...register('target_amount', { required: 'Target amount is required', min: { value: 0.01, message: 'Target amount must be greater than 0' } })}
-                  />
+                <div>
+                  <Label className="font-semibold">Target Amount ($)</Label>
+                  <div className="mt-1">{viewingGoal.target_amount}</div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="current_amount">Current Amount ($)</Label>
-                  <Input
-                    id="current_amount"
-                    type="number"
-                    step="0.01"
-                    defaultValue={viewingGoal.current_amount}
-                    {...register('current_amount', { required: 'Current amount is required', min: { value: 0, message: 'Current amount cannot be negative' } })}
-                  />
+                <div>
+                  <Label className="font-semibold">Current Amount ($)</Label>
+                  <div className="mt-1">{viewingGoal.current_amount}</div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="target_date">Target Date</Label>
-                <Input
-                  id="target_date"
-                  type="date"
-                  defaultValue={viewingGoal.target_date}
-                  {...register('target_date', { required: 'Target date is required' })}
-                />
+              <div>
+                <Label className="font-semibold">Target Date</Label>
+                <div className="mt-1">{viewingGoal.target_date}</div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (markdown supported)</Label>
-                <Textarea
-                  id="description"
-                  defaultValue={viewingGoal.description}
-                  {...register('description')}
-                  className="min-h-[360px]"
-                />
+              <div>
+                <Label className="font-semibold">Description</Label>
+                <div className="mt-1 prose prose-sm max-w-none bg-muted/60 rounded-md px-3 py-2">
+                  {React.createElement(ReactMarkdown as any, {}, viewingGoal.description)}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => {
-                    setGoalToDelete(viewingGoal);
-                    setDeleteDialogOpen(true);
-                  }}
-                >
-                  Delete Goal
-                </Button>
-                <Button type="submit" className="flex-1">Save Changes</Button>
-              </div>
-            </form>
+            </div>
           )}
         </DialogContent>
       </Dialog>
