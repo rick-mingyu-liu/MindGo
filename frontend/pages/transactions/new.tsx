@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Save, Calendar, DollarSign, Tag, LogOut } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { ArrowLeft, Save, Calendar, DollarSign, Tag } from 'lucide-react'
+import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -113,13 +113,6 @@ export default function NewTransaction() {
                   <p className="text-muted-foreground">Record a new income or expense</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                onClick={logout}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
             </div>
           </div>
         </header>

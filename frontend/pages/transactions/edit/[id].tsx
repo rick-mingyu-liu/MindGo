@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -166,14 +166,6 @@ export default function EditTransaction() {
                     Update your transaction details
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => logout(router)}
-                >
-                  Logout
-                </Button>
               </div>
             </div>
           </div>

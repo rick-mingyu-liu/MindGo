@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2 } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { api } from '@/utils/api'
 import { formatCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -129,12 +129,6 @@ export default function Transactions() {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => logout(router)}
-                >
-                  Logout
-                </Button>
                 <Button onClick={() => router.push('/transactions/new')}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Transaction
