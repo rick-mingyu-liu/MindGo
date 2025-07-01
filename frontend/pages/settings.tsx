@@ -207,7 +207,7 @@ export default function Settings() {
 
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="border-b bg-card aurora-header">
+        <div className="border-b bg-card">
           <div className="container mx-auto px-4 py-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -215,13 +215,12 @@ export default function Settings() {
                   variant="ghost"
                   size="sm"
                   onClick={() => router.push('/')}
-                  className="aurora-border"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Dashboard
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold aurora-text">Settings</h1>
+                  <h1 className="text-3xl font-bold">Settings</h1>
                   <p className="text-muted-foreground">
                     Manage your app preferences and data retention
                   </p>
@@ -231,7 +230,6 @@ export default function Settings() {
                 <Button
                   variant="outline"
                   onClick={() => logout()}
-                  className="aurora-border"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -244,7 +242,7 @@ export default function Settings() {
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Theme Settings */}
-            <Card className="aurora-card">
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
@@ -557,7 +555,6 @@ export default function Settings() {
                       variant="outline"
                       onClick={handleClearData}
                       disabled={clearing}
-                      className="aurora-border"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
                       {clearing ? 'Clearing...' : 'Clear All Data'}
@@ -574,7 +571,6 @@ export default function Settings() {
                     <Button
                       variant="outline"
                       onClick={() => logout()}
-                      className="aurora-border"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
