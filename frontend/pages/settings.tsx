@@ -218,7 +218,7 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Settings - Personal Finance App</title>
+        <title>Settings - MindGo</title>
         <meta name="description" content="Manage your app settings and preferences" />
       </Head>
 

@@ -103,8 +103,8 @@ export default function Transactions() {
   return (
     <>
       <Head>
-        <title>Transactions - Personal Finance App</title>
-        <meta name="description" content="View and manage your transactions" />
+        <title>Transactions - MindGo</title>
+        <meta name="description" content="View and manage your recent transactions" />
       </Head>
 
       <div className="min-h-screen bg-background">

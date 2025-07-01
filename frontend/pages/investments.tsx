@@ -151,7 +151,7 @@ export default function Investments() {
   return (
     <>
       <Head>
-        <title>Investment Watchlist - Personal Finance App</title>
+        <title>Watchlist - MindGo</title>
         <meta name="description" content="Track your favorite stocks" />
       </Head>
 

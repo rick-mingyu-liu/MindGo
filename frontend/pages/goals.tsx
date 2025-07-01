@@ -178,7 +178,7 @@ export default function Goals() {
   return (
     <>
       <Head>
-        <title>Savings Goals - Personal Finance App</title>
+        <title>Goals - MindGo</title>
         <meta name="description" content="Manage your savings goals" />
       </Head>
 

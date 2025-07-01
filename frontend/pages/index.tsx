@@ -335,7 +335,7 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>Dashboard - Personal Finance App</title>
+        <title>Dashboard - MindGo</title>
         <meta name="description" content="Your personal finance dashboard" />
       </Head>
 
