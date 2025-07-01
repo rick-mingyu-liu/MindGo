@@ -211,6 +211,13 @@
     z-index: 0;
   }
 
+  .dark .aurora-particles::after {
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, rgba(168, 85, 247, 0.15) 0%, transparent 50%);
+  }
+
   .aurora-particles > * {
     position: relative;
     z-index: 1;

@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface LoginForm {
   email: string
@@ -20,6 +21,7 @@ interface LoginForm {
 
 export default function Login() {
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
@@ -58,12 +60,12 @@ export default function Login() {
         <meta name="description" content="Sign in to your MindGo account" />
       </Head>
 
-      <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-white">
+      <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-white dark:bg-gray-950 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
             <div className="mx-auto mb-4 flex justify-center">
               <Image
-                src="/MindGo.png"
+                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
                 alt="MindGo Logo"
                 width={160}
                 height={160}
@@ -71,7 +73,7 @@ export default function Login() {
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white aurora-text">MindGo</h1>
+            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
             <button
               onClick={() => setShowIntro(true)}
               className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer transition-colors"
@@ -82,9 +84,9 @@ export default function Login() {
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <Card className="shadow-xl bg-white border border-gray-200">
+          <Card className="shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center text-green-700">Welcome back</CardTitle>
+              <CardTitle className="text-2xl text-center text-green-700 dark:text-green-400">Welcome back</CardTitle>
               <CardDescription className="text-center">
                 Enter your credentials to access your account
               </CardDescription>
@@ -99,7 +101,7 @@ export default function Login() {
                       id="email"
                       type="email"
                       placeholder="Enter your email"
-                      className="pl-10 bg-gray-50 border-gray-300 text-gray-900"
+                      className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       {...register('email', {
                         required: 'Email is required',
                         pattern: {
@@ -122,7 +124,7 @@ export default function Login() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password"
-                      className="pl-10 pr-10 bg-gray-50 border-gray-300 text-gray-900"
+                      className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       {...register('password', {
                         required: 'Password is required',
                         minLength: {
@@ -169,7 +171,7 @@ export default function Login() {
 
                 <Button
                   variant="outline"
-                  className="w-full mt-4 border-yellow-400 text-yellow-700"
+                  className="w-full mt-4 border-yellow-400 dark:border-yellow-500 text-yellow-700 dark:text-yellow-300"
                   onClick={() => router.push('/register')}
                 >
                   Create new account
@@ -180,7 +182,7 @@ export default function Login() {
               {/* Demo credentials */}
               <div className="mt-6 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary" className="bg-yellow-400 text-yellow-900">Demo Account</Badge>
+                  <Badge variant="secondary" className="bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950">Demo Account</Badge>
                 </div>
                 <div className="space-y-1 text-sm">
                   <p className="text-muted-foreground">
@@ -198,18 +200,18 @@ export default function Login() {
 
       {/* Who are we Modal */}
       <Dialog open={showIntro} onOpenChange={setShowIntro}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-yellow-400 shadow-2xl text-gray-900">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border border-yellow-400 dark:border-yellow-500 shadow-2xl text-gray-900 dark:text-gray-100">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Image
-                src="/MindGo.png"
+                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
                 alt="MindGo Logo"
-                width={40}
-                height={40}
-                className="h-10 w-auto"
+                width={60}
+                height={60}
+                className="h-15 w-auto"
               />
               <div>
-                <h2 className="text-2xl font-bold text-green-700">Welcome to MindGo</h2>
+                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">Welcome to MindGo</h2>
                 <p className="text-sm text-muted-foreground">Your AI-Powered Personal Finance Companion</p>
               </div>
             </DialogTitle>
@@ -218,7 +220,7 @@ export default function Login() {
           <div className="space-y-6">
             {/* Mission Statement */}
             <div className="text-center py-4">
-              <h3 className="text-xl font-semibold mb-2 text-green-700">Our Mission</h3>
+              <h3 className="text-xl font-semibold mb-2 text-green-700 dark:text-green-400">Our Mission</h3>
               <p className="text-muted-foreground">
                 To democratize financial intelligence by providing everyone with AI-powered tools 
                 to make smarter financial decisions, track their progress, and achieve their goals.
@@ -233,7 +235,7 @@ export default function Login() {
                     <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">Smart Investment Tracking</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">Smart Investment Tracking</h4>
                     <p className="text-sm text-muted-foreground">
                       Real-time stock analysis, K-charts, and AI-powered investment insights to help you make informed decisions.
                     </p>
@@ -245,7 +247,7 @@ export default function Login() {
                     <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">Goal Setting & Tracking</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">Goal Setting & Tracking</h4>
                     <p className="text-sm text-muted-foreground">
                       Set financial goals, track your progress, and get personalized recommendations to stay on target.
                     </p>
@@ -257,7 +259,7 @@ export default function Login() {
                     <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">Expense Analytics</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">Expense Analytics</h4>
                     <p className="text-sm text-muted-foreground">
                       Comprehensive spending analysis with AI-powered insights to identify saving opportunities.
                     </p>
@@ -271,7 +273,7 @@ export default function Login() {
                     <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">AI Financial Planning</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">AI Financial Planning</h4>
                     <p className="text-sm text-muted-foreground">
                       Get personalized financial plans, budget recommendations, and investment advice powered by AI.
                     </p>
@@ -283,7 +285,7 @@ export default function Login() {
                     <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">Secure & Private</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">Secure & Private</h4>
                     <p className="text-sm text-muted-foreground">
                       Bank-level security with end-to-end encryption to keep your financial data safe and private.
                     </p>
@@ -295,7 +297,7 @@ export default function Login() {
                     <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700">Community Driven</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">Community Driven</h4>
                     <p className="text-sm text-muted-foreground">
                       Join a community of financially conscious individuals sharing insights and strategies.
                     </p>
