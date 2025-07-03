@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut, Eye, Brain } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -342,6 +342,13 @@ export default function Goals() {
                     </form>
                   </DialogContent>
                 </Dialog>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/ai-planning')}
+                >
+                  <Brain className="w-4 h-4 mr-2" />
+                  AI Planning
+                </Button>
               </div>
             </div>
           </div>
