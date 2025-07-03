@@ -11,7 +11,7 @@ class FreeStockDataService {
   async getYahooFinanceHistoricalData(symbol, period = '1mo') {
     try {
       // Add longer delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       // Yahoo Finance uses a different endpoint structure
       const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
@@ -22,13 +22,20 @@ class FreeStockDataService {
           events: 'div,split'
         },
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
           'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
           'Cache-Control': 'no-cache',
-          'Referer': 'https://finance.yahoo.com/'
+          'Pragma': 'no-cache',
+          'Referer': 'https://finance.yahoo.com/',
+          'Origin': 'https://finance.yahoo.com',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-site',
+          'Connection': 'keep-alive'
         },
-        timeout: 15000
+        timeout: 20000
       });
 
       if (response.status === 429) {
@@ -74,7 +81,69 @@ class FreeStockDataService {
       return data;
     } catch (error) {
       console.error('Error fetching historical data from Yahoo Finance:', error.message);
+      
+      // If it's a network error or timeout, try with a different approach
+      if (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+        console.log('Network error, trying alternative endpoint...');
+        return await this.getYahooFinanceAlternativeData(symbol, period);
+      }
+      
       throw new Error('Failed to fetch historical data from Yahoo Finance');
+    }
+  }
+
+  // Alternative Yahoo Finance endpoint as fallback
+  async getYahooFinanceAlternativeData(symbol, period = '1mo') {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const response = await axios.get(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}`, {
+        params: {
+          range: period,
+          interval: '1d',
+          includePrePost: false,
+          events: 'div,split'
+        },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Cache-Control': 'no-cache',
+          'Referer': 'https://finance.yahoo.com/'
+        },
+        timeout: 15000
+      });
+
+      const result = response.data.chart.result[0];
+      if (!result) {
+        throw new Error('No data available from Yahoo Finance alternative endpoint');
+      }
+
+      const timestamps = result.timestamp;
+      const quote = result.indicators.quote[0];
+      const adjClose = result.indicators.adjclose[0];
+
+      if (!timestamps || !quote) {
+        throw new Error('Invalid data structure from Yahoo Finance alternative endpoint');
+      }
+
+      const data = {
+        t: [], o: [], h: [], l: [], c: [], v: []
+      };
+
+      timestamps.forEach((timestamp, index) => {
+        data.t.push(timestamp);
+        data.o.push(quote.open[index] || 0);
+        data.h.push(quote.high[index] || 0);
+        data.l.push(quote.low[index] || 0);
+        data.c.push(adjClose && adjClose.adjclose ? adjClose.adjclose[index] || quote.close[index] || 0 : quote.close[index] || 0);
+        data.v.push(quote.volume[index] || 0);
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Alternative Yahoo Finance endpoint also failed:', error.message);
+      throw error;
     }
   }
 
@@ -148,22 +217,14 @@ class FreeStockDataService {
       return cached.data;
     }
 
-    try {
-      // Try Yahoo Finance first (most reliable free option)
-      console.log('Trying Yahoo Finance for historical data...');
-      const data = await this.getYahooFinanceHistoricalData(symbol, period);
-      
-      // Cache the successful result
-      this.cache.set(cacheKey, {
-        data,
-        timestamp: Date.now()
-      });
-      
-      return data;
-    } catch (error) {
-      console.log('Yahoo Finance failed, trying Alpha Vantage...');
+    // Retry logic for better reliability
+    const maxRetries = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const data = await this.getAlphaVantageHistoricalData(symbol);
+        console.log(`Attempt ${attempt}/${maxRetries}: Trying Yahoo Finance for historical data...`);
+        const data = await this.getYahooFinanceHistoricalData(symbol, period);
         
         // Cache the successful result
         this.cache.set(cacheKey, {
@@ -172,10 +233,34 @@ class FreeStockDataService {
         });
         
         return data;
-      } catch (alphaError) {
-        console.error('All free data sources failed:', error.message, alphaError.message);
-        throw new Error('Unable to fetch historical data. Yahoo Finance is rate limited and Alpha Vantage requires a free API key. Please try again later or get a free API key from alphavantage.co');
+      } catch (error) {
+        lastError = error;
+        console.log(`Yahoo Finance attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          // Wait before retry (exponential backoff)
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
+    }
+
+    // If all Yahoo Finance attempts failed, try Alpha Vantage
+    console.log('All Yahoo Finance attempts failed, trying Alpha Vantage...');
+    try {
+      const data = await this.getAlphaVantageHistoricalData(symbol);
+      
+      // Cache the successful result
+      this.cache.set(cacheKey, {
+        data,
+        timestamp: Date.now()
+      });
+      
+      return data;
+    } catch (alphaError) {
+      console.error('All free data sources failed:', lastError.message, alphaError.message);
+      throw new Error('Unable to fetch historical data. Yahoo Finance is rate limited and Alpha Vantage requires a free API key. Please try again later or get a free API key from alphavantage.co');
     }
   }
 }
