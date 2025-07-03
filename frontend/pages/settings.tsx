@@ -166,25 +166,6 @@ export default function Settings() {
     }
   }
 
-  const handleManualCleanup = async () => {
-    if (!confirm(`This will permanently delete all transactions older than ${settings.retentionMonths} months. This action cannot be undone. Are you sure?`)) {
-      return
-    }
-
-    try {
-      setDeleting(true)
-      const response = await api.delete(`/transactions/auto-delete?months=${settings.retentionMonths}`)
-      toast.success(`Cleanup completed: ${response.data.deletedCount} transactions deleted`)
-      // Refresh settings to update lastCleanup
-      await fetchSettings()
-    } catch (error) {
-      console.error('Error during cleanup:', error)
-      toast.error('Failed to perform cleanup')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   const handleClearData = async () => {
     setClearDialogOpen(false)
     try {
@@ -192,7 +173,7 @@ export default function Settings() {
       await Promise.all([
         api.delete('/transactions/clear-all'),
         api.delete('/goals/clear-all'),
-        api.delete('/investments/clear-watchlist')
+        api.delete('/investments/watchlist/clear-all') 
       ])
       toast.success('All data cleared successfully')
       router.push('/')
@@ -204,12 +185,6 @@ export default function Settings() {
     }
   }
 
-  const handleSavePlanningPrefs = async () => {
-    setSavingPlanningPrefs(true)
-    localStorage.setItem('planningPrefs', JSON.stringify(planningPrefs))
-    toast.success('Financial planning preferences saved!')
-    setSavingPlanningPrefs(false)
-  }
 
   if (loading) {
     return (
@@ -552,7 +527,7 @@ export default function Settings() {
             </Card>
 
             {/* Data Retention Settings */}
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
@@ -573,7 +548,7 @@ export default function Settings() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
             {/* Account Management */}
             <Card>
