@@ -5,7 +5,7 @@ const morgan = require('morgan');
 require('dotenv').config();
 const cron = require('node-cron');
 const db = require('./db/connection');
-const { sendWeeklyReport } = require('./services/emailService');
+const { sendWeeklyReport, generateWeeklyReport } = require('./services/emailService');
 
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
@@ -113,10 +113,11 @@ setInterval(() => {
 cron.schedule('0 19 * * 0', async () => {
   try {
     const users = await db.query(
-      'SELECT email FROM users WHERE email_notifications_enabled = true AND weekly_reports_enabled = true'
+      'SELECT id, email FROM users WHERE email_notifications_enabled = true AND weekly_reports_enabled = true'
     );
     for (const user of users.rows) {
-      await sendWeeklyReport(user.email, 'hello');
+      const report = await generateWeeklyReport(user.id);
+      await sendWeeklyReport(user.email, report.text, report.html);
     }
     console.log('Weekly reports sent!');
   } catch (err) {
