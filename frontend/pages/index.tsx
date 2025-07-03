@@ -256,7 +256,7 @@ export default function Dashboard() {
           fill="hsl(var(--muted-foreground))"
           fontSize={11}
         >
-          {formatCurrency(payload.value)}
+          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
         </text>
       </g>
     )
@@ -520,7 +520,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-card rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border border-border dark:shadow-white/10 dark:hover:shadow-white/20">
+                  <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-card rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-border dark:shadow-white/10 dark:hover:shadow-white/20 relative z-0">
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
@@ -541,9 +541,9 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="h-80">
+                  <div className="h-80 relative z-10">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getMonthlyChartData()}>
+                      <LineChart data={getMonthlyChartData()} margin={{ top: 0, right: 32, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
