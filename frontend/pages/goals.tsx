@@ -131,11 +131,14 @@ export default function Goals() {
 
   const handleEdit = (goal: Goal) => {
     setEditingGoal(goal);
+    const formattedDate = goal.target_date
+      ? new Date(goal.target_date).toISOString().slice(0, 10)
+      : '';
     reset({
       name: goal.name,
       target_amount: goal.target_amount.toString(),
       current_amount: goal.current_amount.toString(),
-      target_date: goal.target_date,
+      target_date: formattedDate,
       description: goal.description,
     });
     setIsDialogOpen(true);
