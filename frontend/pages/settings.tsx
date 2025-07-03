@@ -30,6 +30,16 @@ import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'react-hot-toast'
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog'
 
 interface DataRetentionSettings {
   autoDeleteEnabled: boolean
@@ -92,6 +102,7 @@ export default function Settings() {
     investmentExperience: 'beginner'
   })
   const [savingPlanningPrefs, setSavingPlanningPrefs] = useState(false)
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
 
   useEffect(() => {
     fetchSettings()
@@ -175,23 +186,16 @@ export default function Settings() {
   }
 
   const handleClearData = async () => {
-    if (!confirm('This will permanently delete ALL your data including transactions, goals, and watchlist. This action cannot be undone. Are you sure?')) {
-      return
-    }
-
+    setClearDialogOpen(false)
     try {
       setClearing(true)
-      
-      // Clear all data
       await Promise.all([
         api.delete('/transactions/clear-all'),
         api.delete('/goals/clear-all'),
         api.delete('/investments/clear-watchlist')
       ])
-      
       toast.success('All data cleared successfully')
       router.push('/')
-      
     } catch (error) {
       console.error('Error clearing data:', error)
       toast.error('Failed to clear data')
@@ -606,12 +610,12 @@ export default function Settings() {
                       </p>
                     </div>
                     <Button
-                      variant="outline"
-                      onClick={handleClearData}
+                      variant="destructive"
+                      onClick={() => setClearDialogOpen(true)}
                       disabled={clearing}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {clearing ? 'Clearing...' : 'Clear All Data'}
+                      Clear All Data
                     </Button>
                   </div>
 
@@ -675,6 +679,25 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Data</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <b>ALL</b> your data including transactions, goals, and watchlist. This action cannot be undone. Are you sure?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleClearData} disabled={clearing}>
+              {clearing ? 'Clearing...' : 'Yes, Delete Everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 } 

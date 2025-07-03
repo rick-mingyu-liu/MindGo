@@ -122,29 +122,29 @@ export default function Dashboard() {
     setRefreshing(false)
   }
 
-  const handleClearData = async () => {
-    if (confirm('This will clear all your data for testing purposes. Are you sure?')) {
-      try {
-        setRefreshing(true)
+  // const handleClearData = async () => {
+  //   if (confirm('This will clear all your data for testing purposes. Are you sure?')) {
+  //     try {
+  //       setRefreshing(true)
         
-        // Clear all user data
-        await Promise.all([
-          api.delete('/transactions/clear-all'),
-          api.delete('/goals/clear-all'),
-          api.delete('/investments/watchlist/clear-all')
-        ])
+  //       // Clear all user data
+  //       await Promise.all([
+  //         api.delete('/transactions/clear-all'),
+  //         api.delete('/goals/clear-all'),
+  //         api.delete('/investments/watchlist/clear-all')
+  //       ])
         
-        // Refresh dashboard
-        await fetchDashboardData()
-        toast.success('Data cleared for testing')
-      } catch (error) {
-        console.error('Error clearing data:', error)
-        toast.error('Failed to clear data')
-      } finally {
-        setRefreshing(false)
-      }
-    }
-  }
+  //       // Refresh dashboard
+  //       await fetchDashboardData()
+  //       toast.success('Data cleared for testing')
+  //     } catch (error) {
+  //       console.error('Error clearing data:', error)
+  //       toast.error('Failed to clear data')
+  //     } finally {
+  //       setRefreshing(false)
+  //     }
+  //   }
+  // }
 
   useEffect(() => {
     const token = localStorage.getItem('token')
