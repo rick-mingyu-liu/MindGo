@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
+const emailService = require('../services/emailService');
 
 const authController = {
   // Register new user
@@ -143,6 +144,18 @@ const authController = {
     } catch (error) {
       console.error('Update profile error:', error);
       res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Send test email
+  async sendTestEmail(req, res) {
+    try {
+      const userEmail = req.user.email;
+      await emailService.sendWeeklyReport(userEmail, 'Test email');
+      res.json({ message: 'Test email sent successfully' });
+    } catch (error) {
+      console.error('Test email error:', error);
+      res.status(500).json({ error: 'Failed to send test email' });
     }
   }
 };

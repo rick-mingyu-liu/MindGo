@@ -28,5 +28,6 @@ router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
 router.get('/profile', auth, authController.getProfile);
 router.put('/profile', auth, updateProfileValidation, authController.updateProfile);
+router.post('/test-email', auth, authController.sendTestEmail);
 
 module.exports = router; 

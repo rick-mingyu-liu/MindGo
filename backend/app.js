@@ -3,6 +3,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
+const cron = require('node-cron');
+const db = require('./db/connection');
+const { sendWeeklyReport } = require('./services/emailService');
 
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
@@ -105,5 +108,20 @@ app.listen(PORT, () => {
 setInterval(() => {
   aiController.autoDeleteOldAIPlans();
 }, 5 * 60 * 1000);
+
+// Schedule weekly report emails every Sunday at 7pm
+cron.schedule('0 19 * * 0', async () => {
+  try {
+    const users = await db.query(
+      'SELECT email FROM users WHERE email_notifications_enabled = true AND weekly_reports_enabled = true'
+    );
+    for (const user of users.rows) {
+      await sendWeeklyReport(user.email, 'hello');
+    }
+    console.log('Weekly reports sent!');
+  } catch (err) {
+    console.error('Error sending weekly reports:', err);
+  }
+});
 
 module.exports = app; 

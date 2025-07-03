@@ -405,6 +405,8 @@ export default function Dashboard() {
                       <li>• <strong>Create savings goals</strong> to track your financial targets</li>
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
                       <li>• <strong>Track your interested stocks</strong> to see how they perform and financial reports</li>
+                      <li>• <strong>Receive your weekly financial report</strong> to highlight your financial performance</li>
+
                     </ul>
                     <div className="flex gap-2">
                       <Button
