@@ -158,6 +158,21 @@ const authController = {
       console.error('Test email error:', error);
       res.status(500).json({ error: 'Failed to send test email' });
     }
+  },
+
+  // Update notification settings
+  async updateNotificationSettings(req, res) {
+    try {
+      const { weekly_reports_enabled, email_notifications_enabled } = req.body;
+      await db.query(
+        'UPDATE users SET weekly_reports_enabled = $1, email_notifications_enabled = $2 WHERE id = $3',
+        [weekly_reports_enabled, email_notifications_enabled, req.user.userId]
+      );
+      res.json({ message: 'Notification settings updated' });
+    } catch (error) {
+      console.error('Update notification settings error:', error);
+      res.status(500).json({ error: 'Failed to update notification settings' });
+    }
   }
 };
 

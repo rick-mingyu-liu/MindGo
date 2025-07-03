@@ -185,6 +185,21 @@ export default function Settings() {
     }
   }
 
+  const handleWeeklyReportToggle = async (checked: boolean) => {
+    setPreferences({
+      ...preferences,
+      notifications: { ...preferences.notifications, weeklyReport: checked }
+    });
+    try {
+      await api.put('/auth/notifications', {
+        weekly_reports_enabled: checked,
+        email_notifications_enabled: preferences.notifications.email
+      });
+      toast.success('Weekly report preference updated!');
+    } catch (error) {
+      toast.error('Failed to update weekly report preference');
+    }
+  };
 
   if (loading) {
     return (
@@ -410,10 +425,7 @@ export default function Settings() {
                   </div>
                   <Switch
                     checked={preferences.notifications.weeklyReport}
-                    onCheckedChange={(checked) => setPreferences({
-                      ...preferences,
-                      notifications: { ...preferences.notifications, weeklyReport: checked }
-                    })}
+                    onCheckedChange={handleWeeklyReportToggle}
                   />
                 </div>
 
