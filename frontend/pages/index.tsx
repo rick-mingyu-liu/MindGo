@@ -713,7 +713,7 @@ export default function Dashboard() {
                     <CardDescription>Track your financial goals</CardDescription>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => router.push('/goals')}
                   >
@@ -728,7 +728,7 @@ export default function Dashboard() {
                     {goals.slice(0, 3).map((goal) => {
                       const progress = (goal.current_amount / goal.target_amount) * 100;
                       return (
-                        <div key={goal.id} className="space-y-2">
+                        <div key={goal.id} className="p-3 border rounded-lg bg-background transition-shadow hover:shadow-md space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
                             <span className="text-sm text-muted-foreground">
@@ -768,7 +768,7 @@ export default function Dashboard() {
                     <CardDescription>Track your favorite stocks</CardDescription>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => router.push('/investments')}
                   >
@@ -781,7 +781,7 @@ export default function Dashboard() {
                 {watchlist.length > 0 ? (
                   <div className="space-y-3">
                     {watchlist.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between">
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md">
                         <div>
                           <div className="font-medium">{item.symbol}</div>
                           <div className="text-sm text-muted-foreground">{item.company_name}</div>

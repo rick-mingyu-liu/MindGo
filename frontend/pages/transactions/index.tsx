@@ -199,7 +199,7 @@ export default function Transactions() {
               {filteredTransactions.length > 0 ? (
                 <div className="space-y-3">
                   {filteredTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg bg-background transition-all hover:bg-white/5 hover:shadow-md hover:border-primary/30">
                       <div className="flex items-center space-x-4">
                         <div className={`w-3 h-3 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
                         <div>
