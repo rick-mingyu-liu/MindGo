@@ -466,7 +466,7 @@ export default function Goals() {
               </div>
               <div>
                 <Label className="font-semibold">Target Date</Label>
-                <div className="mt-1">{viewingGoal.target_date}</div>
+                <div className="mt-1">{viewingGoal.target_date ? new Date(viewingGoal.target_date).toISOString().slice(0, 10) : ''}</div>
               </div>
               <div>
                 <Label className="font-semibold">Description</Label>
