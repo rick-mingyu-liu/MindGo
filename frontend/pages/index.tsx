@@ -520,7 +520,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-white dark:bg-background rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-border">
+                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-card rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer border border-border dark:shadow-white/10 dark:hover:shadow-white/20">
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
