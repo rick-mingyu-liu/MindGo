@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2 } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -319,6 +319,55 @@ export default function Login() {
                 <Button variant="outline" onClick={() => setShowIntro(false)}>
                   Continue to Login
                 </Button>
+              </div>
+            </div>
+
+            {/* Ads and Collaboration Opportunities */}
+            <div className="border-t border-border pt-6">
+              <h3 className="text-xl font-semibold mb-4 text-green-700 dark:text-green-400">Partnership & Collaboration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                      <Volume2 className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-green-700 dark:text-green-400">Advertising Opportunities</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Reach our engaged community of financially conscious users. We offer targeted advertising solutions 
+                        for financial services, investment products, and educational content.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-teal-100 dark:bg-teal-900 rounded-lg">
+                      <Users2 className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-green-700 dark:text-green-400">Collaboration Opportunities</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Partner with us to create innovative financial solutions. We're open to strategic partnerships, 
+                        API integrations, and joint ventures that benefit our users.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Interested in advertising or collaboration? Get in touch with us.
+                </p>
+                <a 
+                  href="mailto:rickmyliu@gmail.com" 
+                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                >
+                  Contact Us
+                  <Mail className="ml-2 h-4 w-4" />
+                </a>
               </div>
             </div>
           </div>
