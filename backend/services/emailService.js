@@ -88,6 +88,17 @@ exports.generateWeeklyReport = async (userId) => {
       return '$' + parseFloat(val).toFixed(2);
     }
 
+    // Fetch user goals
+    const goalsRes = await db.query('SELECT name, current_amount, target_amount, target_date FROM savings_goals WHERE user_id = $1', [userId]);
+    const goals = goalsRes.rows;
+
+    // Fetch user's current balance (net worth)
+    let currentBalance = null;
+    const netWorthRes = await db.query('SELECT net_worth FROM users WHERE id = $1', [userId]);
+    if (netWorthRes.rows.length > 0) {
+      currentBalance = parseFloat(netWorthRes.rows[0].net_worth);
+    }
+
     // --- Plain Text Content ---
     let content = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}\n\n`;
     // Summary
@@ -96,7 +107,24 @@ exports.generateWeeklyReport = async (userId) => {
     content += `==========================\n`;
     content += pad('Total Income:', 18) + money(totalIncome) + '\n';
     content += pad('Total Expenses:', 18) + money(totalExpenses) + '\n';
-    content += pad('Net Income:', 18) + money(netIncome) + '\n\n';
+    content += pad('Net Income:', 18) + money(netIncome) + '\n';
+    if (currentBalance !== null) {
+      content += pad('Current Balance:', 18) + money(currentBalance) + '\n';
+    }
+    content += '\n';
+    // Goals Status
+    if (goals.length > 0) {
+      content += `==========================\n`;
+      content += `🎯 GOALS STATUS\n`;
+      content += `==========================\n`;
+      content += pad('Goal', 18) + pad('Current', 10) + pad('Target', 10) + pad('Date', 12) + pad('%', 6) + '\n';
+      content += '--------------------------------------------------------------\n';
+      goals.forEach(g => {
+        const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
+        content += pad(g.name, 18) + pad(money(g.current_amount), 10) + pad(money(g.target_amount), 10) + pad(g.target_date ? new Date(g.target_date).toLocaleDateString() : '-', 12) + pad(percent.toFixed(1) + '%', 6) + '\n';
+      });
+      content += '\n';
+    }
 
     // Income breakdown
     if (income.length > 0) {
@@ -180,6 +208,15 @@ exports.generateWeeklyReport = async (userId) => {
             const type = t.type === 'income' ? 'INCOME' : 'EXPENSE';
             const desc = t.description.length > 25 ? t.description.slice(0, 22) + '...' : t.description;
             return `<tr><td>${date}</td><td>${type}</td><td>${desc}</td><td align="right">${money(t.amount)}</td></tr>`;
+          }).join('')}
+        </table>
+
+        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">🎯 GOALS STATUS</h2>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
+          <tr style="background: #f7fafc;"><th align="left">Goal</th><th align="right">Current</th><th align="right">Target</th><th align="center">Date</th><th align="right">%</th></tr>
+          ${goals.map(g => {
+            const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
+            return `<tr><td>${g.name}</td><td align="right">${money(g.current_amount)}</td><td align="right">${money(g.target_amount)}</td><td align="center">${g.target_date ? new Date(g.target_date).toLocaleDateString() : '-'}</td><td align="right">${percent.toFixed(1)}%</td></tr>`;
           }).join('')}
         </table>
 
