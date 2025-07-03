@@ -255,7 +255,7 @@ export default function Dashboard() {
           y={0} 
           dy={4} 
           textAnchor="end" 
-          fill="hsl(var(--muted-foreground))"
+          fill={resolvedTheme === 'dark' ? '#e5e7eb' : '#374151'}
           fontSize={11}
         >
           {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
@@ -580,11 +580,7 @@ export default function Dashboard() {
                           tickLine={false}
                         />
                         <YAxis
-                          tick={{
-                            fill: resolvedTheme === 'dark' ? '#e5e7eb' : '#374151',
-                            fontSize: 13,
-                            fontWeight: 500
-                          }}
+                          tick={CustomYTick}
                           axisLine={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
                           tickLine={false}
                           tickMargin={10}
