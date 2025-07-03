@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 
 exports.sendWeeklyReport = async (to, content, htmlContent) => {
   await transporter.sendMail({
-    from: process.env.EMAIL_USER,
+    from: `"MindGo" <${process.env.EMAIL_USER}>`,
     to,
     subject: 'Your Weekly Financial Report',
     text: content,
