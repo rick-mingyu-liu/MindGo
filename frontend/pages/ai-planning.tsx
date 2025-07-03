@@ -58,6 +58,7 @@ export default function AIPlanning() {
   const [editingPrefs, setEditingPrefs] = useState(false)
   const [prefsDraft, setPrefsDraft] = useState<{ riskTolerance: string, lifeStage: string, investmentExperience: string } | null>(null)
   const [savingPrefs, setSavingPrefs] = useState(false)
+  const [moveGoalAmountHint, setMoveGoalAmountHint] = useState('')
   
   const {
     register,
@@ -440,9 +441,21 @@ export default function AIPlanning() {
                       className="bg-black text-white hover:bg-neutral-800 transition-colors duration-150"
                       onClick={() => {
                         setMoveGoalName(watch('financialGoal') || '')
-                        // Try to extract a number from the goal string for amount
-                        const match = (watch('financialGoal') || '').match(/\$?([\d,]+(\.\d+)?)/)
-                        setMoveGoalAmount(match ? match[1].replace(/,/g, '') : '')
+                        const goalStr = watch('financialGoal') || '';
+                        const match = goalStr.match(/\$?([\d,]+(\.\d+)?)([KMBkmb])?/);
+                        if (match) {
+                          let num = match[1].replace(/,/g, '');
+                          let shorthand = match[3] ? match[3].toUpperCase() : '';
+                          let numericValue = num;
+                          if (shorthand === 'K') numericValue = String(parseFloat(num) * 1e3);
+                          if (shorthand === 'M') numericValue = String(parseFloat(num) * 1e6);
+                          if (shorthand === 'B') numericValue = String(parseFloat(num) * 1e9);
+                          setMoveGoalAmount(numericValue);
+                          setMoveGoalAmountHint(shorthand ? `${num}${shorthand}` : '');
+                        } else {
+                          setMoveGoalAmount('');
+                          setMoveGoalAmountHint('');
+                        }
                         setMoveGoalDate('')
                         setShowMoveGoal(true)
                       }}
@@ -490,7 +503,15 @@ export default function AIPlanning() {
                       required: 'Target amount is required',
                       min: { value: 0.01, message: 'Target amount must be greater than 0' },
                     })}
+                    value={moveGoalAmount}
+                    onChange={e => {
+                      setMoveGoalAmount(e.target.value);
+                      setMoveGoalAmountHint('');
+                    }}
                   />
+                  {moveGoalAmountHint && (
+                    <p className="text-xs text-muted-foreground">Detected: {moveGoalAmountHint}</p>
+                  )}
                   {moveGoalErrors.target_amount && (
                     <p className="text-sm text-destructive">{moveGoalErrors.target_amount.message}</p>
                   )}
