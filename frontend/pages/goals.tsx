@@ -276,16 +276,22 @@ export default function Goals() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="target_date">Target Date</Label>
+                        <Label htmlFor="target_date">Target Date <span className="text-red-500">*</span></Label>
                         <Input
                           id="target_date"
                           type="date"
+                          placeholder="Select a date"
+                          aria-invalid={!!errors.target_date}
+                          aria-describedby={errors.target_date ? 'target_date-error' : undefined}
+                          className={errors.target_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
                           {...register('target_date', {
                             required: 'Target date is required',
                           })}
                         />
                         {errors.target_date && (
-                          <p className="text-sm text-destructive">{errors.target_date.message}</p>
+                          <p id="target_date-error" className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
+                            <Calendar className="w-4 h-4 text-red-500" /> {errors.target_date.message}
+                          </p>
                         )}
                       </div>
 
