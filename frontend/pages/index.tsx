@@ -102,16 +102,12 @@ export default function Dashboard() {
       setTransactions(transactionsRes.data.transactions)
 
       // Check if this is a new user (has very little data or sample data)
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
-      const hasSampleData = summaryRes.data.transactions?.some((t: any) => 
-        t.description.includes('Sample')
-      )
       const hasVeryLittleData = summaryRes.data.transactions?.length <= 6 && 
                                goalsRes.data.goals.length <= 1 && 
                                watchlistRes.data.watchlist.length <= 3
       
       // Show welcome message for users with sample data or very little data
-      setIsNewUser(hasSampleData || hasVeryLittleData)
+      setIsNewUser(hasVeryLittleData)
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -397,15 +393,16 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Welcome to Personal Finance App! 🎉
+                      Welcome to MindGo! 🎉
                     </h3>
                     <p className="text-blue-800 mb-4">
-                      We've created some sample data to help you get started. You can:
+                      You've started your journey to financial freedom. Let's get you started with some basic steps:
                     </p>
                     <ul className="text-blue-800 space-y-1 mb-4">
                       <li>• <strong>Add your own transactions</strong> by clicking "Add Transaction"</li>
                       <li>• <strong>Create savings goals</strong> to track your financial targets</li>
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
+                      <li>• <strong>Track your interested stocks</strong> to see how they perform and financial reports</li>
                     </ul>
                     <div className="flex gap-2">
                       <Button
@@ -422,6 +419,22 @@ export default function Dashboard() {
                       >
                         <Target className="w-4 h-4 mr-2" />
                         Create a Goal
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push('/ai-planning')}
+                      >
+                        <Brain className="w-4 h-4 mr-2" />
+                        AI Planning
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push('/investments')}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Add to Watchlist
                       </Button>
                     </div>
                   </div>
