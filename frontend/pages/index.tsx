@@ -831,7 +831,7 @@ export default function Dashboard() {
               {transactions.length > 0 ? (
                 <div className="space-y-3">
                   {transactions.slice(0, 5).map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md">
                       <div className="flex items-center space-x-3">
                         <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
                         <div>
