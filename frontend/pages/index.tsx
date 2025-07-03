@@ -447,7 +447,7 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
@@ -462,7 +462,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
@@ -477,7 +477,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Net Income</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
@@ -492,7 +492,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
                 <Target className="h-4 w-4 text-orange-600" />
@@ -510,7 +510,7 @@ export default function Dashboard() {
           {summary && summary.monthlyBreakdown && summary.monthlyBreakdown.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Monthly Trend Chart */}
-              <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
@@ -522,7 +522,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-card rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer border border-border dark:shadow-white/10 dark:hover:shadow-white/20 relative z-0">
+                  <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-card rounded-lg shadow hover:shadow-md transition-shadow border border-border dark:shadow-white/10 dark:hover:shadow-white/20 relative z-0">
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
@@ -638,7 +638,7 @@ export default function Dashboard() {
               </Card>
 
               {/* Category Breakdown */}
-              <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader>
                   <CardTitle>Spending by Category</CardTitle>
                   <CardDescription>
@@ -712,7 +712,7 @@ export default function Dashboard() {
           {/* Goals and Watchlist */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Savings Goals */}
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -767,7 +767,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Investment Watchlist */}
-            <Card className="transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -817,7 +817,7 @@ export default function Dashboard() {
           </div>
 
           {/* Recent Transactions */}
-          <Card className="mb-8 mt-8 transition-colors duration-200 hover:bg-muted/80 cursor-pointer dark:hover:bg-white/2.5">
+          <Card className="mb-8 mt-8 transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
