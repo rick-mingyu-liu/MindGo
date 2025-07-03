@@ -545,7 +545,7 @@ export default function Dashboard() {
 
                   <div className="h-80 relative z-10">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getMonthlyChartData()} margin={{ top: 0, right: 32, left: 0, bottom: 0 }}>
+                      <LineChart data={getMonthlyChartData()} margin={{ top: 0, right: 32, left: 0, bottom: 0 }} style={{ cursor: 'pointer' }}>
                         <defs>
                           <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
@@ -592,8 +592,8 @@ export default function Dashboard() {
                           stroke={resolvedTheme === 'dark' ? '#4ade80' : '#22c55e'}
                           strokeWidth={3} 
                           name="Income"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, style: { cursor: 'pointer' } }}
                         />
                         <Line 
                           type="monotone" 
@@ -601,8 +601,8 @@ export default function Dashboard() {
                           stroke={resolvedTheme === 'dark' ? '#f87171' : '#ef4444'}
                           strokeWidth={3} 
                           name="Expenses"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, style: { cursor: 'pointer' } }}
                         />
                         <Line 
                           type="monotone" 
@@ -610,8 +610,8 @@ export default function Dashboard() {
                           stroke={resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6'}
                           strokeWidth={3} 
                           name="Net"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, style: { cursor: 'pointer' } }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -648,7 +648,7 @@ export default function Dashboard() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                      <PieChart style={{ cursor: 'pointer' }}>
                         <Pie
                           data={getCategoryChartData()}
                           cx="50%"
@@ -658,9 +658,10 @@ export default function Dashboard() {
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
+                          style={{ cursor: 'pointer' }}
                         >
                           {getCategoryChartData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} style={{ cursor: 'pointer' }} />
                           ))}
                         </Pie>
                         <Tooltip formatter={(value) => formatCurrency(value as number)} />
