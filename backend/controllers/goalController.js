@@ -199,8 +199,8 @@ const goalController = {
   async createGoalFromAIPlan(req, res) {
     try {
       const { aiPlanId, name, target_amount, target_date, description } = req.body;
-      if (!aiPlanId || !name || !target_amount) {
-        return res.status(400).json({ error: 'aiPlanId, name, and target_amount are required' });
+      if (!aiPlanId || !name || !target_amount || !target_date) {
+        return res.status(400).json({ error: 'aiPlanId, name, target_amount, and target_date are required' });
       }
       // Check if AI plan exists and belongs to user
       const planResult = await db.query(

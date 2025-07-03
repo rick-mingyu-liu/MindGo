@@ -10,6 +10,7 @@ const summaryRoutes = require('./routes/summary');
 const goalRoutes = require('./routes/goals');
 const investmentRoutes = require('./routes/investments');
 const aiRoutes = require('./routes/ai');
+const aiController = require('./controllers/aiController');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -99,5 +100,10 @@ app.listen(PORT, () => {
   console.log(`  POST   http://localhost:${PORT}/ai/budget-recommendations      (aiController.generateBudgetRecommendations)`);
   console.log(`  POST   http://localhost:${PORT}/ai/investment-advice           (aiController.generateInvestmentAdvice)`);
 });
+
+// Periodically delete AI plans older than 30 minutes (every 5 minutes)
+setInterval(() => {
+  aiController.autoDeleteOldAIPlans();
+}, 5 * 60 * 1000);
 
 module.exports = app; 

@@ -413,6 +413,18 @@ const aiController = {
       console.error('Generate investment advice error:', error);
       res.status(500).json({ error: 'Failed to generate investment advice' });
     }
+  },
+
+  // Auto-delete AI plans older than 30 minutes
+  async autoDeleteOldAIPlans() {
+    try {
+      const result = await db.query(
+        `DELETE FROM ai_plans WHERE created_at < NOW() - INTERVAL '30 minutes'`
+      );
+      console.log(`Auto-deleted ${result.rowCount} old AI plans.`);
+    } catch (error) {
+      console.error('Auto-delete old AI plans error:', error);
+    }
   }
 };
 

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ReactMarkdown from 'react-markdown'
 import React from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 
 interface PlanningForm {
   financialGoal: string
@@ -66,10 +67,37 @@ export default function AIPlanning() {
     formState: { errors },
   } = useForm<PlanningForm>()
 
+  const {
+    register: registerMoveGoal,
+    handleSubmit: handleSubmitMoveGoal,
+    reset: resetMoveGoal,
+    formState: { errors: moveGoalErrors },
+    setValue: setMoveGoalValue,
+  } = useForm({
+    defaultValues: {
+      name: moveGoalName,
+      target_amount: moveGoalAmount,
+      current_amount: '0',
+      target_date: moveGoalDate,
+      description: planningResponse?.analysis || '',
+    },
+  })
+
   useEffect(() => {
     const saved = localStorage.getItem('planningPrefs')
     if (saved) setPlanningPrefs(JSON.parse(saved))
   }, [])
+
+  useEffect(() => {
+    if (showMoveGoal) {
+      setMoveGoalValue('name', moveGoalName);
+      setMoveGoalValue('target_amount', moveGoalAmount);
+      setMoveGoalValue('current_amount', '0');
+      setMoveGoalValue('target_date', moveGoalDate);
+      setMoveGoalValue('description', planningResponse?.analysis || '');
+    }
+    // eslint-disable-next-line
+  }, [showMoveGoal]);
 
   const onSubmit = async (data: PlanningForm) => {
     try {
@@ -98,31 +126,31 @@ export default function AIPlanning() {
     setValue('financialGoal', prompt)
   }
 
-  const handleMoveGoal = async () => {
-    if (!planningResponse) return
-    setMoveGoalLoading(true)
+  const onMoveGoalSubmit = async (data: any) => {
+    setMoveGoalLoading(true);
     try {
-      const aiPlanId = planningResponse.plan?.id
+      const aiPlanId = planningResponse?.plan?.id;
       if (!aiPlanId) {
-        toast.error('AI plan ID not found. Please try again.')
-        setMoveGoalLoading(false)
-        return
+        toast.error('AI plan ID not found. Please try again.');
+        setMoveGoalLoading(false);
+        return;
       }
       await goalAPI.createFromAIPlan({
         aiPlanId,
-        name: moveGoalName,
-        target_amount: parseFloat(moveGoalAmount),
-        target_date: moveGoalDate || undefined,
-        description: planningResponse.analysis || undefined
-      })
-      toast.success('Goal moved to active goals!')
-      setShowMoveGoal(false)
+        name: data.name,
+        target_amount: parseFloat(data.target_amount),
+        target_date: data.target_date,
+        description: data.description,
+      });
+      toast.success('Goal moved to active goals!');
+      setShowMoveGoal(false);
+      resetMoveGoal();
     } catch (err) {
       // Error handled by API interceptor
     } finally {
-      setMoveGoalLoading(false)
+      setMoveGoalLoading(false);
     }
-  }
+  };
 
   const handleEditPrefs = () => {
     setPrefsDraft(planningPrefs)
@@ -430,35 +458,94 @@ export default function AIPlanning() {
       </div>
 
       {showMoveGoal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Move to Active Goals</h2>
-            <div className="mb-3">
-              <Label>Goal Name</Label>
-              <Input value={moveGoalName} onChange={e => setMoveGoalName(e.target.value)} placeholder="Goal name" />
-            </div>
-            <div className="mb-3">
-              <Label>Target Amount ($)</Label>
-              <Input type="number" value={moveGoalAmount} onChange={e => setMoveGoalAmount(e.target.value)} placeholder="Target amount" />
-            </div>
-            <div className="mb-3">
-              <Label>Target Date</Label>
-              <Input type="date" value={moveGoalDate} onChange={e => setMoveGoalDate(e.target.value)} />
-            </div>
-            <div className="mb-3">
-              <Label>Description</Label>
-              <Textarea value={planningResponse?.analysis || ''} readOnly className="min-h-[80px]" />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <Button onClick={handleMoveGoal} disabled={moveGoalLoading}>
-                {moveGoalLoading ? 'Saving...' : 'Save Goal'}
-              </Button>
-              <Button variant="outline" onClick={() => setShowMoveGoal(false)} disabled={moveGoalLoading}>
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Dialog open={showMoveGoal} onOpenChange={setShowMoveGoal}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] min-h-[500px] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Move to Active Goals</DialogTitle>
+              <DialogDescription>
+                Set up a new savings goal with target amount and timeline
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitMoveGoal(onMoveGoalSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="movegoal-name">Goal Name</Label>
+                <Input
+                  id="movegoal-name"
+                  placeholder="e.g., Emergency Fund, House Down Payment"
+                  {...registerMoveGoal('name', { required: 'Goal name is required' })}
+                />
+                {moveGoalErrors.name && (
+                  <p className="text-sm text-destructive">{moveGoalErrors.name.message}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="movegoal-target-amount">Target Amount ($)</Label>
+                  <Input
+                    id="movegoal-target-amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    {...registerMoveGoal('target_amount', {
+                      required: 'Target amount is required',
+                      min: { value: 0.01, message: 'Target amount must be greater than 0' },
+                    })}
+                  />
+                  {moveGoalErrors.target_amount && (
+                    <p className="text-sm text-destructive">{moveGoalErrors.target_amount.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="movegoal-current-amount">Current Amount ($)</Label>
+                  <Input
+                    id="movegoal-current-amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    {...registerMoveGoal('current_amount', {
+                      required: 'Current amount is required',
+                      min: { value: 0, message: 'Current amount cannot be negative' },
+                    })}
+                  />
+                  {moveGoalErrors.current_amount && (
+                    <p className="text-sm text-destructive">{moveGoalErrors.current_amount.message}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="movegoal-target-date">Target Date <span className="text-red-500">*</span></Label>
+                <Input
+                  id="movegoal-target-date"
+                  type="date"
+                  placeholder="Select a date"
+                  {...registerMoveGoal('target_date', { required: 'Target date is required' })}
+                />
+                {moveGoalErrors.target_date && (
+                  <p className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
+                    {moveGoalErrors.target_date.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="movegoal-description">Description (optional)</Label>
+                <Textarea
+                  id="movegoal-description"
+                  placeholder="Additional details about your goal..."
+                  {...registerMoveGoal('description')}
+                  className="min-h-[300px]"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => { setShowMoveGoal(false); resetMoveGoal(); }} className="flex-1" disabled={moveGoalLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={moveGoalLoading}>
+                  {moveGoalLoading ? 'Saving...' : 'Save Goal'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   )

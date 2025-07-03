@@ -13,7 +13,7 @@ const goalValidation = [
   body('name').notEmpty().withMessage('Goal name is required'),
   body('target_amount').isFloat({ min: 0.01 }).withMessage('Target amount must be a positive number'),
   body('current_amount').optional().isFloat({ min: 0 }).withMessage('Current amount must be a non-negative number'),
-  body('target_date').optional().isISO8601().withMessage('Target date must be a valid date')
+  body('target_date').isISO8601().withMessage('Target date is required and must be a valid date')
 ];
 
 const progressValidation = [
