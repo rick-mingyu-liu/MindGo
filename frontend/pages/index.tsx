@@ -520,7 +520,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg">
+                  <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted rounded-lg border transition-shadow hover:shadow-md dark:hover:shadow-white/10">
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
@@ -728,7 +728,7 @@ export default function Dashboard() {
                     {goals.slice(0, 3).map((goal) => {
                       const progress = (goal.current_amount / goal.target_amount) * 100;
                       return (
-                        <div key={goal.id} className="p-3 border rounded-lg bg-background transition-shadow hover:shadow-md space-y-2">
+                        <div key={goal.id} className="p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/10 space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
                             <span className="text-sm text-muted-foreground">
@@ -781,7 +781,7 @@ export default function Dashboard() {
                 {watchlist.length > 0 ? (
                   <div className="space-y-3">
                     {watchlist.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md">
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/10">
                         <div>
                           <div className="font-medium">{item.symbol}</div>
                           <div className="text-sm text-muted-foreground">{item.company_name}</div>
@@ -831,7 +831,7 @@ export default function Dashboard() {
               {transactions.length > 0 ? (
                 <div className="space-y-3">
                   {transactions.slice(0, 5).map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md">
+                    <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/10">
                       <div className="flex items-center space-x-3">
                         <div className={`w-2 h-2 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
                         <div>
