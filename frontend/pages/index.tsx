@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { toast } from 'react-hot-toast'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface FinancialSummary {
   period: string
@@ -84,6 +85,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const { resolvedTheme } = useTheme();
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -560,52 +562,60 @@ export default function Dashboard() {
                         </defs>
                         <CartesianGrid 
                           strokeDasharray="3 3" 
-                          stroke="hsl(var(--border))" 
+                          stroke={resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)'}
                           strokeWidth={1}
-                          opacity={0.5}
+                          opacity={1}
                         />
                         <XAxis
                           dataKey="month"
                           tickFormatter={(str) => {
                             return str.split(' ')[0]
                           }}
-                          tick={CustomAxisTick}
-                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                          tick={{
+                            fill: resolvedTheme === 'dark' ? '#e5e7eb' : '#374151',
+                            fontSize: 13,
+                            fontWeight: 500
+                          }}
+                          axisLine={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
                           tickLine={false}
                         />
                         <YAxis
-                          tick={CustomYTick}
-                          axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                          tick={{
+                            fill: resolvedTheme === 'dark' ? '#e5e7eb' : '#374151',
+                            fontSize: 13,
+                            fontWeight: 500
+                          }}
+                          axisLine={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
                           tickLine={false}
                           tickMargin={10}
                         />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)', strokeWidth: 2 }} />
                         <Line 
                           type="monotone" 
                           dataKey="income" 
-                          stroke="#22c55e" 
+                          stroke={resolvedTheme === 'dark' ? '#4ade80' : '#22c55e'}
                           strokeWidth={3} 
                           name="Income"
-                          dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2 }}
                         />
                         <Line 
                           type="monotone" 
                           dataKey="expenses" 
-                          stroke="#ef4444" 
+                          stroke={resolvedTheme === 'dark' ? '#f87171' : '#ef4444'}
                           strokeWidth={3} 
                           name="Expenses"
-                          dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: '#ef4444', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2 }}
                         />
                         <Line 
                           type="monotone" 
                           dataKey="net" 
-                          stroke="#3b82f6" 
+                          stroke={resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6'}
                           strokeWidth={3} 
                           name="Net"
-                          dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+                          dot={{ fill: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
