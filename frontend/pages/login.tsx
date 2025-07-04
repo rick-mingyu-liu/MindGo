@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ export default function Login() {
   const [showIntro, setShowIntro] = useState(false)
   const [verificationError, setVerificationError] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
   
   const {
     register,
@@ -41,6 +42,7 @@ export default function Login() {
     try {
       setLoading(true)
       setVerificationError('')
+      setLoginError('')
       
       const response = await api.post('/auth/login', data)
       
@@ -56,6 +58,10 @@ export default function Login() {
       
       if (error.response?.data?.requiresVerification) {
         setVerificationError(error.response.data.error)
+      } else if (error.response?.data?.error) {
+        setLoginError(error.response.data.error)
+      } else {
+        setLoginError('An unexpected error occurred. Please try again.')
       }
       // Other error handling is done in api interceptor
     } finally {
@@ -128,6 +134,19 @@ export default function Login() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {loginError && (
+                <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                        {loginError}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {verificationError && (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <div className="flex items-start space-x-2">
@@ -172,7 +191,7 @@ export default function Login() {
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.email.message}</p>
                   )}
                 </div>
 
@@ -211,7 +230,7 @@ export default function Login() {
                     </Button>
                   </div>
                   {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.password.message}</p>
                   )}
                 </div>
 

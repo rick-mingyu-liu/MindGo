@@ -207,7 +207,7 @@ export default function Register() {
                       />
                     </div>
                     {errors.first_name && (
-                      <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.first_name.message}</p>
                     )}
                   </div>
 
@@ -232,7 +232,7 @@ export default function Register() {
                       />
                     </div>
                     {errors.last_name && (
-                      <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.last_name.message}</p>
                     )}
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export default function Register() {
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.email.message}</p>
                   )}
                 </div>
 
@@ -298,7 +298,7 @@ export default function Register() {
                     </Button>
                   </div>
                   {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.password.message}</p>
                   )}
                 </div>
 
@@ -334,7 +334,7 @@ export default function Register() {
                     </Button>
                   </div>
                   {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.confirmPassword.message}</p>
                   )}
                 </div>
 
