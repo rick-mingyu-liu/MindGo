@@ -307,7 +307,7 @@ export default function Investments() {
                       <TableHead>Symbol</TableHead>
                       <TableHead className="hidden sm:table-cell">Company</TableHead>
                       <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right">Change</TableHead>
+                      <TableHead className="text-right hidden sm:table-cell">Change</TableHead>
                       <TableHead className="text-right">Change %</TableHead>
                       <TableHead className="text-right w-16 sm:w-auto">Actions</TableHead>
                     </TableRow>
@@ -320,7 +320,7 @@ export default function Investments() {
                         <TableCell className="text-right">
                           {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right hidden sm:table-cell">
                           {item.change ? (
                             <div className={`flex items-center justify-end gap-1 ${
                               item.change >= 0 ? 'text-green-600' : 'text-red-600'
