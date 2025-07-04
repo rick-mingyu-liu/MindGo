@@ -20,7 +20,9 @@ exports.sendWeeklyReport = async (to, content, htmlContent) => {
 };
 
 exports.sendEmailVerification = async (to, firstName, verificationToken) => {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+  console.log(`[EmailService] Using verification URL: ${verificationUrl}`);
   
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
