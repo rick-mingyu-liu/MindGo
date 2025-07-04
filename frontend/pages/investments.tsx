@@ -305,18 +305,18 @@ export default function Investments() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Symbol</TableHead>
-                      <TableHead>Company</TableHead>
+                      <TableHead className="hidden sm:table-cell">Company</TableHead>
                       <TableHead className="text-right">Price</TableHead>
                       <TableHead className="text-right">Change</TableHead>
                       <TableHead className="text-right">Change %</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right w-16 sm:w-auto">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredWatchlist.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.symbol}</TableCell>
-                        <TableCell>{item.company_name}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{item.company_name}</TableCell>
                         <TableCell className="text-right">
                           {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
                         </TableCell>
@@ -346,7 +346,7 @@ export default function Investments() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
                             <StockDetailModal
                               symbol={item.symbol}
                               companyName={item.company_name}
@@ -354,13 +354,14 @@ export default function Investments() {
                               change={item.change}
                               changePercent={item.changePercent}
                             >
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="icon" className="w-7 h-7 p-0">
                                 <Eye className="w-4 h-4" />
-                            </Button>
+                              </Button>
                             </StockDetailModal>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="w-7 h-7 p-0"
                               onClick={() => handleDelete(item.id)}
                             >
                               <Trash2 className="w-4 h-4" />
