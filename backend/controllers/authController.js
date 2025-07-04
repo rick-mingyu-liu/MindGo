@@ -30,22 +30,32 @@ async function validateEmailMailboxLayer(email) {
   try {
     const response = await axios.get(url);
     const data = response.data;
-    // Check for valid, deliverable, non-disposable email
+    console.log('[MailboxLayer] Response for', email, ':', data); // Detailed logging
+
     if (!data.format_valid) {
       return { valid: false, reason: 'Invalid email format' };
-    }
-    if (!data.mx_found) {
-      return { valid: false, reason: 'Email domain cannot receive mail' };
     }
     if (data.disposable) {
       return { valid: false, reason: 'Disposable email addresses are not allowed' };
     }
-    if (data.smtp_check === false) {
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    const majorDomains = [
+      'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com',
+      '163.com', 'qq.com', 'sina.com', '126.com', '139.com', 'sohu.com'
+    ];
+    // Loosen MX/SMTP checks for major and Chinese providers
+    if ((!data.mx_found || !data.smtp_check) && majorDomains.includes(emailDomain)) {
+      return { valid: true };
+    }
+    if (!data.mx_found) {
+      return { valid: false, reason: 'Email domain cannot receive mail' };
+    }
+    if (!data.smtp_check) {
       return { valid: false, reason: 'Email address is not deliverable' };
     }
     return { valid: true };
   } catch (error) {
-    console.error('MailboxLayer API error:', error);
+    console.error('MailboxLayer API error:', error?.response?.data || error.message || error);
     return { valid: false, reason: 'Email validation service error' };
   }
 }
