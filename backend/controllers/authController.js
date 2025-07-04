@@ -42,9 +42,6 @@ const authController = {
 
       const userId = newUser.rows[0].id;
 
-      // Create sample data for new user
-      await createSampleDataForNewUser(userId);
-
       // Send verification email
       try {
         await sendEmailVerification(email, first_name, verificationToken);
