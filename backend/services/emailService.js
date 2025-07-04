@@ -99,8 +99,30 @@ exports.generateWeeklyReport = async (userId) => {
       currentBalance = parseFloat(netWorthRes.rows[0].net_worth);
     }
 
+    // Fetch 4-month net income summary (dashboard style)
+    const fourMonthsAgo = new Date();
+    fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 3); // includes current month
+    const endOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+    const rollingTx = await db.query(
+      `SELECT * FROM transactions WHERE user_id = $1 AND date >= $2 AND date < $3`,
+      [userId, fourMonthsAgo.toISOString().split('T')[0], endOfThisMonth.toISOString().split('T')[0]]
+    );
+    let rollingIncome = 0, rollingExpenses = 0;
+    rollingTx.rows.forEach(t => {
+      if (t.type === 'income') rollingIncome += parseFloat(t.amount);
+      else if (t.type === 'expense') rollingExpenses += parseFloat(t.amount);
+    });
+    const rollingNetIncome = rollingIncome - rollingExpenses;
+
     // --- Plain Text Content ---
     let content = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}\n\n`;
+    // Dashboard-style 4-month summary
+    content += `==========================\n`;
+    content += `📅 LAST 4 MONTHS SUMMARY\n`;
+    content += `==========================\n`;
+    content += pad('Total Income:', 18) + money(rollingIncome) + '\n';
+    content += pad('Total Expenses:', 18) + money(rollingExpenses) + '\n';
+    content += pad('Net Income:', 18) + money(rollingNetIncome) + '\n\n';
     // Summary
     content += `==========================\n`;
     content += `💰 WEEKLY SUMMARY\n`;
@@ -178,6 +200,13 @@ exports.generateWeeklyReport = async (userId) => {
       <div style="font-family: Arial, sans-serif; color: #222; max-width: 600px; margin: auto;">
         <h1 style="font-size: 2em; color: #2d3748; margin-bottom: 0.2em;">📊 WEEKLY FINANCIAL REPORT</h1>
         <div style="font-size: 1.1em; margin-bottom: 1.5em;">Period: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}</div>
+
+        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📅 LAST 4 MONTHS SUMMARY</h2>
+        <table style="width: 100%; font-size: 1.1em; margin-bottom: 1.5em;">
+          <tr><td>Total Income:</td><td style="font-weight: bold;">${money(rollingIncome)}</td></tr>
+          <tr><td>Total Expenses:</td><td style="font-weight: bold;">${money(rollingExpenses)}</td></tr>
+          <tr><td>Net Income:</td><td style="font-weight: bold; color: ${rollingNetIncome >= 0 ? '#38a169' : '#e53e3e'};">${money(rollingNetIncome)}</td></tr>
+        </table>
 
         <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">💰 WEEKLY SUMMARY</h2>
         <table style="width: 100%; font-size: 1.1em; margin-bottom: 1.5em;">

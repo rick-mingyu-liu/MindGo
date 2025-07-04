@@ -420,7 +420,7 @@ export default function Settings() {
                   <div className="space-y-0.5">
                     <Label className="text-base">Weekly Reports</Label>
                     <p className="text-sm text-muted-foreground">
-                      Get weekly financial summaries
+                      Get weekly financial summary by email every Sunday at 7 p.m.
                     </p>
                   </div>
                   <Switch

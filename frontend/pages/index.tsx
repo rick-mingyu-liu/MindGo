@@ -432,9 +432,9 @@ export default function Dashboard() {
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
                       <li>• <strong>Track your interested stocks</strong> to see how they perform and financial reports</li>
                       <li>• <strong>Receive your weekly financial report</strong> to highlight your financial performance</li>
-
+                      <li>• <strong>Manage your settings</strong> to customize your experience</li>
                     </ul>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
                         onClick={() => router.push('/transactions/new')}
@@ -465,6 +465,14 @@ export default function Dashboard() {
                       >
                         <Eye className="w-4 h-4 mr-2" />
                         Add to Watchlist
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSendReport}
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Send Report
                       </Button>
                     </div>
                   </div>
