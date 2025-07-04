@@ -365,7 +365,7 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold aurora-text">MindGo</h1>
                 <p className="text-muted-foreground">Your financial overview</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <ThemeToggle />
                 <Button
                   variant="outline"
