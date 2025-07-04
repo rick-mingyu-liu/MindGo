@@ -449,7 +449,7 @@ export default function Dashboard() {
         <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
           {/* Welcome Message for New Users */}
           {isNewUser && (
-            <Card className="mb-8 border-blue-200 bg-blue-50 transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
+            <Card className="mb-8 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50 transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-900/30">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
@@ -458,13 +458,13 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                    <h3 className="text-lg font-semibold text-blue-900 dark:text-white mb-2">
                       Welcome to MindGo! 🎉
                     </h3>
-                    <p className="text-blue-800 mb-4">
+                    <p className="text-blue-800 dark:text-blue-200 mb-4">
                       You've started your journey to financial freedom. Let's get you started with some basic steps:
                     </p>
-                    <ul className="text-blue-800 space-y-1 mb-4">
+                    <ul className="text-blue-800 dark:text-blue-200 space-y-1 mb-4">
                       <li>• <strong>Add your own transactions</strong> by clicking "Add Transaction"</li>
                       <li>• <strong>Create savings goals</strong> to track your financial targets</li>
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
@@ -472,7 +472,7 @@ export default function Dashboard() {
                       <li>• <strong>Receive your weekly financial report</strong> to highlight your financial performance</li>
                       <li>• <strong>Manage your settings</strong> to customize your experience</li>
                     </ul>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-col sm:flex-row">
                       <Button
                         size="sm"
                         onClick={() => router.push('/transactions/new')}
