@@ -263,7 +263,7 @@ export function StockDetailModal({
               <div className="text-2xl font-bold">{formatCurrency(currentPrice)}</div>
               <div className={`flex items-center gap-1 text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {getChangeIcon()}
-                {formatCurrency(Math.abs(change))} ({changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%)
+                {formatCurrency(Math.abs(typeof change === 'number' ? change : 0))} ({(typeof changePercent === 'number' ? (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) : '0.00')}%)
               </div>
             </div>
           </DialogTitle>

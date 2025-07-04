@@ -159,22 +159,22 @@ export default function Investments() {
         {/* Header */}
         <header className="border-b bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-6 gap-4 sm:gap-0">
               <div className="flex items-center">
                 <Button
                   variant="ghost"
-                  onClick={() => router.push('/')}
-                  className="mr-4"
+                  onClick={() => router.push('/')} 
+                  className="mr-4 flex items-center"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
+                  <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
                 </Button>
                 <div>
                   <h1 className="text-3xl font-bold">Investment Watchlist</h1>
                   <p className="text-muted-foreground">Track your favorite stocks and investments</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="hidden sm:flex gap-2">
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -235,6 +235,15 @@ export default function Investments() {
             </div>
           </div>
         </header>
+
+        {/* FAB for mobile */}
+        <button
+          className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full fab-add-transaction"
+          onClick={() => setIsDialogOpen(true)}
+          aria-label="Add Stock"
+        >
+          <Plus className="w-8 h-8" />
+        </button>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Info Section */}

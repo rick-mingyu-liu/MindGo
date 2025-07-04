@@ -194,10 +194,10 @@ export default function Goals() {
                 <Button
                   variant="ghost"
                   onClick={() => router.push('/')}
-                  className="mr-4"
+                  className="mr-4 flex items-center"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Dashboard
+                  <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
                 </Button>
                 <div>
                   <h1 className="text-3xl font-bold">Savings Goals</h1>

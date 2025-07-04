@@ -173,21 +173,13 @@ export function StockWatchlist() {
           </div>
           <Button 
             onClick={() => setShowAddStock(true)}
-            className="aurora-glow hidden sm:flex"
+            className="aurora-glow"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Stock
           </Button>
         </div>
       </CardHeader>
-      {/* FAB for mobile */}
-      <button
-        className="fixed bottom-6 right-6 z-50 sm:hidden fab-add-transaction"
-        onClick={() => setShowAddStock(true)}
-        aria-label="Add Stock"
-      >
-        <Plus className="w-8 h-8 mx-auto my-auto" />
-      </button>
       <CardContent>
         {/* Search Bar */}
         <div className="relative mb-6">
