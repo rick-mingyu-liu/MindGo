@@ -20,6 +20,57 @@ interface RegisterForm {
   confirmPassword: string
 }
 
+// Enhanced email validation function
+const validateEmail = (email: string) => {
+  // Basic format check
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    return 'Please enter a valid email address';
+  }
+
+  // Check length limits
+  if (email.length > 254) {
+    return 'Email address is too long';
+  }
+
+  const [localPart, domain] = email.split('@');
+  if (localPart.length > 64) {
+    return 'Email local part is too long';
+  }
+
+  // Check for invalid patterns
+  if (email.includes('..') || email.startsWith('.') || email.endsWith('.')) {
+    return 'Invalid email format';
+  }
+
+  if (email.includes('@.') || email.includes('.@')) {
+    return 'Invalid email format';
+  }
+
+  // Check for common disposable email domains
+  const disposableDomains = [
+    '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
+    'throwaway.email', 'temp-mail.org', 'yopmail.com', 'trashmail.com',
+    'maildrop.cc', 'mailinator.net', 'fakeinbox.com', 'spam4.me'
+  ];
+
+  if (disposableDomains.includes(domain.toLowerCase())) {
+    return 'Disposable email addresses are not allowed';
+  }
+
+  // Check for test patterns
+  if (localPart.includes('test') && domain.includes('test')) {
+    return 'Test email addresses are not allowed';
+  }
+
+  // Check for sequential characters
+  if (/(.)\1{4,}/.test(localPart)) {
+    return 'Invalid email format';
+  }
+
+  return true;
+};
+
 export default function Register() {
   const router = useRouter()
   const { resolvedTheme } = useTheme()
@@ -37,6 +88,7 @@ export default function Register() {
   } = useForm<RegisterForm>()
 
   const password = watch('password')
+  const email = watch('email')
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -250,11 +302,12 @@ export default function Register() {
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('email', {
                         required: 'Email is required',
-                        pattern: {
-                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                          message: 'Invalid email address',
+                        validate: (value) => {
+                          if (/\s/.test(value)) return 'Email cannot contain spaces';
+                          const emailValidation = validateEmail(value);
+                          if (emailValidation !== true) return emailValidation;
+                          return true;
                         },
-                        validate: (value) => !/\s/.test(value) || 'Email cannot contain spaces',
                       })}
                     />
                   </div>

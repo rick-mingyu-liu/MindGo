@@ -5,9 +5,41 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+// Enhanced email validation function
+const validateEmail = (email) => {
+  // Basic format check
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    return false;
+  }
+  
+  // Check for common invalid patterns
+  const invalidPatterns = [
+    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, // Valid format
+    /^[^@]+@[^@]+\.[^@]+$/, // Has @ and domain
+  ];
+  
+  // Additional checks
+  if (email.length > 254) return false; // RFC 5321 limit
+  if (email.split('@')[0].length > 64) return false; // Local part limit
+  if (email.includes('..')) return false; // No consecutive dots
+  if (email.startsWith('.') || email.endsWith('.')) return false; // No leading/trailing dots
+  if (email.includes('@.') || email.includes('.@')) return false; // No @ next to dots
+  
+  return true;
+};
+
 // Validation middleware
 const registerValidation = [
-  body('email').isEmail().withMessage('Please enter a valid email'),
+  body('email')
+    .isEmail().withMessage('Please enter a valid email')
+    .custom((value) => {
+      if (!validateEmail(value)) {
+        throw new Error('Invalid email format');
+      }
+      return true;
+    })
+    .normalizeEmail(),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
   body('first_name').notEmpty().withMessage('First name is required'),
   body('last_name').notEmpty().withMessage('Last name is required')

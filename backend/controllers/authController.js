@@ -4,6 +4,51 @@ const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
+const axios = require('axios');
+
+// List of known disposable email domains (partial list - you can expand this)
+const DISPOSABLE_EMAIL_DOMAINS = [
+  '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
+  'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
+  'sharklasers.com', 'getairmail.com', 'getnada.com', 'yopmail.com',
+  'trashmail.com', 'maildrop.cc', 'mailinator.net', 'tempmailaddress.com',
+  'fakeinbox.com', 'mailmetrash.com', 'spam4.me', 'bccto.me',
+  'chacuo.net', 'dispostable.com', 'mailnesia.com', 'mailnull.com',
+  'spamspot.com', 'spam.la', 'tempr.email', 'tmpeml.com',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net'
+];
+
+// MailboxLayer API validation
+async function validateEmailMailboxLayer(email) {
+  const apiKey = process.env.MAILBOXLAYER_API_KEY;
+  if (!apiKey) {
+    throw new Error('MailboxLayer API key not set');
+  }
+  const url = `https://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}`;
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
+    // Check for valid, deliverable, non-disposable email
+    if (!data.format_valid) {
+      return { valid: false, reason: 'Invalid email format' };
+    }
+    if (!data.mx_found) {
+      return { valid: false, reason: 'Email domain cannot receive mail' };
+    }
+    if (data.disposable) {
+      return { valid: false, reason: 'Disposable email addresses are not allowed' };
+    }
+    if (data.smtp_check === false) {
+      return { valid: false, reason: 'Email address is not deliverable' };
+    }
+    return { valid: true };
+  } catch (error) {
+    console.error('MailboxLayer API error:', error);
+    return { valid: false, reason: 'Email validation service error' };
+  }
+}
 
 const authController = {
   // Register new user
@@ -15,6 +60,12 @@ const authController = {
       }
 
       const { email, password, first_name, last_name } = req.body;
+
+      // MailboxLayer email validation
+      const emailValidation = await validateEmailMailboxLayer(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({ error: emailValidation.reason });
+      }
 
       // Check if user already exists
       const existingUser = await db.query(
@@ -276,6 +327,20 @@ const authController = {
     } catch (error) {
       console.error('Update notification settings error:', error);
       res.status(500).json({ error: 'Failed to update notification settings' });
+    }
+  },
+
+  // Scheduled job: Delete unverified accounts older than 30 minutes
+  async deleteUnverifiedAccounts() {
+    try {
+      const result = await db.query(
+        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email`
+      );
+      if (result.rows.length > 0) {
+        console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => u.email));
+      }
+    } catch (error) {
+      console.error('[Cleanup] Error deleting unverified accounts:', error);
     }
   }
 };
