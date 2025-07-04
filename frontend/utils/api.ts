@@ -41,6 +41,9 @@ api.interceptors.response.use(
   (error) => {
     const { response } = error
 
+    // Don't show automatic toast for auth endpoints (handled manually in components)
+    const isAuthEndpoint = error.config?.url?.includes('/auth/')
+
     if (response?.status === 401) {
       // Unauthorized - redirect to login
       logout()
@@ -50,9 +53,9 @@ api.interceptors.response.use(
       toast.error('Resource not found.')
     } else if (response?.status >= 500) {
       toast.error('Server error. Please try again later.')
-    } else if (response?.data?.error) {
+    } else if (response?.data?.error && !isAuthEndpoint) {
       toast.error(response.data.error)
-    } else {
+    } else if (!isAuthEndpoint) {
       toast.error('An unexpected error occurred.')
     }
 

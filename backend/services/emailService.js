@@ -19,6 +19,72 @@ exports.sendWeeklyReport = async (to, content, htmlContent) => {
   });
 };
 
+exports.sendEmailVerification = async (to, firstName, verificationToken) => {
+  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+  
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #16a34a; margin: 0;">MindGo</h1>
+        <p style="color: #6b7280; margin: 10px 0 0 0;">Personal Finance Management</p>
+      </div>
+      
+      <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; border-left: 4px solid #16a34a;">
+        <h2 style="color: #111827; margin: 0 0 20px 0;">Welcome to MindGo, ${firstName}!</h2>
+        
+        <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">
+          Thank you for creating your MindGo account. To complete your registration and start managing your finances, please verify your email address by clicking the button below.
+        </p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verificationUrl}" 
+             style="background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
+            Verify Email Address
+          </a>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
+          If the button doesn't work, you can copy and paste this link into your browser:
+        </p>
+        <p style="color: #6b7280; font-size: 14px; margin: 5px 0 0 0; word-break: break-all;">
+          <a href="${verificationUrl}" style="color: #16a34a;">${verificationUrl}</a>
+        </p>
+        
+        <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
+          This verification link will expire in 24 hours. If you didn't create a MindGo account, you can safely ignore this email.
+        </p>
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+        <p style="color: #6b7280; font-size: 14px; margin: 0;">
+          © 2024 MindGo. All rights reserved.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const textContent = `
+Welcome to MindGo, ${firstName}!
+
+Thank you for creating your MindGo account. To complete your registration and start managing your finances, please verify your email address by visiting the following link:
+
+${verificationUrl}
+
+This verification link will expire in 24 hours. If you didn't create a MindGo account, you can safely ignore this email.
+
+Best regards,
+The MindGo Team
+  `;
+
+  await transporter.sendMail({
+    from: `"MindGo" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Verify your MindGo account',
+    text: textContent,
+    html: htmlContent,
+  });
+};
+
 // Helper function to create ASCII pie chart
 function createAsciiPieChart(data, title, maxWidth = 40) {
   if (Object.keys(data).length === 0) return '';

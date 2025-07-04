@@ -6,6 +6,7 @@ require('dotenv').config();
 const cron = require('node-cron');
 const db = require('./db/connection');
 const { sendWeeklyReport, generateWeeklyReport } = require('./services/emailService');
+const authController = require('./controllers/authController');
 
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
@@ -108,6 +109,11 @@ app.listen(PORT, () => {
 setInterval(() => {
   aiController.autoDeleteOldAIPlans();
 }, 5 * 60 * 1000);
+
+// Periodically delete unverified accounts older than 30 minutes (every 10 minutes)
+setInterval(() => {
+  authController.deleteUnverifiedAccounts();
+}, 10 * 60 * 1000);
 
 // Schedule weekly report emails every Sunday at 7pm
 cron.schedule('0 19 * * 0', async () => {

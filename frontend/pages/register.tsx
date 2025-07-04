@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -20,12 +20,65 @@ interface RegisterForm {
   confirmPassword: string
 }
 
+// Enhanced email validation function
+const validateEmail = (email: string) => {
+  // Basic format check
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    return 'Please enter a valid email address';
+  }
+
+  // Check length limits
+  if (email.length > 254) {
+    return 'Email address is too long';
+  }
+
+  const [localPart, domain] = email.split('@');
+  if (localPart.length > 64) {
+    return 'Email local part is too long';
+  }
+
+  // Check for invalid patterns
+  if (email.includes('..') || email.startsWith('.') || email.endsWith('.')) {
+    return 'Invalid email format';
+  }
+
+  if (email.includes('@.') || email.includes('.@')) {
+    return 'Invalid email format';
+  }
+
+  // Check for common disposable email domains
+  const disposableDomains = [
+    '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
+    'throwaway.email', 'temp-mail.org', 'yopmail.com', 'trashmail.com',
+    'maildrop.cc', 'mailinator.net', 'fakeinbox.com', 'spam4.me'
+  ];
+
+  if (disposableDomains.includes(domain.toLowerCase())) {
+    return 'Disposable email addresses are not allowed';
+  }
+
+  // Check for test patterns
+  if (localPart.includes('test') && domain.includes('test')) {
+    return 'Test email addresses are not allowed';
+  }
+
+  // Check for sequential characters
+  if (/(.)\1{4,}/.test(localPart)) {
+    return 'Invalid email format';
+  }
+
+  return true;
+};
+
 export default function Register() {
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [registrationSuccess, setRegistrationSuccess] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
   
   const {
     register,
@@ -35,6 +88,7 @@ export default function Register() {
   } = useForm<RegisterForm>()
 
   const password = watch('password')
+  const email = watch('email')
 
   const onSubmit = async (data: RegisterForm) => {
     try {
@@ -43,12 +97,17 @@ export default function Register() {
       const { confirmPassword, ...registerData } = data
       const response = await api.post('/auth/register', registerData)
       
-      // Store token and user data
-      localStorage.setItem('token', response.data.token)
-      localStorage.setItem('user', JSON.stringify(response.data.user))
-      
-      toast.success('Registration successful! Welcome to MindGo.')
-      router.push('/')
+      if (response.data.requiresVerification) {
+        setRegistrationSuccess(true)
+        setUserEmail(data.email)
+        toast.success('Registration successful! Please check your email to verify your account.')
+      } else {
+        // Store token and user data (fallback for non-verification flow)
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        toast.success('Registration successful! Welcome to MindGo.')
+        router.push('/')
+      }
       
     } catch (error) {
       console.error('Registration error:', error)
@@ -56,6 +115,89 @@ export default function Register() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Prevent blank spaces in input fields
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    if (value.includes(' ')) {
+      e.target.value = value.replace(/\s/g, '')
+    }
+  }
+
+  if (registrationSuccess) {
+    return (
+      <>
+        <Head>
+          <title>Check Your Email - MindGo</title>
+          <meta name="description" content="Verify your MindGo account" />
+        </Head>
+
+        <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
+          <div className="sm:mx-auto sm:w-full sm:max-w-md">
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex justify-center">
+                <Image
+                  src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
+                  alt="MindGo Logo"
+                  width={160}
+                  height={160}
+                  className="h-24 w-auto aurora-glow"
+                  priority
+                />
+              </div>
+              <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
+            </div>
+          </div>
+
+          <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <Card className="shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
+              <CardHeader className="space-y-1 text-center">
+                <div className="flex justify-center mb-4">
+                  <CheckCircle className="h-16 w-16 text-green-500" />
+                </div>
+                <CardTitle className="text-2xl text-green-700 dark:text-green-400">
+                  Check Your Email
+                </CardTitle>
+                <CardDescription className="text-center">
+                  We've sent a verification link to your email address
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Email:</strong> {userEmail}
+                  </p>
+                </div>
+                
+                <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+                  <p>• Click the verification link in your email to activate your account</p>
+                  <p>• The link will expire in 24 hours</p>
+                  <p>• Check your spam folder if you don't see the email</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Button 
+                    onClick={() => router.push('/login')}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Continue to Login
+                  </Button>
+                  <Button 
+                    onClick={() => setRegistrationSuccess(false)}
+                    variant="outline"
+                    className="w-full border-yellow-400 dark:border-yellow-500 text-yellow-700 dark:text-yellow-300"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Registration
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </>
+    )
   }
 
   return (
@@ -104,17 +246,20 @@ export default function Register() {
                         id="first_name"
                         placeholder="First name"
                         className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        onInput={handleInputChange}
+                        onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                         {...register('first_name', {
                           required: 'First name is required',
                           minLength: {
                             value: 2,
                             message: 'First name must be at least 2 characters',
                           },
+                          validate: (value) => !/\s/.test(value) || 'First name cannot contain spaces',
                         })}
                       />
                     </div>
                     {errors.first_name && (
-                      <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.first_name.message}</p>
                     )}
                   </div>
 
@@ -126,17 +271,20 @@ export default function Register() {
                         id="last_name"
                         placeholder="Last name"
                         className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        onInput={handleInputChange}
+                        onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                         {...register('last_name', {
                           required: 'Last name is required',
                           minLength: {
                             value: 2,
                             message: 'Last name must be at least 2 characters',
                           },
+                          validate: (value) => !/\s/.test(value) || 'Last name cannot contain spaces',
                         })}
                       />
                     </div>
                     {errors.last_name && (
-                      <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                      <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.last_name.message}</p>
                     )}
                   </div>
                 </div>
@@ -150,17 +298,21 @@ export default function Register() {
                       type="email"
                       placeholder="Enter your email"
                       className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      onInput={handleInputChange}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('email', {
                         required: 'Email is required',
-                        pattern: {
-                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                          message: 'Invalid email address',
+                        validate: (value) => {
+                          if (/\s/.test(value)) return 'Email cannot contain spaces';
+                          const emailValidation = validateEmail(value);
+                          if (emailValidation !== true) return emailValidation;
+                          return true;
                         },
                       })}
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.email.message}</p>
                   )}
                 </div>
 
@@ -173,12 +325,15 @@ export default function Register() {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Create a password"
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      onInput={handleInputChange}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('password', {
                         required: 'Password is required',
                         minLength: {
                           value: 6,
                           message: 'Password must be at least 6 characters',
                         },
+                        validate: (value) => !/\s/.test(value) || 'Password cannot contain spaces',
                       })}
                     />
                     <Button
@@ -196,7 +351,7 @@ export default function Register() {
                     </Button>
                   </div>
                   {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.password.message}</p>
                   )}
                 </div>
 
@@ -209,10 +364,12 @@ export default function Register() {
                       type={showConfirmPassword ? 'text' : 'password'}
                       placeholder="Confirm your password"
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      onInput={handleInputChange}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('confirmPassword', {
                         required: 'Please confirm your password',
                         validate: (value) =>
-                          value === password || 'Passwords do not match',
+                          (!/\s/.test(value) ? (value === password || 'Passwords do not match') : 'Password cannot contain spaces'),
                       })}
                     />
                     <Button
@@ -230,7 +387,7 @@ export default function Register() {
                     </Button>
                   </div>
                   {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.confirmPassword.message}</p>
                   )}
                 </div>
 

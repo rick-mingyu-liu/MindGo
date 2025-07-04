@@ -1,8 +1,54 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
-const { sendWeeklyReport, generateWeeklyReport } = require('../services/emailService');
+const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
+const axios = require('axios');
+
+// List of known disposable email domains (partial list - you can expand this)
+const DISPOSABLE_EMAIL_DOMAINS = [
+  '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
+  'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
+  'sharklasers.com', 'getairmail.com', 'getnada.com', 'yopmail.com',
+  'trashmail.com', 'maildrop.cc', 'mailinator.net', 'tempmailaddress.com',
+  'fakeinbox.com', 'mailmetrash.com', 'spam4.me', 'bccto.me',
+  'chacuo.net', 'dispostable.com', 'mailnesia.com', 'mailnull.com',
+  'spamspot.com', 'spam.la', 'tempr.email', 'tmpeml.com',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
+  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net'
+];
+
+// MailboxLayer API validation
+async function validateEmailMailboxLayer(email) {
+  const apiKey = process.env.MAILBOXLAYER_API_KEY;
+  if (!apiKey) {
+    throw new Error('MailboxLayer API key not set');
+  }
+  const url = `https://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}`;
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
+    // Check for valid, deliverable, non-disposable email
+    if (!data.format_valid) {
+      return { valid: false, reason: 'Invalid email format' };
+    }
+    if (!data.mx_found) {
+      return { valid: false, reason: 'Email domain cannot receive mail' };
+    }
+    if (data.disposable) {
+      return { valid: false, reason: 'Disposable email addresses are not allowed' };
+    }
+    if (data.smtp_check === false) {
+      return { valid: false, reason: 'Email address is not deliverable' };
+    }
+    return { valid: true };
+  } catch (error) {
+    console.error('MailboxLayer API error:', error);
+    return { valid: false, reason: 'Email validation service error' };
+  }
+}
 
 const authController = {
   // Register new user
@@ -14,6 +60,12 @@ const authController = {
       }
 
       const { email, password, first_name, last_name } = req.body;
+
+      // MailboxLayer email validation
+      const emailValidation = await validateEmailMailboxLayer(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({ error: emailValidation.reason });
+      }
 
       // Check if user already exists
       const existingUser = await db.query(
@@ -29,28 +81,30 @@ const authController = {
       const saltRounds = 10;
       const passwordHash = await bcrypt.hash(password, saltRounds);
 
-      // Create user
+      // Generate email verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Create user with email verification fields
       const newUser = await db.query(
-        'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name, created_at',
-        [email, passwordHash, first_name, last_name]
+        'INSERT INTO users (email, password_hash, first_name, last_name, email_verification_token, email_verification_expires) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, first_name, last_name, created_at',
+        [email, passwordHash, first_name, last_name, verificationToken, verificationExpires]
       );
 
       const userId = newUser.rows[0].id;
 
-      // Create sample data for new user
-      await createSampleDataForNewUser(userId);
-
-      // Generate JWT token
-      const token = jwt.sign(
-        { userId: newUser.rows[0].id, email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
+      // Send verification email
+      try {
+        await sendEmailVerification(email, first_name, verificationToken);
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        // Don't fail registration if email fails, but log it
+      }
 
       res.status(201).json({
-        message: 'User registered successfully',
+        message: 'Registration successful! Please check your email to verify your account.',
         user: newUser.rows[0],
-        token
+        requiresVerification: true
       });
 
     } catch (error) {
@@ -71,7 +125,7 @@ const authController = {
 
       // Find user
       const user = await db.query(
-        'SELECT id, email, password_hash, first_name, last_name FROM users WHERE email = $1',
+        'SELECT id, email, password_hash, first_name, last_name, email_verified FROM users WHERE email = $1',
         [email]
       );
 
@@ -85,6 +139,14 @@ const authController = {
         return res.status(400).json({ error: 'Invalid credentials' });
       }
 
+      // Check if email is verified
+      if (!user.rows[0].email_verified) {
+        return res.status(400).json({ 
+          error: 'Please verify your email address before logging in. Check your inbox for a verification link.',
+          requiresVerification: true 
+        });
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: user.rows[0].id, email },
@@ -92,7 +154,7 @@ const authController = {
         { expiresIn: '7d' }
       );
 
-      const { password_hash, ...userWithoutPassword } = user.rows[0];
+      const { password_hash, email_verified, ...userWithoutPassword } = user.rows[0];
 
       res.json({
         message: 'Login successful',
@@ -102,6 +164,99 @@ const authController = {
 
     } catch (error) {
       console.error('Login error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Verify email
+  async verifyEmail(req, res) {
+    try {
+      const { token } = req.params;
+
+      // Find user with this verification token
+      const user = await db.query(
+        'SELECT id, email, first_name, email_verification_expires FROM users WHERE email_verification_token = $1',
+        [token]
+      );
+
+      if (user.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid verification token' });
+      }
+
+      // Check if token has expired
+      if (new Date() > new Date(user.rows[0].email_verification_expires)) {
+        return res.status(400).json({ error: 'Verification token has expired' });
+      }
+
+      // Mark email as verified and clear token
+      await db.query(
+        'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
+        [user.rows[0].id]
+      );
+
+      res.json({
+        message: 'Email verified successfully! You can now log in to your account.',
+        user: {
+          id: user.rows[0].id,
+          email: user.rows[0].email,
+          first_name: user.rows[0].first_name
+        }
+      });
+
+    } catch (error) {
+      console.error('Email verification error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // Resend verification email
+  async resendVerification(req, res) {
+    try {
+      const { email } = req.body;
+
+      // Find user
+      const user = await db.query(
+        'SELECT id, email, first_name, email_verified, email_verification_token, email_verification_expires FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (user.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (user.rows[0].email_verified) {
+        return res.status(400).json({ error: 'Email is already verified' });
+      }
+
+      // Check if previous token is still valid (within 1 hour)
+      if (user.rows[0].email_verification_expires && 
+          new Date() < new Date(user.rows[0].email_verification_expires) &&
+          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - 60 * 60 * 1000)) {
+        return res.status(400).json({ error: 'Please wait before requesting another verification email' });
+      }
+
+      // Generate new verification token
+      const crypto = require('crypto');
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Update user with new token
+      await db.query(
+        'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
+        [verificationToken, verificationExpires, user.rows[0].id]
+      );
+
+      // Send verification email
+      try {
+        await sendEmailVerification(email, user.rows[0].first_name, verificationToken);
+        res.json({ message: 'Verification email sent successfully' });
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        res.status(500).json({ error: 'Failed to send verification email' });
+      }
+
+    } catch (error) {
+      console.error('Resend verification error:', error);
       res.status(500).json({ error: 'Server error' });
     }
   },
@@ -172,6 +327,20 @@ const authController = {
     } catch (error) {
       console.error('Update notification settings error:', error);
       res.status(500).json({ error: 'Failed to update notification settings' });
+    }
+  },
+
+  // Scheduled job: Delete unverified accounts older than 30 minutes
+  async deleteUnverifiedAccounts() {
+    try {
+      const result = await db.query(
+        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email`
+      );
+      if (result.rows.length > 0) {
+        console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => u.email));
+      }
+    } catch (error) {
+      console.error('[Cleanup] Error deleting unverified accounts:', error);
     }
   }
 };
