@@ -107,7 +107,7 @@ export default function Transactions() {
         <meta name="description" content="View and manage your recent transactions" />
       </Head>
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative">
         {/* Header */}
         <div className="border-b bg-card">
           <div className="container mx-auto px-4 py-6">
@@ -128,7 +128,7 @@ export default function Transactions() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="hidden sm:flex items-center space-x-2">
                 <Button onClick={() => router.push('/transactions/new')}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Transaction
@@ -138,7 +138,16 @@ export default function Transactions() {
           </div>
         </div>
 
-        <div className="container mx-auto px-4 py-8">
+        {/* FAB for mobile */}
+        <button
+          className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
+          onClick={() => router.push('/transactions/new')}
+          aria-label="Add Transaction"
+        >
+          <Plus className="w-8 h-8" />
+        </button>
+
+        <div className="container mx-auto px-2 sm:px-4 py-8">
           {/* Filters */}
           <Card className="mb-6">
             <CardHeader>
@@ -150,17 +159,16 @@ export default function Transactions() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     placeholder="Search transactions..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-12 py-3 rounded-lg text-base"
                   />
                 </div>
-                
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="py-3 rounded-lg text-base">
                     <SelectValue placeholder="Filter by type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -169,9 +177,8 @@ export default function Transactions() {
                     <SelectItem value="expense">Expense</SelectItem>
                   </SelectContent>
                 </Select>
-
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="py-3 rounded-lg text-base">
                     <SelectValue placeholder="Filter by category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -197,49 +204,56 @@ export default function Transactions() {
             </CardHeader>
             <CardContent>
               {filteredTransactions.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {filteredTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg bg-background transition-all hover:bg-white/5 hover:shadow-md hover:border-primary/30">
+                    <div
+                      key={transaction.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-xl bg-background transition-all hover:bg-white/5 hover:shadow-md hover:border-primary/30 shadow-sm"
+                    >
                       <div className="flex items-center space-x-4">
-                        <div className={`w-3 h-3 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <div className={`w-4 h-4 rounded-full ${transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} />
                         <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                          <p className="font-medium text-base">{transaction.description}</p>
+                          <div className="flex flex-wrap items-center space-x-2 text-sm text-muted-foreground">
                             <span>{transaction.category}</span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
+                              <Calendar className="w-4 h-4" />
                               {new Date(transaction.date).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                             {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                           </p>
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge
+                            className={`text-xs px-3 py-1 rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                          >
                             {transaction.type}
                           </Badge>
                         </div>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-2">
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
-                            className="h-8 w-8 p-0"
+                            className="h-10 w-10 p-0 flex items-center justify-center"
+                            aria-label="Edit Transaction"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-6 h-6" />
                           </Button>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleDelete(transaction.id)}
                             disabled={deletingId === transaction.id}
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-10 w-10 p-0 flex items-center justify-center text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label="Delete Transaction"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-6 h-6" />
                           </Button>
                         </div>
                       </div>

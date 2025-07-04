@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { Brain, ArrowLeft, Send, Sparkles, LogOut } from 'lucide-react'
+import { Brain, ArrowLeft, Send, Sparkles, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
 import { api, logout, goalAPI } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -59,6 +59,7 @@ export default function AIPlanning() {
   const [prefsDraft, setPrefsDraft] = useState<{ riskTolerance: string, lifeStage: string, investmentExperience: string } | null>(null)
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [moveGoalAmountHint, setMoveGoalAmountHint] = useState('')
+  const [showPrompts, setShowPrompts] = useState(false)
   
   const {
     register,
@@ -200,7 +201,7 @@ export default function AIPlanning() {
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Planning Form */}
             <div className="space-y-6">
@@ -277,13 +278,13 @@ export default function AIPlanning() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+                  <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                     <div className="space-y-2">
                       <Label htmlFor="financialGoal">What's your main financial goal?</Label>
                       <Textarea
                         id="financialGoal"
                         placeholder="e.g., Save $50,000 for a down payment on a house in 3 years"
-                        className="min-h-[80px]"
+                        className="min-h-[80px] w-full rounded-lg py-3 px-4 text-base"
                         {...register('financialGoal', {
                           required: 'Financial goal is required',
                           minLength: {
@@ -297,13 +298,14 @@ export default function AIPlanning() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="currentIncome">Monthly Income ($)</Label>
                         <Input
                           id="currentIncome"
                           type="number"
                           placeholder="5000"
+                          className="w-full rounded-lg py-3 px-4 text-base"
                           {...register('currentIncome', {
                             required: 'Current income is required',
                             min: {
@@ -323,6 +325,7 @@ export default function AIPlanning() {
                           id="currentExpenses"
                           type="number"
                           placeholder="3000"
+                          className="w-full rounded-lg py-3 px-4 text-base"
                           {...register('currentExpenses', {
                             required: 'Current expenses are required',
                             min: {
@@ -340,7 +343,7 @@ export default function AIPlanning() {
                     <div className="space-y-2">
                       <Label htmlFor="timeline">Timeline for achieving your goal</Label>
                       <Select onValueChange={(value) => setValue('timeline', value)}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full rounded-lg py-3 px-4 text-base">
                           <SelectValue placeholder="Select timeline" />
                         </SelectTrigger>
                         <SelectContent>
@@ -362,12 +365,12 @@ export default function AIPlanning() {
                       <Textarea
                         id="additionalContext"
                         placeholder="Any additional information about your financial situation, constraints, or preferences..."
-                        className="min-h-[100px]"
+                        className="min-h-[100px] w-full rounded-lg py-3 px-4 text-base"
                         {...register('additionalContext')}
                       />
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    <Button type="submit" className="w-full py-3 text-base" disabled={loading}>
                       {loading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -384,30 +387,24 @@ export default function AIPlanning() {
                 </CardContent>
               </Card>
 
-              {/* Quick Prompts */}
+              {/* Quick Prompts - collapsible on mobile */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                <CardHeader className="flex flex-row items-center justify-between cursor-pointer select-none" onClick={() => setShowPrompts(v => !v)}>
+                  <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5" />
                     Quick Prompts
-                  </CardTitle>
-                  <CardDescription>
-                    Click on a prompt to quickly fill in your financial goal
-                  </CardDescription>
+                  </div>
+                  <div className="sm:hidden">
+                    {showPrompts ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={`transition-all duration-300 ${showPrompts || typeof window === 'undefined' || window.innerWidth >= 640 ? 'block' : 'hidden'} sm:block`}> 
                   <div className="grid grid-cols-1 gap-2">
-                    {[
-                      "I want to save $20,000 for an emergency fund within 1 year",
-                      "Help me plan to buy a $300,000 house with a 20% down payment in 5 years",
-                      "I need to pay off $15,000 in credit card debt as quickly as possible",
-                      "I want to start investing for retirement and have $1M by age 65",
-                      "Help me create a budget to save for a $10,000 vacation in 2 years"
-                    ].map((prompt, index) => (
+                    {["I want to save $20,000 for an emergency fund within 1 year","Help me plan to buy a $300,000 house with a 20% down payment in 5 years","I need to pay off $15,000 in credit card debt as quickly as possible","I want to start investing for retirement and have $1M by age 65","Help me create a budget to save for a $10,000 vacation in 2 years"].map((prompt, index) => (
                       <Button
                         key={index}
                         variant="outline"
-                        className="justify-start text-left h-auto p-3"
+                        className="justify-start text-left h-auto p-3 text-base whitespace-normal break-words w-full max-w-full"
                         onClick={() => handleQuickPrompt(prompt)}
                       >
                         {prompt}

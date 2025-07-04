@@ -189,7 +189,7 @@ export default function Goals() {
         {/* Header */}
         <header className="border-b bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-6 gap-4 sm:gap-0">
               <div className="flex items-center">
                 <Button
                   variant="ghost"
@@ -204,10 +204,10 @@ export default function Goals() {
                   <p className="text-muted-foreground">Track and manage your financial goals</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="w-full sm:w-auto">
                       <Plus className="w-4 h-4 mr-2" />
                       Add Goal
                     </Button>
@@ -345,6 +345,7 @@ export default function Goals() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/ai-planning')}
+                  className="w-full sm:w-auto"
                 >
                   <Brain className="w-4 h-4 mr-2" />
                   AI Planning
@@ -354,7 +355,7 @@ export default function Goals() {
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
           {goals.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
@@ -376,9 +377,17 @@ export default function Goals() {
                 const daysRemaining = Math.ceil(
                   (new Date(goal.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
                 )
-                
+                const progressColor = progress >= 100 ? 'bg-green-500' : progress >= 75 ? 'bg-blue-500' : progress >= 50 ? 'bg-yellow-500' : 'bg-red-500';
                 return (
-                  <Card key={goal.id} className="relative">
+                  <Card
+                    key={goal.id}
+                    className="relative cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => {
+                      if (window.innerWidth < 640) setViewingGoal(goal);
+                    }}
+                  >
+                    {/* Progress color bar */}
+                    <div className={`absolute top-0 left-0 w-full h-1 rounded-t-xl ${progressColor}`} />
                     <CardHeader>
                       <div className="flex items-start justify-between w-full">
                         <CardTitle className="text-lg flex-1">{goal.name}</CardTitle>
@@ -386,14 +395,14 @@ export default function Goals() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setViewingGoal(goal)}
+                            onClick={e => { e.stopPropagation(); setViewingGoal(goal); }}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEdit(goal)}
+                            onClick={e => { e.stopPropagation(); handleEdit(goal); }}
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -405,36 +414,30 @@ export default function Goals() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
+                        <div className="flex justify-between text-base font-semibold">
                           <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium">{progress.toFixed(1)}%</span>
+                          <span className="font-bold">{progress.toFixed(1)}%</span>
                         </div>
-                        <Progress value={progress} className="h-2" />
+                        <Progress value={progress} className="h-3" />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-2 gap-4 text-base">
                         <div>
                           <p className="text-muted-foreground">Current</p>
-                          <p className="font-medium text-green-600">
-                            {formatCurrency(goal.current_amount)}
-                          </p>
+                          <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Target</p>
-                          <p className="font-medium">
-                            {formatCurrency(goal.target_amount)}
-                          </p>
+                          <p className="font-bold text-lg">{formatCurrency(goal.target_amount)}</p>
                         </div>
                       </div>
-
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">
+                          <Calendar className="w-5 h-5 text-muted-foreground" />
+                          <span className="text-base text-muted-foreground">
                             {new Date(goal.target_date).toLocaleDateString()}
                           </span>
                         </div>
-                        <Badge variant={daysRemaining < 0 ? "destructive" : daysRemaining < 30 ? "default" : "secondary"}>
+                        <Badge variant={daysRemaining < 0 ? "destructive" : daysRemaining < 30 ? "default" : "secondary"} className="text-base px-3 py-1 rounded-full">
                           {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days left`}
                         </Badge>
                       </div>

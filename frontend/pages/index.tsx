@@ -31,6 +31,7 @@ import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 
 interface FinancialSummary {
   period: string
@@ -88,6 +89,7 @@ export default function Dashboard() {
   const [isNewUser, setIsNewUser] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const { resolvedTheme } = useTheme();
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -356,7 +358,7 @@ export default function Dashboard() {
         <meta name="description" content="Your personal finance dashboard" />
       </Head>
 
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background relative">
         {/* Header */}
         <header className="border-b bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -365,7 +367,8 @@ export default function Dashboard() {
                 <h1 className="text-3xl font-bold aurora-text">MindGo</h1>
                 <p className="text-muted-foreground">Your financial overview</p>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              {/* Desktop actions */}
+              <div className="hidden sm:flex gap-2 flex-wrap">
                 <ThemeToggle />
                 <Button
                   variant="outline"
@@ -404,11 +407,46 @@ export default function Dashboard() {
                   Settings
                 </Button>
               </div>
+              {/* Mobile actions: FAB + menu */}
+              <div className="sm:hidden flex items-center gap-2">
+                <button
+                  className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
+                  onClick={() => router.push('/transactions/new')}
+                  aria-label="Add Transaction"
+                >
+                  <Plus className="w-8 h-8" />
+                </button>
+                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" className="ml-2">
+                      <SettingsIcon className="w-6 h-6" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="p-6 flex flex-col gap-4">
+                    <Button onClick={handleRefresh} disabled={refreshing}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                      Refresh
+                    </Button>
+                    <Button onClick={() => router.push('/ai-planning')}>
+                      <Brain className="w-4 h-4 mr-2" />
+                      AI Planning
+                    </Button>
+                    <Button onClick={handleSendReport}>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send Report
+                    </Button>
+                    <Button onClick={() => router.push('/settings')}>
+                      <SettingsIcon className="w-4 h-4 mr-2" />
+                      Settings
+                    </Button>
+                  </SheetContent>
+                </Sheet>
+              </div>
             </div>
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
           {/* Welcome Message for New Users */}
           {isNewUser && (
             <Card className="mb-8 border-blue-200 bg-blue-50 transition-colors duration-200 hover:bg-muted/80 cursor-pointer">
@@ -482,64 +520,66 @@ export default function Dashboard() {
           )}
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(summary?.totalIncome || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Last 4 months
-                </p>
-              </CardContent>
-            </Card>
+          <div className="overflow-x-auto scrollbar-hide -mx-2 pb-2 sm:mx-0 sm:pb-0">
+            <div className="flex gap-4 min-w-[600px] sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-6 mb-8">
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatCurrency(summary?.totalIncome || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last 4 months
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(summary?.totalExpenses || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Last 4 months
-                </p>
-              </CardContent>
-            </Card>
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatCurrency(summary?.totalExpenses || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last 4 months
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Income</CardTitle>
-                <DollarSign className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${(summary?.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(summary?.netIncome || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Last 4 months
-                </p>
-              </CardContent>
-            </Card>
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Net Income</CardTitle>
+                  <DollarSign className="h-4 w-4 text-blue-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${(summary?.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(summary?.netIncome || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Last 4 months
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
-                <Target className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{goals.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Savings goals
-                </p>
-              </CardContent>
-            </Card>
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
+                  <Target className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{goals.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Savings goals
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Charts Section */}
@@ -708,15 +748,15 @@ export default function Dashboard() {
                   {/* Legend */}
                   {getCategoryChartData().length > 0 && (
                     <div className="mt-4">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
                         {getCategoryChartData().map((entry, index) => (
-                          <div key={entry.name} className="flex items-center space-x-2">
+                          <div key={entry.name} className="flex items-center space-x-2 whitespace-normal">
                             <div 
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: COLORS[index % COLORS.length] }}
                             />
-                            <span className="truncate text-foreground">{entry.name}</span>
-                            <span className="text-muted-foreground ml-auto">
+                            <span className="text-foreground whitespace-normal">{entry.name}</span>
+                            <span className="text-muted-foreground ml-1">
                               {formatCurrency(entry.value)}
                             </span>
                           </div>
