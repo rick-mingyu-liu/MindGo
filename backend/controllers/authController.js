@@ -79,11 +79,17 @@ const authController = {
 
       // Check if user already exists
       const existingUser = await db.query(
-        'SELECT id FROM users WHERE email = $1',
+        'SELECT id, email, email_verified FROM users WHERE email = $1',
         [email]
       );
 
       if (existingUser.rows.length > 0) {
+        const isVerified = existingUser.rows[0].email_verified;
+        if (isVerified) {
+          console.log(`[Register] Attempt to register already verified email: ${email}`);
+        } else {
+          console.log(`[Register] Attempt to register unverified email: ${email} (user did not verify)`);
+        }
         return res.status(400).json({ error: 'User already exists' });
       }
 

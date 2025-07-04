@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -79,6 +79,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState('')
+  const [registerError, setRegisterError] = useState('')
   
   const {
     register,
@@ -93,25 +94,29 @@ export default function Register() {
   const onSubmit = async (data: RegisterForm) => {
     try {
       setLoading(true)
-      
+      setRegisterError('')
       const { confirmPassword, ...registerData } = data
       const response = await api.post('/auth/register', registerData)
-      
       if (response.data.requiresVerification) {
         setRegistrationSuccess(true)
         setUserEmail(data.email)
         toast.success('Registration successful! Please check your email to verify your account.')
       } else {
-        // Store token and user data (fallback for non-verification flow)
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
         toast.success('Registration successful! Welcome to MindGo.')
         router.push('/')
       }
-      
-    } catch (error) {
+    } catch (error: any) {
+      // Custom error handling for already registered users
+      if (error.response?.data?.error === 'User already exists') {
+        setRegisterError('This email is already registered. If you have not verified your email, please check your inbox (and spam folder) for the verification link. If you already verified, please log in.')
+      } else if (error.response?.data?.error) {
+        setRegisterError(error.response.data.error)
+      } else {
+        setRegisterError('Registration failed. Please try again.')
+      }
       console.error('Registration error:', error)
-      // Error handling is done in api interceptor
     } finally {
       setLoading(false)
     }
@@ -390,6 +395,15 @@ export default function Register() {
                     <p className="text-sm text-red-600 dark:text-red-400 font-medium">{errors.confirmPassword.message}</p>
                   )}
                 </div>
+
+                {registerError && (
+                  <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-start space-x-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">{registerError}</p>
+                    </div>
+                  </div>
+                )}
 
                 <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
                   {loading ? 'Creating account...' : 'Create account'}
