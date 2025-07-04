@@ -1,75 +1,55 @@
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Import the database connection
-const { pool } = require('./db/connection');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
 
 async function runMigration() {
+  const client = await pool.connect();
+  
   try {
-    console.log('🔄 Running database migration...');
+    console.log('Starting migration...');
     
-    // Read the schema file
-    const schemaPath = path.join(__dirname, 'db', 'schema.sql');
-    const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+    // Add email verification fields to users table
+    console.log('Adding email verification fields to users table...');
+    await client.query(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP
+    `);
     
-    // Split the SQL into individual statements
-    const statements = schemaSQL
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+    // Update existing users to have verified emails (for backward compatibility)
+    console.log('Updating existing users to have verified emails...');
+    await client.query(`
+      UPDATE users 
+      SET email_verified = TRUE 
+      WHERE email_verified IS NULL
+    `);
     
-    console.log(`📝 Found ${statements.length} SQL statements to execute`);
-    
-    // Execute each statement
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      if (statement.trim()) {
-        try {
-          console.log(`Executing statement ${i + 1}/${statements.length}...`);
-          await pool.query(statement);
-        } catch (error) {
-          // Ignore errors for IF NOT EXISTS statements
-          if (error.message.includes('already exists') || error.message.includes('duplicate key')) {
-            console.log(`⚠️  Statement ${i + 1} skipped (already exists): ${error.message.split('\n')[0]}`);
-          } else {
-            console.error(`❌ Error in statement ${i + 1}:`, error.message);
-            throw error;
-          }
-        }
-      }
-    }
-    
-    console.log('✅ Database migration completed successfully!');
-    
-    // Test the new tables
-    console.log('🔍 Testing new tables...');
-    
-    const testQueries = [
-      'SELECT COUNT(*) FROM stock_data',
-      'SELECT COUNT(*) FROM financial_reports', 
-      'SELECT COUNT(*) FROM stock_news',
-      'SELECT COUNT(*) FROM analyst_ratings',
-      'SELECT COUNT(*) FROM stock_price_history'
-    ];
-    
-    for (const query of testQueries) {
-      try {
-        const result = await pool.query(query);
-        const tableName = query.split('FROM ')[1];
-        console.log(`✅ ${tableName}: ${result.rows[0].count} rows`);
-      } catch (error) {
-        console.log(`❌ ${query.split('FROM ')[1]}: ${error.message}`);
-      }
-    }
+    console.log('Migration completed successfully!');
     
   } catch (error) {
-    console.error('❌ Migration failed:', error);
-    process.exit(1);
+    console.error('Migration failed:', error);
+    throw error;
   } finally {
-    await pool.end();
+    client.release();
   }
 }
 
-// Run the migration
-runMigration(); 
+// Run migration if this file is executed directly
+if (require.main === module) {
+  runMigration()
+    .then(() => {
+      console.log('Migration script completed');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Migration script failed:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = { runMigration }; 

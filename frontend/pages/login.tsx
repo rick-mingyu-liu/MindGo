@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2 } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -25,16 +25,22 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
+  const [verificationError, setVerificationError] = useState('')
+  const [resendLoading, setResendLoading] = useState(false)
   
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
   } = useForm<LoginForm>()
+
+  const email = watch('email')
 
   const onSubmit = async (data: LoginForm) => {
     try {
       setLoading(true)
+      setVerificationError('')
       
       const response = await api.post('/auth/login', data)
       
@@ -45,11 +51,41 @@ export default function Login() {
       toast.success('Login successful!')
       router.push('/')
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error)
-      // Error handling is done in api interceptor
+      
+      if (error.response?.data?.requiresVerification) {
+        setVerificationError(error.response.data.error)
+      }
+      // Other error handling is done in api interceptor
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast.error('Please enter your email address first')
+      return
+    }
+
+    try {
+      setResendLoading(true)
+      await api.post('/auth/resend-verification', { email })
+      toast.success('Verification email sent successfully!')
+      setVerificationError('')
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to send verification email')
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  // Prevent blank spaces in input fields
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    if (value.includes(' ')) {
+      e.target.value = value.replace(/\s/g, '')
     }
   }
 
@@ -92,6 +128,27 @@ export default function Login() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {verificationError && (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                        {verificationError}
+                      </p>
+                      <Button
+                        onClick={handleResendVerification}
+                        disabled={resendLoading}
+                        size="sm"
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                      >
+                        {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email address</Label>
@@ -102,12 +159,15 @@ export default function Login() {
                       type="email"
                       placeholder="Enter your email"
                       className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      onInput={handleInputChange}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('email', {
                         required: 'Email is required',
                         pattern: {
                           value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
                           message: 'Invalid email address',
                         },
+                        validate: (value) => !/\s/.test(value) || 'Email cannot contain spaces',
                       })}
                     />
                   </div>
@@ -125,12 +185,15 @@ export default function Login() {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password"
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      onInput={handleInputChange}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('password', {
                         required: 'Password is required',
                         minLength: {
                           value: 6,
                           message: 'Password must be at least 6 characters',
                         },
+                        validate: (value) => !/\s/.test(value) || 'Password cannot contain spaces',
                       })}
                     />
                     <Button

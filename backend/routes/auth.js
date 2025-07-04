@@ -23,9 +23,15 @@ const updateProfileValidation = [
   body('last_name').notEmpty().withMessage('Last name is required')
 ];
 
+const resendVerificationValidation = [
+  body('email').isEmail().withMessage('Please enter a valid email')
+];
+
 // Routes
 router.post('/register', registerValidation, authController.register);
 router.post('/login', loginValidation, authController.login);
+router.get('/verify-email/:token', authController.verifyEmail);
+router.post('/resend-verification', resendVerificationValidation, authController.resendVerification);
 router.get('/profile', auth, authController.getProfile);
 router.put('/profile', auth, updateProfileValidation, authController.updateProfile);
 router.post('/test-email', auth, authController.sendTestEmail);
