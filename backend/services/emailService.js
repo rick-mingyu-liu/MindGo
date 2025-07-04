@@ -53,13 +53,13 @@ exports.sendEmailVerification = async (to, firstName, verificationToken) => {
         </p>
         
         <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
-          This verification link will expire in 24 hours. If you didn't create a MindGo account, you can safely ignore this email.
+          This verification link will expire in 30 minutes. If you didn't create a MindGo account, you can safely ignore this email.
         </p>
       </div>
       
       <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
         <p style="color: #6b7280; font-size: 14px; margin: 0;">
-          © 2024 MindGo. All rights reserved.
+          © 2025 MindGo. All rights reserved.
         </p>
       </div>
     </div>
