@@ -91,6 +91,8 @@ export default function Dashboard() {
   const { resolvedTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false)
 
+  const streak = 5; // Placeholder value for the user's streak
+
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
@@ -521,7 +523,29 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="overflow-x-auto scrollbar-hide -mx-2 pb-2 sm:mx-0 sm:pb-0">
-            <div className="flex gap-4 min-w-[600px] sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:gap-6 mb-8">
+            <div className="flex gap-4 min-w-[750px] sm:grid sm:grid-cols-5 lg:grid-cols-5 sm:gap-6 mb-8">
+              {/* Streak Card */}
+              <Card className="transition-colors duration-200 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex flex-col items-center justify-center text-center">
+                <button
+                  type="button"
+                  className="focus:outline-none focus:ring-2 focus:ring-yellow-400 rounded-lg flex flex-col items-center justify-center text-center w-full h-full cursor-pointer bg-transparent border-0 p-0"
+                  onClick={() => {/* TODO: Show streak details modal or page */}}
+                  aria-label="View streak details"
+                  tabIndex={0}
+                >
+                  <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      Streak
+                      <Sparkles className="h-4 w-4 text-yellow-500 animate-pulse" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-center justify-center">
+                    <div className="text-2xl font-bold text-yellow-600">{streak}</div>
+                    <p className="text-xs text-muted-foreground">Days in a row</p>
+                  </CardContent>
+                </button>
+              </Card>
+              {/* Total Income Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -536,7 +560,7 @@ export default function Dashboard() {
                   </p>
                 </CardContent>
               </Card>
-
+              {/* Total Expenses Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
@@ -551,7 +575,7 @@ export default function Dashboard() {
                   </p>
                 </CardContent>
               </Card>
-
+              {/* Net Income Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Net Income</CardTitle>
@@ -566,17 +590,17 @@ export default function Dashboard() {
                   </p>
                 </CardContent>
               </Card>
-
-              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Active Goals</CardTitle>
-                  <Target className="h-4 w-4 text-orange-600" />
+              {/* Active Goals Card (shrunk) */}
+              <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5 flex flex-col items-center justify-center text-center px-2">
+                <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    Active Goals
+                    <Target className="h-4 w-4 text-orange-600" />
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col items-center justify-center">
                   <div className="text-2xl font-bold">{goals.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Savings goals
-                  </p>
+                  <p className="text-xs text-muted-foreground">Savings goals</p>
                 </CardContent>
               </Card>
             </div>

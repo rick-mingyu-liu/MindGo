@@ -417,7 +417,7 @@
   height: 2.5em;
   background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, var(--background, #fff) 90%);
   pointer-events: none;
-}
+} 
 
 /* Floating Action Button for mobile */
 .fab-add-transaction {

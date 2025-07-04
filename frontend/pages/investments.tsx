@@ -163,7 +163,7 @@ export default function Investments() {
               <div className="flex items-center">
                 <Button
                   variant="ghost"
-                  onClick={() => router.push('/')} 
+                  onClick={() => router.push('/')}
                   className="mr-4 flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
@@ -356,7 +356,7 @@ export default function Investments() {
                             >
                               <Button variant="ghost" size="icon" className="w-7 h-7 p-0">
                                 <Eye className="w-4 h-4" />
-                              </Button>
+                            </Button>
                             </StockDetailModal>
                             <Button
                               variant="ghost"
