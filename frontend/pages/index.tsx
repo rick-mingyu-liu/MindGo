@@ -17,7 +17,9 @@ import {
   Eye,
   Edit,
   Settings as SettingsIcon,
-  Star
+  Star,
+  Mail,
+  CheckCircle2
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { api, logout } from '@/utils/api'
@@ -123,6 +125,23 @@ export default function Dashboard() {
     await fetchDashboardData()
     setRefreshing(false)
   }
+
+  const handleSendReport = async () => {
+    try {
+      await api.post('/auth/test-email');
+      toast.custom((t) => (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 shadow-lg" style={{ minWidth: 320 }}>
+          <CheckCircle2 className="w-7 h-7 text-green-500" />
+          <div>
+            <div className="font-bold text-green-800 text-lg">Report Sent!</div>
+            <div className="text-green-700 text-sm">Your financial report has been emailed to you. Check your inbox!</div>
+          </div>
+        </div>
+      ), { duration: 4000 });
+    } catch (error) {
+      toast.error('Failed to send financial report.');
+    }
+  };
 
   // const handleClearData = async () => {
   //   if (confirm('This will clear all your data for testing purposes. Are you sure?')) {
@@ -357,6 +376,13 @@ export default function Dashboard() {
                   Refresh
                 </Button>
                 <Button
+                  onClick={() => router.push('/transactions/new')}
+                  className="aurora-glow"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Transaction
+                </Button>
+                <Button
                   variant="outline"
                   onClick={() => router.push('/ai-planning')}
                 >
@@ -364,11 +390,11 @@ export default function Dashboard() {
                   AI Planning
                 </Button>
                 <Button
-                  onClick={() => router.push('/transactions/new')}
-                  className="aurora-glow"
+                  variant="outline"
+                  onClick={handleSendReport}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Transaction
+                  <Mail className="w-4 h-4 mr-2" />
+                  Send Report
                 </Button>
                 <Button
                   variant="outline"
@@ -405,8 +431,10 @@ export default function Dashboard() {
                       <li>• <strong>Create savings goals</strong> to track your financial targets</li>
                       <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
                       <li>• <strong>Track your interested stocks</strong> to see how they perform and financial reports</li>
+                      <li>• <strong>Receive your weekly financial report</strong> to highlight your financial performance</li>
+                      <li>• <strong>Manage your settings</strong> to customize your experience</li>
                     </ul>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         size="sm"
                         onClick={() => router.push('/transactions/new')}
@@ -437,6 +465,14 @@ export default function Dashboard() {
                       >
                         <Eye className="w-4 h-4 mr-2" />
                         Add to Watchlist
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSendReport}
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        Send Report
                       </Button>
                     </div>
                   </div>
