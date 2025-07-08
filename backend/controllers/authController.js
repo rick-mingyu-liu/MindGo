@@ -100,6 +100,7 @@ const authController = {
       // Generate email verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      console.log(`[Register] Generated verification token for ${email}:`, verificationToken);
 
       // Create user with email verification fields
       const newUser = await db.query(
@@ -111,6 +112,7 @@ const authController = {
 
       // Send verification email
       try {
+        console.log(`[Register] Sending verification email to ${email} with token:`, verificationToken);
         await sendEmailVerification(email, first_name, verificationToken);
       } catch (emailError) {
         console.error('Failed to send verification email:', emailError);
@@ -188,28 +190,27 @@ const authController = {
   async verifyEmail(req, res) {
     try {
       const { token } = req.params;
-
+      console.log(`[VerifyEmail] Received verification request for token:`, token);
       // Find user with this verification token
       const user = await db.query(
         'SELECT id, email, first_name, email_verification_expires FROM users WHERE email_verification_token = $1',
         [token]
       );
-
       if (user.rows.length === 0) {
+        console.log(`[VerifyEmail] No user found for token:`, token);
         return res.status(400).json({ error: 'Invalid verification token' });
       }
-
       // Check if token has expired
       if (new Date() > new Date(user.rows[0].email_verification_expires)) {
+        console.log(`[VerifyEmail] Token expired for user:`, user.rows[0].email);
         return res.status(400).json({ error: 'Verification token has expired' });
       }
-
       // Mark email as verified and clear token
       await db.query(
         'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
         [user.rows[0].id]
       );
-
+      console.log(`[VerifyEmail] Email verified for user:`, user.rows[0].email);
       res.json({
         message: 'Email verified successfully! You can now log in to your account.',
         user: {
@@ -218,7 +219,6 @@ const authController = {
           first_name: user.rows[0].first_name
         }
       });
-
     } catch (error) {
       console.error('Email verification error:', error);
       res.status(500).json({ error: 'Server error' });
