@@ -185,7 +185,7 @@ export default function Register() {
                 
                 <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
                   <p>• Click the verification link in your email to activate your account</p>
-                  <p>• The link will expire in 24 hours</p>
+                  <p>• The link will expire in 30 minutes</p>
                   <p>• Check your spam folder if you don't see the email</p>
                 </div>
 

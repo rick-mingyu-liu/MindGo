@@ -26,6 +26,12 @@ export default function VerifyEmail() {
   }, [router.query, hasAttemptedVerification])
 
   const verifyEmail = async (token: string) => {
+    console.log('Verifying token:', token, 'Length:', token.length)
+    if (token.length !== 64) {
+      setVerificationStatus('error')
+      setMessage('Invalid or incomplete verification link. Please use the link sent to your email.')
+      return
+    }
     try {
       const response = await api.get(`/auth/verify-email/${token}`)
       setVerificationStatus('success')
