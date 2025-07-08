@@ -30,6 +30,25 @@ interface WatchlistForm {
   company_name: string
 }
 
+// Add fallback index info
+const INDEX_CARDS = [
+  {
+    symbol: '^GSPC',
+    label: 'S&P 500',
+    name: 'S&P 500 Index',
+  },
+  {
+    symbol: '^DJI',
+    label: 'DJI',
+    name: 'Dow Jones Industrial Average',
+  },
+  {
+    symbol: '^IXIC',
+    label: 'IXIC',
+    name: 'NASDAQ Composite',
+  },
+];
+
 export default function Investments() {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
@@ -43,9 +62,13 @@ export default function Investments() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
   const [detailModalOpenId, setDetailModalOpenId] = useState<number | null>(null)
+  const [indexRows, setIndexRows] = useState<any[]>([])
+  const [indexLoading, setIndexLoading] = useState(true)
+  const [indexError, setIndexError] = useState('')
 
   useEffect(() => {
     fetchWatchlist()
+    fetchIndices()
   }, [])
 
   // Debounced search for Add Stock dialog
@@ -85,6 +108,25 @@ export default function Investments() {
       console.error('Error fetching watchlist:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchIndices = async () => {
+    setIndexLoading(true)
+    setIndexError('')
+    try {
+      const results = await Promise.all(
+        INDEX_CARDS.map(idx => investmentAPI.getStockSnapshot(idx.symbol))
+      )
+      setIndexRows(results.map((res, i) => ({
+        ...INDEX_CARDS[i],
+        quote: res.data.quote,
+      })))
+    } catch (err) {
+      setIndexError('Failed to load index data')
+      setIndexRows([])
+    } finally {
+      setIndexLoading(false)
     }
   }
 
@@ -255,37 +297,84 @@ export default function Investments() {
         </button>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Info Section */}
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-1">
-                <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                  <Info className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-                  Watchlist
-                </h3>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Track your favorite stocks and investments in a simple table with essential stock data.
-                </p>
-              </div>
-            </div>
-          </div>
+
 
           {/* Search */}
           <div className="mb-6">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search stocks..."
+                placeholder="Search your watchlist..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
           </div>
+          {/* Indices Table */}
+          <div className="mb-6">
+            <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-950/20 shadow-sm p-4">
+              <div className="flex items-center gap-4 mb-2">
+                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-base font-semibold text-blue-900 dark:text-blue-100">Major Indices <span className="text-xs font-normal text-blue-700 dark:text-blue-300">(Live)</span></h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-500 dark:text-gray-400">
+                      <th className="px-3 py-2 text-left font-semibold">Symbol</th>
+                      <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
+                      <th className="px-3 py-2 text-right font-semibold">Price</th>
+                      <th className="px-3 py-2 text-right font-semibold">Change</th>
+                      <th className="px-3 py-2 text-right font-semibold">Change %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indexLoading ? (
+                      <tr><td colSpan={5} className="text-center py-4">Loading...</td></tr>
+                    ) : indexError ? (
+                      <tr><td colSpan={5} className="text-center text-red-600 py-4">{indexError}</td></tr>
+                    ) : indexRows.length > 0 ? (
+                      indexRows.map(idx => {
+                        const price = idx.quote?.c ?? 'N/A'
+                        const change = idx.quote?.d ?? 'N/A'
+                        const changePct = idx.quote?.dp ?? 'N/A'
+                        const isUp = typeof change === 'number' && change > 0
+                        const isDown = typeof change === 'number' && change < 0
+                        return (
+                          <tr key={idx.symbol} className="border-t border-gray-100 dark:border-gray-800">
+                            <td className="px-3 py-2 font-mono">{idx.label}</td>
+                            <td className="px-3 py-2 hidden sm:table-cell">{idx.name}</td>
+                            <td className="px-3 py-2 text-right font-mono">{price !== 'N/A' ? `$${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 'N/A'}</td>
+                            <td className={`px-3 py-2 text-right font-mono ${isUp ? 'text-green-600' : isDown ? 'text-red-600' : ''}`}>{
+                              price !== 'N/A' && change !== 'N/A' ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {isUp && <span>↗️</span>}
+                                  {isDown && <span>↘️</span>}
+                                  {change > 0 ? '+' : ''}{change.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </span>
+                              ) : 'N/A'
+                            }</td>
+                            <td className="px-3 py-2 text-right">
+                              {price !== 'N/A' && changePct !== 'N/A' ? (
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${isUp ? 'bg-green-100 text-green-700' : isDown ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {changePct > 0 ? '+' : ''}{changePct.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%
+                                </span>
+                              ) : 'N/A'}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr><td colSpan={5} className="text-center py-4">No data</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          
 
           {watchlist.length === 0 ? (
             <Card>
