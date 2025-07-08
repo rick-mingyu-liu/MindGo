@@ -99,7 +99,7 @@ const authController = {
 
       // Generate email verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
       console.log(`[Register] Generated verification token for ${email}:`, verificationToken);
 
       // Create user with email verification fields
@@ -269,7 +269,7 @@ const authController = {
       // Generate new verification token
       const crypto = require('crypto');
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
       // Update user with new token
       await db.query(
