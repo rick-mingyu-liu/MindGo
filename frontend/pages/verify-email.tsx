@@ -14,14 +14,16 @@ export default function VerifyEmail() {
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [userEmail, setUserEmail] = useState('')
+  const [hasAttemptedVerification, setHasAttemptedVerification] = useState(false)
 
   useEffect(() => {
     const { token } = router.query
     
-    if (token && typeof token === 'string') {
+    if (token && typeof token === 'string' && !hasAttemptedVerification) {
+      setHasAttemptedVerification(true)
       verifyEmail(token)
     }
-  }, [router.query])
+  }, [router.query, hasAttemptedVerification])
 
   const verifyEmail = async (token: string) => {
     try {
