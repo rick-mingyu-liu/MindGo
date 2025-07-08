@@ -32,6 +32,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import Swal from 'sweetalert2'
 
 interface FinancialSummary {
   period: string
@@ -92,6 +93,7 @@ export default function Dashboard() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [streak, setStreak] = useState(0)
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
+  const [hasJustCheckedIn, setHasJustCheckedIn] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
 
   const fetchDashboardData = useCallback(async () => {
@@ -133,27 +135,40 @@ export default function Dashboard() {
   }, [])
 
   const handleCheckIn = async () => {
-    if (checkingIn) return
-    
+    setCheckingIn(true);
     try {
-      setCheckingIn(true)
-      await api.post('/summary/checkin')
-      
-      // Refresh streak data
-      const streakRes = await api.get('/summary/checkin-streak')
-      setStreak(streakRes.data.streak || 0)
-      setHasCheckedInToday(true)
-      
-      toast.success('Checked in for today! Keep up the streak! 🔥')
-    } catch (error: any) {
-      if (error.response?.data?.error === 'Already checked in today!') {
-        toast.error('You\'ve already checked in today!')
+      await api.post('/summary/checkin');
+      // Fetch the latest streak/check-in status
+      const streakRes = await api.get('/summary/checkin-streak');
+      setStreak(streakRes.data.streak || 0);
+      // If you use lastCheckinDate, update hasCheckedInToday accordingly
+      // setHasCheckedInToday(isToday(new Date(streakRes.data.lastCheckinDate)));
+      setHasCheckedInToday(true);
+      setHasJustCheckedIn(true);
+      Swal.fire({
+        icon: 'success',
+        title: 'Checked in!',
+        text: 'You have checked in for today. Keep up the streak! 🔥',
+        confirmButtonColor: '#facc15',
+      });
+    } catch (err: any) {
+      if (err?.response?.status === 400 && err?.response?.data?.message?.toLowerCase().includes('already checked in')) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Already checked in',
+          text: 'You have already checked in today. Come back tomorrow!',
+          confirmButtonColor: '#f87171',
+        });
       } else {
-        toast.error('Failed to check in. Please try again.')
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Unable to check in. Please try again later.',
+          confirmButtonColor: '#f87171',
+        });
       }
-    } finally {
-      setCheckingIn(false)
     }
+    setCheckingIn(false);
   }
 
   const handleRefresh = async () => {
@@ -557,33 +572,27 @@ export default function Dashboard() {
           <div className="overflow-x-auto scrollbar-hide -mx-2 pb-2 sm:mx-0 sm:pb-0">
             <div className="flex gap-4 min-w-[750px] sm:grid sm:grid-cols-5 lg:grid-cols-5 sm:gap-6 mb-8">
                             {/* Streak Card */}
-              <Card className={`transition-colors duration-200 flex flex-col items-center justify-center text-center ${
-                hasCheckedInToday 
-                  ? 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20' 
-                  : 'hover:bg-orange-50 dark:hover:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 animate-pulse'
-              }`}>
+              <Card
+                className="transition-colors duration-200 flex flex-col items-center justify-center text-center hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+              >
                 <button
                   type="button"
-                  className={`focus:outline-none focus:ring-2 rounded-lg flex flex-col items-center justify-center text-center w-full h-full cursor-pointer bg-transparent border-0 p-0 ${
-                    hasCheckedInToday 
-                      ? 'focus:ring-yellow-400' 
-                      : 'focus:ring-orange-400'
-                  }`}
+                  className="focus:outline-none focus:ring-2 rounded-lg flex flex-col items-center justify-center text-center w-full h-full cursor-pointer bg-transparent border-0 p-0 focus:ring-yellow-400"
                   onClick={handleCheckIn}
                   disabled={checkingIn}
-                  aria-label={hasCheckedInToday ? "View streak details" : "Check in for today"}
+                  aria-label={!hasCheckedInToday ? "Check in for today" : "View streak details"}
                   tabIndex={0}
                 >
                   <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      {hasCheckedInToday ? 'Streak' : 'Check In'}
+                      {!hasCheckedInToday ? 'Check In' : 'Streak'}
                       {hasCheckedInToday && (
                         <Sparkles className="h-4 w-4 text-yellow-500 animate-pulse" />
                       )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center justify-center">
-                    <div className={`text-2xl font-bold ${hasCheckedInToday ? 'text-yellow-600' : 'text-orange-600'}`}>
+                    <div className={`text-2xl font-bold ${!hasCheckedInToday ? 'text-orange-600' : 'text-yellow-600'}`}>
                       {checkingIn ? (
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
                       ) : (
@@ -591,7 +600,7 @@ export default function Dashboard() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {hasCheckedInToday ? 'Days in a row' : 'Click to check in'}
+                      {!hasCheckedInToday ? 'Click to check in' : 'Days in a row'}
                     </p>
                   </CardContent>
                 </button>

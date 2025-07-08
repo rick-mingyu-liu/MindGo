@@ -261,7 +261,7 @@ exports.generateWeeklyReport = async (userId) => {
     // Footer
     content += `Keep up the great work managing your finances! 💪\n\n`;
     content += `— The MindGo Team\n`;
-    content += `https://mindgo.ca\n`;
+    content += `https://mindgo.io\n`;
 
     // --- HTML Content ---
     let html = `
@@ -318,7 +318,7 @@ exports.generateWeeklyReport = async (userId) => {
         </table>
 
         <div style="margin-top: 2em; font-size: 1.1em;">Keep up the great work managing your finances! 💪</div>
-        <div style="margin-top: 2em; color: #888; font-size: 1em;">— The MindGo Team<br><a href="https://mindgo.ca" style="color: #3182ce; text-decoration: none;">https://mindgo.ca</a></div>
+        <div style="margin-top: 2em; color: #888; font-size: 1em;">— The MindGo Team<br><a href="https://mindgo.io" style="color: #3182ce; text-decoration: none;">https://mindgo.io</a></div>
       </div>
     `;
 
