@@ -203,21 +203,16 @@ const authController = {
       );
       if (user.rows.length === 0) {
         console.log(`[VerifyEmail] No user found for token:`, token);
-        // Check if any user with this email is already verified
-        const userByEmail = await db.query(
-          'SELECT id, email, first_name, email_verified FROM users WHERE email = $1',
-          [token.split('@')[0] + '@' + token.split('@')[1]] // This is a fallback, but we should get the email from the token lookup
+        // Try to find a recently verified user (last 30 min)
+        const recentVerified = await db.query(
+          `SELECT id, email, first_name FROM users WHERE email_verified = TRUE AND email_verification_token IS NULL AND created_at > NOW() - INTERVAL '30 minutes' ORDER BY created_at DESC LIMIT 1`
         );
-        if (userByEmail.rows.length > 0 && userByEmail.rows[0].email_verified) {
-          console.log(`[VerifyEmail] User already verified:`, userByEmail.rows[0].email);
-          return res.status(200).json({ 
+        if (recentVerified.rows.length > 0) {
+          console.log(`[VerifyEmail] User already verified:`, recentVerified.rows[0].email);
+          return res.status(200).json({
             message: 'Your email is already verified. You can now log in to your account.',
             alreadyVerified: true,
-            user: {
-              id: userByEmail.rows[0].id,
-              email: userByEmail.rows[0].email,
-              first_name: userByEmail.rows[0].first_name
-            }
+            user: recentVerified.rows[0]
           });
         }
         return res.status(400).json({ error: 'Invalid verification token' });

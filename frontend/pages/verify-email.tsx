@@ -34,6 +34,12 @@ export default function VerifyEmail() {
     }
     try {
       const response = await api.get(`/auth/verify-email/${token}`)
+      if (response.data.alreadyVerified) {
+        setVerificationStatus('success')
+        setMessage(response.data.message)
+        setUserEmail(response.data.user.email)
+        return
+      }
       setVerificationStatus('success')
       setMessage(response.data.message)
       setUserEmail(response.data.user.email)
