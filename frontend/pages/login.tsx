@@ -5,7 +5,6 @@ import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, X, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useTheme } from '@/contexts/ThemeContext'
+import Swal from 'sweetalert2'
 
 interface LoginForm {
   email: string
@@ -50,7 +50,12 @@ export default function Login() {
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('user', JSON.stringify(response.data.user))
       
-      toast.success('Login successful!')
+      Swal.fire({
+        icon: 'success',
+        title: 'Login successful!',
+        text: 'Welcome back!',
+        confirmButtonColor: '#facc15',
+      })
       router.push('/')
       
     } catch (error: any) {
@@ -71,17 +76,28 @@ export default function Login() {
 
   const handleResendVerification = async () => {
     if (!email) {
-      toast.error('Please enter your email address first')
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Please enter your email address first',
+      })
       return
     }
 
     try {
       setResendLoading(true)
       await api.post('/auth/resend-verification', { email })
-      toast.success('Verification email sent successfully!')
+      Swal.fire({
+        icon: 'success',
+        title: 'Verification email sent successfully!',
+      })
       setVerificationError('')
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to send verification email')
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.error || 'Failed to send verification email',
+      })
     } finally {
       setResendLoading(false)
     }

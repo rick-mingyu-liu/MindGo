@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'react-hot-toast'
+import Swal from 'sweetalert2'
 
 interface Transaction {
   id: number
@@ -37,7 +37,11 @@ export default function Transactions() {
       setTransactions(response.data.transactions)
     } catch (error) {
       console.error('Error fetching transactions:', error)
-      toast.error('Failed to load transactions')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to load transactions',
+        text: 'There was an error fetching transactions. Please try again later.'
+      })
     } finally {
       setLoading(false)
     }
@@ -75,18 +79,35 @@ export default function Transactions() {
   const categories = [...new Set(transactions.map(t => t.category))]
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
-      return
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+    });
+    if (!result.isConfirmed) {
+      return;
     }
-
     try {
       setDeletingId(id)
       await api.delete(`/transactions/${id}`)
-      toast.success('Transaction deleted successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'Transaction deleted successfully',
+        text: 'The transaction has been deleted successfully.'
+      })
       fetchTransactions() // Refresh the list
     } catch (error) {
       console.error('Error deleting transaction:', error)
-      toast.error('Failed to delete transaction')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to delete transaction',
+        text: 'There was an error deleting the transaction. Please try again later.'
+      })
     } finally {
       setDeletingId(null)
     }

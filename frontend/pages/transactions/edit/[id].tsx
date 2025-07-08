@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'react-hot-toast'
+import Swal from 'sweetalert2'
 
 interface Transaction {
   id: number
@@ -63,7 +63,11 @@ export default function EditTransaction() {
       const targetTransaction = transactions.find((t: Transaction) => t.id === parseInt(id as string))
       
       if (!targetTransaction) {
-        toast.error('Transaction not found')
+        Swal.fire({
+          icon: 'error',
+          title: 'Transaction not found',
+          text: 'The transaction you are trying to edit does not exist.'
+        })
         router.push('/transactions')
         return
       }
@@ -78,7 +82,11 @@ export default function EditTransaction() {
       })
     } catch (error) {
       console.error('Error fetching transaction:', error)
-      toast.error('Failed to load transaction')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to load transaction',
+        text: 'There was an error loading the transaction. Please try again later.'
+      })
       router.push('/transactions')
     } finally {
       setLoading(false)
@@ -89,7 +97,11 @@ export default function EditTransaction() {
     e.preventDefault()
     
     if (!formData.description || !formData.amount || !formData.category || !formData.date) {
-      toast.error('Please fill in all required fields')
+      Swal.fire({
+        icon: 'error',
+        title: 'Please fill in all required fields',
+        text: 'You must provide a description, amount, category, and date for the transaction.'
+      })
       return
     }
 
@@ -103,11 +115,19 @@ export default function EditTransaction() {
         date: formData.date
       })
 
-      toast.success('Transaction updated successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'Transaction updated successfully',
+        text: 'The transaction has been updated successfully.'
+      })
       router.push('/transactions')
     } catch (error) {
       console.error('Error updating transaction:', error)
-      toast.error('Failed to update transaction')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to update transaction',
+        text: 'There was an error updating the transaction. Please try again later.'
+      })
     } finally {
       setSaving(false)
     }
@@ -121,11 +141,19 @@ export default function EditTransaction() {
     try {
       setDeleting(true)
       await api.delete(`/transactions/${id}`)
-      toast.success('Transaction deleted successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'Transaction deleted successfully',
+        text: 'The transaction has been deleted successfully.'
+      })
       router.push('/transactions')
     } catch (error) {
       console.error('Error deleting transaction:', error)
-      toast.error('Failed to delete transaction')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to delete transaction',
+        text: 'There was an error deleting the transaction. Please try again later.'
+      })
     } finally {
       setDeleting(false)
     }

@@ -23,7 +23,7 @@ import {
 import { StockDetailModal } from './StockDetailModal'
 import { formatCurrency } from '@/utils/formatters'
 import { enhancedStockAPI, investmentAPI } from '@/utils/api'
-import toast from 'react-hot-toast'
+import Swal from 'sweetalert2'
 
 interface Stock {
   id: number
@@ -61,7 +61,11 @@ export function StockWatchlist() {
       setStocks(response.data.watchlist)
     } catch (error) {
       console.error('Error fetching watchlist:', error)
-      toast.error('Failed to load watchlist')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to load watchlist',
+        text: 'Please try again later.'
+      })
     } finally {
       setLoading(false)
     }
@@ -101,14 +105,22 @@ export function StockWatchlist() {
 
   const handleAddStock = async () => {
     if (!newStockSymbol.trim() || !newStockCompany.trim()) {
-      toast.error('Please enter both symbol and company name')
+      Swal.fire({
+        icon: 'error',
+        title: 'Please enter both symbol and company name',
+        text: 'Please fill in all fields.'
+      })
       return
     }
 
     try {
       setAddingStock(true)
       await enhancedStockAPI.addToWatchlist(newStockSymbol.trim(), newStockCompany.trim())
-      toast.success('Stock added to watchlist')
+      Swal.fire({
+        icon: 'success',
+        title: 'Stock added to watchlist',
+        text: 'The stock has been successfully added to your watchlist.'
+      })
       setNewStockSymbol('')
       setNewStockCompany('')
       setShowAddStock(false)
@@ -124,7 +136,11 @@ export function StockWatchlist() {
   const handleRemoveStock = async (symbol: string) => {
     try {
       await enhancedStockAPI.removeFromWatchlist(symbol)
-      toast.success('Stock removed from watchlist')
+      Swal.fire({
+        icon: 'success',
+        title: 'Stock removed from watchlist',
+        text: 'The stock has been successfully removed from your watchlist.'
+      })
       fetchWatchlist() // Refresh the list
     } catch (error) {
       console.error('Error removing stock:', error)

@@ -180,17 +180,19 @@ export default function Dashboard() {
   const handleSendReport = async () => {
     try {
       await api.post('/auth/test-email');
-      toast.custom((t) => (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 shadow-lg" style={{ minWidth: 320 }}>
-          <CheckCircle2 className="w-7 h-7 text-green-500" />
-          <div>
-            <div className="font-bold text-green-800 text-lg">Report Sent!</div>
-            <div className="text-green-700 text-sm">Your financial report has been emailed to you. Check your inbox!</div>
-          </div>
-        </div>
-      ), { duration: 4000 });
+      Swal.fire({
+        icon: 'success',
+        title: 'Report Sent!',
+        text: 'Your financial report has been emailed to you. Check your inbox!',
+        confirmButtonColor: '#facc15',
+      });
     } catch (error) {
-      toast.error('Failed to send financial report.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to send financial report.',
+        confirmButtonColor: '#f87171',
+      });
     }
   };
 

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/utils/formatters'
 import { investmentAPI } from '@/utils/api'
-import toast from 'react-hot-toast'
+import Swal from 'sweetalert2'
 import { BarChart, Bar, Legend, ResponsiveContainer, CartesianGrid, XAxis as RechartsXAxis, YAxis as RechartsYAxis, Tooltip, LineChart, Line } from 'recharts';
 
 interface StockDetailModalProps {
@@ -150,7 +150,10 @@ export function StockDetailModal({
       setStockData(response.data)
     } catch (error) {
       console.error('Error fetching stock data:', error)
-      toast.error('Failed to load stock details')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to load stock details',
+      })
     } finally {
       setLoading(false)
     }

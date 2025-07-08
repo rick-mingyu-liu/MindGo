@@ -4,7 +4,6 @@ import Head from 'next/head'
 import { useForm } from 'react-hook-form'
 import { Brain, ArrowLeft, Send, Sparkles, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
 import { api, logout, goalAPI } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ReactMarkdown from 'react-markdown'
 import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import Swal from 'sweetalert2'
 
 interface PlanningForm {
   financialGoal: string
@@ -115,7 +115,10 @@ export default function AIPlanning() {
         investmentExperience: planningPrefs.investmentExperience,
       })
       setPlanningResponse(response.data)
-      toast.success('AI analysis completed!')
+      Swal.fire({
+        icon: 'success',
+        title: 'AI analysis completed!',
+      })
     } catch (error) {
       console.error('AI planning error:', error)
       // Error handling is done in api interceptor
@@ -133,7 +136,11 @@ export default function AIPlanning() {
     try {
       const aiPlanId = planningResponse?.plan?.id;
       if (!aiPlanId) {
-        toast.error('AI plan ID not found. Please try again.');
+        Swal.fire({
+          icon: 'error',
+          title: 'AI plan ID not found',
+          text: 'Please try again.',
+        });
         setMoveGoalLoading(false);
         return;
       }
@@ -144,7 +151,10 @@ export default function AIPlanning() {
         target_date: data.target_date,
         description: data.description,
       });
-      toast.success('Goal moved to active goals!');
+      Swal.fire({
+        icon: 'success',
+        title: 'Goal moved to active goals!',
+      });
       setShowMoveGoal(false);
       resetMoveGoal();
     } catch (err) {
@@ -168,7 +178,10 @@ export default function AIPlanning() {
     setPlanningPrefs(prefsDraft)
     setEditingPrefs(false)
     setSavingPrefs(false)
-    toast.success('Preferences updated!')
+    Swal.fire({
+      icon: 'success',
+      title: 'Preferences updated!',
+    })
   }
 
   return (

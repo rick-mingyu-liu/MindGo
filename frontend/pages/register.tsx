@@ -5,12 +5,12 @@ import Image from 'next/image'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTheme } from '@/contexts/ThemeContext'
+import Swal from 'sweetalert2'
 
 interface RegisterForm {
   first_name: string
@@ -100,11 +100,19 @@ export default function Register() {
       if (response.data.requiresVerification) {
         setRegistrationSuccess(true)
         setUserEmail(data.email)
-        toast.success('Registration successful! Please check your email to verify your account.')
+        Swal.fire({
+          icon: 'success',
+          title: 'Registration successful!',
+          text: 'Please check your email to verify your account.',
+        })
       } else {
         localStorage.setItem('token', response.data.token)
         localStorage.setItem('user', JSON.stringify(response.data.user))
-        toast.success('Registration successful! Welcome to MindGo.')
+        Swal.fire({
+          icon: 'success',
+          title: 'Registration successful!',
+          text: 'Welcome to MindGo.',
+        })
         router.push('/')
       }
     } catch (error: any) {

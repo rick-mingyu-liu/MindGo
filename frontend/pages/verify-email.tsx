@@ -4,7 +4,6 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { CheckCircle, XCircle, Mail, ArrowRight } from 'lucide-react'
 import { api } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -30,11 +29,9 @@ export default function VerifyEmail() {
       setVerificationStatus('success')
       setMessage(response.data.message)
       setUserEmail(response.data.user.email)
-      toast.success('Email verified successfully!')
     } catch (error: any) {
       setVerificationStatus('error')
       setMessage(error.response?.data?.error || 'Verification failed')
-      toast.error('Email verification failed')
     }
   }
 

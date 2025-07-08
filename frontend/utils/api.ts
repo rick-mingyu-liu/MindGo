@@ -1,5 +1,5 @@
 import axios from 'axios'
-import toast from 'react-hot-toast'
+import Swal from 'sweetalert2'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
@@ -16,7 +16,6 @@ export const logout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   window.location.href = '/login'
-  toast.success('Logged out successfully')
 }
 
 // Request interceptor to add auth token
@@ -48,15 +47,35 @@ api.interceptors.response.use(
       // Unauthorized - redirect to login
       logout()
     } else if (response?.status === 403) {
-      toast.error('Access denied. You do not have permission to perform this action.')
+      Swal.fire({
+        icon: 'error',
+        title: 'Access denied',
+        text: 'Access denied. You do not have permission to perform this action.',
+      })
     } else if (response?.status === 404) {
-      toast.error('Resource not found.')
+      Swal.fire({
+        icon: 'error',
+        title: 'Resource not found',
+        text: 'Resource not found.',
+      })
     } else if (response?.status >= 500) {
-      toast.error('Server error. Please try again later.')
+      Swal.fire({
+        icon: 'error',
+        title: 'Server error',
+        text: 'Server error. Please try again later.',
+      })
     } else if (response?.data?.error && !isAuthEndpoint) {
-      toast.error(response.data.error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: response.data.error,
+      })
     } else if (!isAuthEndpoint) {
-      toast.error('An unexpected error occurred.')
+      Swal.fire({
+        icon: 'error',
+        title: 'An unexpected error occurred',
+        text: 'An unexpected error occurred.',
+      })
     }
 
     return Promise.reject(error)

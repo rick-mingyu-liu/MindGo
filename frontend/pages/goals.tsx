@@ -4,7 +4,6 @@ import Head from 'next/head'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut, Eye, Brain } from 'lucide-react'
 import { api, logout } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +14,7 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ReactMarkdown from 'react-markdown'
 import React from 'react'
+import Swal from 'sweetalert2'
 
 interface Goal {
   id: number
@@ -109,14 +109,20 @@ export default function Goals() {
           target_amount: parseFloat(data.target_amount),
           current_amount: parseFloat(data.current_amount),
         })
-        toast.success('Goal updated successfully!')
+        Swal.fire({
+          icon: 'success',
+          title: 'Goal updated successfully!',
+        })
       } else {
         await api.post('/goals', {
           ...data,
           target_amount: parseFloat(data.target_amount),
           current_amount: parseFloat(data.current_amount),
         })
-        toast.success('Goal created successfully!')
+        Swal.fire({
+          icon: 'success',
+          title: 'Goal created successfully!',
+        })
       }
       
       setIsDialogOpen(false)
@@ -148,7 +154,10 @@ export default function Goals() {
     if (confirm('Are you sure you want to delete this goal?')) {
       try {
         await api.delete(`/goals/${goalId}`)
-        toast.success('Goal deleted successfully!')
+        Swal.fire({
+          icon: 'success',
+          title: 'Goal deleted successfully!',
+        })
         fetchGoals()
       } catch (error) {
         console.error('Error deleting goal:', error)
@@ -503,7 +512,10 @@ export default function Goals() {
               onClick={async () => {
                 if (goalToDelete) {
                   await api.delete(`/goals/${goalToDelete.id}`);
-                  toast.success('Goal deleted successfully!');
+                  Swal.fire({
+                    icon: 'success',
+                    title: 'Goal deleted successfully!',
+                  })
                   setDeleteDialogOpen(false);
                   setViewingGoal(null);
                   setIsDialogOpen(false);

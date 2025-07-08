@@ -4,7 +4,6 @@ import Head from 'next/head'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info, Eye } from 'lucide-react'
 import { api, logout, investmentAPI } from '@/utils/api'
-import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { StockDetailModal } from '@/components/StockDetailModal'
+import Swal from 'sweetalert2'
 
 interface WatchlistItem {
   id: number
@@ -97,7 +97,10 @@ export default function Investments() {
     if (pendingDeleteId == null) return
       try {
       await api.delete(`/investments/watchlist/${pendingDeleteId}`)
-        toast.success('Stock removed from watchlist!')
+        Swal.fire({
+          icon: 'success',
+          title: 'Stock removed from watchlist!',
+        })
         fetchWatchlist()
       } catch (error) {
         console.error('Error removing stock:', error)
@@ -130,13 +133,19 @@ export default function Investments() {
   const handleAddStockFromSearch = async (symbol: string, companyName: string) => {
     try {
       await api.post('/investments/watchlist', { symbol, company_name: companyName })
-      toast.success('Stock added to watchlist!')
+      Swal.fire({
+        icon: 'success',
+        title: 'Stock added to watchlist!',
+      })
       setIsDialogOpen(false)
       setSearchAddQuery('')
       setSearchAddResults([])
       fetchWatchlist()
     } catch (error) {
-      toast.error('Failed to add stock')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to add stock',
+      })
     }
   }
 

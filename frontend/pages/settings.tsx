@@ -29,7 +29,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'react-hot-toast'
 import {
   Dialog,
   DialogTrigger,
@@ -40,6 +39,7 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog'
+import Swal from 'sweetalert2'
 
 interface DataRetentionSettings {
   autoDeleteEnabled: boolean
@@ -120,7 +120,11 @@ export default function Settings() {
       setSettings(response.data)
     } catch (error) {
       console.error('Error fetching settings:', error)
-      toast.error('Failed to load settings')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to load settings',
+        text: 'There was an error fetching your settings. Please try again later.'
+      })
     } finally {
       setLoading(false)
     }
@@ -143,10 +147,18 @@ export default function Settings() {
     try {
       setSaving(true)
       await api.put('/transactions/retention-settings', settings)
-      toast.success('Settings saved successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'Settings saved successfully',
+        text: 'Your settings have been saved successfully!'
+      })
     } catch (error) {
       console.error('Error saving settings:', error)
-      toast.error('Failed to save settings')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to save settings',
+        text: 'There was an error saving your settings. Please try again later.'
+      })
     } finally {
       setSaving(false)
     }
@@ -157,10 +169,18 @@ export default function Settings() {
       setSaving(true)
       // In a real app, you'd save to API
       localStorage.setItem('userPreferences', JSON.stringify(preferences))
-      toast.success('Preferences saved successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'Preferences saved successfully',
+        text: 'Your preferences have been saved successfully!'
+      })
     } catch (error) {
       console.error('Error saving preferences:', error)
-      toast.error('Failed to save preferences')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to save preferences',
+        text: 'There was an error saving your preferences. Please try again later.'
+      })
     } finally {
       setSaving(false)
     }
@@ -175,11 +195,19 @@ export default function Settings() {
         api.delete('/goals/clear-all'),
         api.delete('/investments/watchlist/clear-all') 
       ])
-      toast.success('All data cleared successfully')
+      Swal.fire({
+        icon: 'success',
+        title: 'All data cleared successfully',
+        text: 'All your data including transactions, goals, and watchlist have been cleared successfully!'
+      })
       router.push('/')
     } catch (error) {
       console.error('Error clearing data:', error)
-      toast.error('Failed to clear data')
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to clear data',
+        text: 'There was an error clearing your data. Please try again later.'
+      })
     } finally {
       setClearing(false)
     }
@@ -195,9 +223,17 @@ export default function Settings() {
         weekly_reports_enabled: checked,
         email_notifications_enabled: preferences.notifications.email
       });
-      toast.success('Weekly report preference updated!');
+      Swal.fire({
+        icon: 'success',
+        title: 'Weekly report preference updated!',
+        text: 'Your weekly report preference has been updated successfully!'
+      })
     } catch (error) {
-      toast.error('Failed to update weekly report preference');
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed to update weekly report preference',
+        text: 'There was an error updating your weekly report preference. Please try again later.'
+      })
     }
   };
 
@@ -650,7 +686,11 @@ export default function Settings() {
                       showCharts: true
                     }
                   })
-                  toast.success('Preferences reset to defaults')
+                  Swal.fire({
+                    icon: 'success',
+                    title: 'Preferences reset to defaults',
+                    text: 'Your preferences have been reset to defaults successfully!'
+                  })
                 }}
                 className="aurora-border"
               >
