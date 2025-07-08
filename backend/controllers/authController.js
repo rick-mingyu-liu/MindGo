@@ -104,11 +104,16 @@ const authController = {
 
       // Create user with email verification fields
       const newUser = await db.query(
-        'INSERT INTO users (email, password_hash, first_name, last_name, email_verification_token, email_verification_expires) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, first_name, last_name, created_at',
+        'INSERT INTO users (email, password_hash, first_name, last_name, email_verification_token, email_verification_expires) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, first_name, last_name, created_at, email_verification_expires',
         [email, passwordHash, first_name, last_name, verificationToken, verificationExpires]
       );
-
       const userId = newUser.rows[0].id;
+      console.log(`[Register] User created:`, {
+        id: userId,
+        email,
+        created_at: newUser.rows[0].created_at,
+        verification_expires: newUser.rows[0].email_verification_expires
+      });
 
       // Send verification email
       try {
@@ -193,15 +198,25 @@ const authController = {
       console.log(`[VerifyEmail] Received verification request for token:`, token);
       // Find user with this verification token
       const user = await db.query(
-        'SELECT id, email, first_name, email_verification_expires FROM users WHERE email_verification_token = $1',
+        'SELECT id, email, first_name, email_verification_expires, created_at FROM users WHERE email_verification_token = $1',
         [token]
       );
       if (user.rows.length === 0) {
         console.log(`[VerifyEmail] No user found for token:`, token);
         return res.status(400).json({ error: 'Invalid verification token' });
       }
+      const now = new Date();
+      const expires = new Date(user.rows[0].email_verification_expires);
+      const created = new Date(user.rows[0].created_at);
+      console.log(`[VerifyEmail] User found:`, {
+        id: user.rows[0].id,
+        email: user.rows[0].email,
+        created_at: created,
+        verification_expires: expires,
+        now: now
+      });
       // Check if token has expired
-      if (new Date() > new Date(user.rows[0].email_verification_expires)) {
+      if (now > expires) {
         console.log(`[VerifyEmail] Token expired for user:`, user.rows[0].email);
         return res.status(400).json({ error: 'Verification token has expired' });
       }
@@ -349,11 +364,14 @@ const authController = {
   // Scheduled job: Delete unverified accounts older than 30 minutes
   async deleteUnverifiedAccounts() {
     try {
+      console.log(`[Cleanup] Running unverified user cleanup job at`, new Date());
       const result = await db.query(
-        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email`
+        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email, created_at` 
       );
       if (result.rows.length > 0) {
-        console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => u.email));
+        console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => ({email: u.email, created_at: u.created_at})));
+      } else {
+        console.log(`[Cleanup] No unverified accounts deleted.`);
       }
     } catch (error) {
       console.error('[Cleanup] Error deleting unverified accounts:', error);
