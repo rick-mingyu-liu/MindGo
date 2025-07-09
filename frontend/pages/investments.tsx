@@ -325,16 +325,16 @@ export default function Investments() {
                       <th className="px-1 py-2 text-left font-semibold">Symbol</th>
                       <th className="px-1 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
                       <th className="px-1 py-2 text-right font-semibold">Price</th>
-                      <th className="px-1 py-2 text-right font-semibold">Change</th>
+                      <th className="px-1 py-2 text-right font-semibold hidden sm:table-cell">Change</th>
                       <th className="px-1 py-2 text-right font-semibold">Change %</th>
                       <th className="px-1 py-2 text-center font-semibold">View</th>
                     </tr>
                   </thead>
                   <tbody>
                     {indexLoading ? (
-                      <tr><td colSpan={6} className="text-center py-4">Loading...</td></tr>
+                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">Loading...</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">Loading...</td></tr>
                     ) : indexError ? (
-                      <tr><td colSpan={6} className="text-center text-red-600 py-4">{indexError}</td></tr>
+                      <tr><td colSpan={4} className="text-center text-red-600 py-4 sm:hidden">{indexError}</td><td colSpan={6} className="text-center text-red-600 py-4 hidden sm:table-cell">{indexError}</td></tr>
                     ) : indexRows.length > 0 ? (
                       indexRows.map(idx => {
                         const price = idx.quote?.c ?? 'N/A'
@@ -367,23 +367,25 @@ export default function Investments() {
                               ) : 'N/A'}
                             </td>
                             <td className="px-1 py-2 text-center">
-                              <Button variant="ghost" size="icon" className="w-7 h-7 p-0" onClick={() => {
-                                const links: Record<string, string> = {
-                                  '^GSPC': 'https://www.investopedia.com/terms/s/sp500.asp',
-                                  '^DJI': 'https://www.investopedia.com/terms/d/djia.asp',
-                                  '^IXIC': 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
-                                };
-                                const url = links[idx.symbol as keyof typeof links] || 'https://www.investopedia.com/';
-                                window.open(url, '_blank');
-                              }}>
-                                <Eye className="w-4 h-4" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" className="w-7 h-7 p-0" onClick={() => {
+                                  const links: Record<string, string> = {
+                                    '^GSPC': 'https://www.investopedia.com/terms/s/sp500.asp',
+                                    '^DJI': 'https://www.investopedia.com/terms/d/djia.asp',
+                                    '^IXIC': 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
+                                  };
+                                  const url = links[idx.symbol as keyof typeof links] || 'https://www.investopedia.com/';
+                                  window.open(url, '_blank');
+                                }}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         )
                       })
                     ) : (
-                      <tr><td colSpan={6} className="text-center py-4">No data</td></tr>
+                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">No data</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">No data</td></tr>
                     )}
                   </tbody>
                 </table>
