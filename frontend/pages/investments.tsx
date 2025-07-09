@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFirstRow } from '@/components/ui/table'
 import { StockDetailModal } from '@/components/StockDetailModal'
 import Swal from 'sweetalert2'
 
@@ -378,7 +378,7 @@ export default function Investments() {
                         const isUp = typeof change === 'number' && change > 0
                         const isDown = typeof change === 'number' && change < 0
                         return (
-                          <tr key={idx.symbol} className="border-t border-gray-100 dark:border-gray-800">
+                          <tr key={idx.symbol} className="border-t border-gray-100 dark:border-gray-800 hover:bg-muted/60 transition-colors">
                             <td className="px-1 py-2 font-mono">{idx.label}</td>
                             <td className="px-1 py-2 hidden sm:table-cell">{idx.name}</td>
                             <td className="text-right font-medium">{price !== 'N/A' ? formatCurrency(price) : 'N/A'}</td>
@@ -453,14 +453,14 @@ export default function Investments() {
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableFirstRow>
                       <TableHead>Symbol</TableHead>
                       <TableHead className="hidden sm:table-cell">Company</TableHead>
                       <TableHead className="text-right">Price</TableHead>
                       <TableHead className="text-right hidden sm:table-cell">Change</TableHead>
                       <TableHead className="text-right">Change %</TableHead>
                       <TableHead className="text-right w-16 sm:w-auto">Actions</TableHead>
-                    </TableRow>
+                    </TableFirstRow>
                   </TableHeader>
                   <TableBody>
                     {filteredWatchlist.map((item) => (
