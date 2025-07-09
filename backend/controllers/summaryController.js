@@ -286,6 +286,18 @@ const summaryController = {
     }
   },
 
+  // Clear all check-in and streak data for a user
+  async clearAllStreakData(req, res) {
+    try {
+      await db.query('DELETE FROM checkins WHERE user_id = $1', [req.user.userId]);
+      await db.query('DELETE FROM streak_totals WHERE user_id = $1', [req.user.userId]);
+      res.json({ message: 'Streak and check-in data cleared successfully' });
+    } catch (error) {
+      console.error('Clear all streak data error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
   // Helper method to update streak totals
   async updateStreakTotals(userId) {
     try {

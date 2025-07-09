@@ -193,7 +193,8 @@ export default function Settings() {
       await Promise.all([
         api.delete('/transactions/clear-all'),
         api.delete('/goals/clear-all'),
-        api.delete('/investments/watchlist/clear-all') 
+        api.delete('/investments/watchlist/clear-all'),
+        api.delete('/summary/clear-all') // Clear streak/check-in data
       ])
       Swal.fire({
         icon: 'success',
@@ -631,7 +632,7 @@ export default function Settings() {
                     <div className="space-y-0.5">
                       <Label className="text-base">Clear All Data</Label>
                       <p className="text-sm text-muted-foreground">
-                        Permanently delete all transactions, goals, and watchlist data
+                        Permanently delete all transactions, goals, and streak etc.
                       </p>
                     </div>
                     <Button
