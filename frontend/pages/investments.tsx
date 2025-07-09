@@ -322,18 +322,19 @@ export default function Investments() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-xs text-gray-500 dark:text-gray-400">
-                      <th className="px-3 py-2 text-left font-semibold">Symbol</th>
-                      <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
-                      <th className="px-3 py-2 text-right font-semibold">Price</th>
-                      <th className="px-3 py-2 text-right font-semibold">Change</th>
-                      <th className="px-3 py-2 text-right font-semibold">Change %</th>
+                      <th className="px-1 py-2 text-left font-semibold">Symbol</th>
+                      <th className="px-1 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
+                      <th className="px-1 py-2 text-right font-semibold">Price</th>
+                      <th className="px-1 py-2 text-right font-semibold">Change</th>
+                      <th className="px-1 py-2 text-right font-semibold">Change %</th>
+                      <th className="px-1 py-2 text-center font-semibold">View</th>
                     </tr>
                   </thead>
                   <tbody>
                     {indexLoading ? (
-                      <tr><td colSpan={5} className="text-center py-4">Loading...</td></tr>
+                      <tr><td colSpan={6} className="text-center py-4">Loading...</td></tr>
                     ) : indexError ? (
-                      <tr><td colSpan={5} className="text-center text-red-600 py-4">{indexError}</td></tr>
+                      <tr><td colSpan={6} className="text-center text-red-600 py-4">{indexError}</td></tr>
                     ) : indexRows.length > 0 ? (
                       indexRows.map(idx => {
                         const price = idx.quote?.c ?? 'N/A'
@@ -343,30 +344,46 @@ export default function Investments() {
                         const isDown = typeof change === 'number' && change < 0
                         return (
                           <tr key={idx.symbol} className="border-t border-gray-100 dark:border-gray-800">
-                            <td className="px-3 py-2 font-mono">{idx.label}</td>
-                            <td className="px-3 py-2 hidden sm:table-cell">{idx.name}</td>
-                            <td className="px-3 py-2 text-right font-mono">{price !== 'N/A' ? `$${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 'N/A'}</td>
-                            <td className={`px-3 py-2 text-right font-mono ${isUp ? 'text-green-600' : isDown ? 'text-red-600' : ''}`}>{
-                              price !== 'N/A' && change !== 'N/A' ? (
-                                <span className="inline-flex items-center gap-1">
-                                  {isUp && <span>↗️</span>}
-                                  {isDown && <span>↘️</span>}
-                                  {change > 0 ? '+' : ''}{change.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                </span>
-                              ) : 'N/A'
-                            }</td>
-                            <td className="px-3 py-2 text-right">
-                              {price !== 'N/A' && changePct !== 'N/A' ? (
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${isUp ? 'bg-green-100 text-green-700' : isDown ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                  {changePct > 0 ? '+' : ''}{changePct.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%
-                                </span>
+                            <td className="px-1 py-2 font-mono">{idx.label}</td>
+                            <td className="px-1 py-2 hidden sm:table-cell">{idx.name}</td>
+                            <td className="text-right font-medium">{price !== 'N/A' ? formatCurrency(price) : 'N/A'}</td>
+                            <td className="text-right hidden sm:table-cell">
+                              {price !== 'N/A' && change !== 'N/A' ? (
+                                <div className={`flex items-center justify-end gap-1 ${isUp ? 'text-green-600' : isDown ? 'text-red-600' : ''}`}> 
+                                  {isUp ? (
+                                    <TrendingUp className="w-4 h-4" />
+                                  ) : isDown ? (
+                                    <TrendingDown className="w-4 h-4" />
+                                  ) : null}
+                                  {formatCurrency(Math.abs(change))}
+                                </div>
                               ) : 'N/A'}
+                            </td>
+                            <td className="px-1 py-2 text-right">
+                              {price !== 'N/A' && changePct !== 'N/A' ? (
+                                <Badge variant={changePct >= 0 ? "default" : "destructive"}>
+                                  {changePct > 0 ? '+' : ''}{changePct.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%
+                                </Badge>
+                              ) : 'N/A'}
+                            </td>
+                            <td className="px-1 py-2 text-center">
+                              <Button variant="ghost" size="icon" className="w-7 h-7 p-0" onClick={() => {
+                                const links: Record<string, string> = {
+                                  '^GSPC': 'https://www.investopedia.com/terms/s/sp500.asp',
+                                  '^DJI': 'https://www.investopedia.com/terms/d/djia.asp',
+                                  '^IXIC': 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
+                                };
+                                const url = links[idx.symbol as keyof typeof links] || 'https://www.investopedia.com/';
+                                window.open(url, '_blank');
+                              }}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
                             </td>
                           </tr>
                         )
                       })
                     ) : (
-                      <tr><td colSpan={5} className="text-center py-4">No data</td></tr>
+                      <tr><td colSpan={6} className="text-center py-4">No data</td></tr>
                     )}
                   </tbody>
                 </table>

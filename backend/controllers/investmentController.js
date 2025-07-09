@@ -12,7 +12,95 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      // Fetch quote and profile from Finnhub
+      // Special handling for major indices
+      const indexMap = {
+        '^GSPC': { name: 'S&P 500 Index' },
+        '^DJI': { name: 'Dow Jones Industrial Average' },
+        '^IXIC': { name: 'NASDAQ Composite' },
+      };
+      if (indexMap[symbol]) {
+        // Try Alpha Vantage first
+        let quote = null;
+        try {
+          const avData = await freeStockDataService.getAlphaVantageHistoricalData(symbol);
+          // Get the latest date
+          const lastIdx = avData.t.length - 1;
+          const prevIdx = avData.t.length - 2;
+          if (lastIdx >= 0 && prevIdx >= 0) {
+            const price = avData.c[lastIdx];
+            const prevPrice = avData.c[prevIdx];
+            const change = price - prevPrice;
+            const changePct = (change / prevPrice) * 100;
+            quote = {
+              c: price,
+              d: change,
+              dp: changePct,
+              h: avData.h[lastIdx],
+              l: avData.l[lastIdx],
+              o: avData.o[lastIdx],
+              pc: prevPrice,
+              t: avData.t[lastIdx],
+              v: avData.v[lastIdx],
+            };
+          }
+        } catch (e) {
+          // Fallback to Yahoo Finance
+          try {
+            const yfData = await freeStockDataService.getYahooFinanceHistoricalData(symbol, '5d');
+            const lastIdx = yfData.t.length - 1;
+            const prevIdx = yfData.t.length - 2;
+            if (lastIdx >= 0 && prevIdx >= 0) {
+              const price = yfData.c[lastIdx];
+              const prevPrice = yfData.c[prevIdx];
+              const change = price - prevPrice;
+              const changePct = (change / prevPrice) * 100;
+              quote = {
+                c: price,
+                d: change,
+                dp: changePct,
+                h: yfData.h[lastIdx],
+                l: yfData.l[lastIdx],
+                o: yfData.o[lastIdx],
+                pc: prevPrice,
+                t: yfData.t[lastIdx],
+                v: yfData.v[lastIdx],
+              };
+            }
+          } catch (err) {
+            return res.status(500).json({ error: 'Failed to fetch index data from Alpha Vantage and Yahoo Finance' });
+          }
+        }
+        if (!quote) {
+          return res.status(500).json({ error: 'No index data available' });
+        }
+        return res.json({
+          symbol: symbol.toUpperCase(),
+          quote,
+          companyInfo: {
+            name: indexMap[symbol].name,
+            ticker: symbol.toUpperCase(),
+            // Fill other fields as null or N/A for indices
+            country: null,
+            industry: null,
+            sector: null,
+            employees: null,
+            website: null,
+            description: null,
+            logo: null,
+            exchange: null,
+            ipo: null,
+            phone: null,
+          },
+          tradingInfo: {
+            volume: quote.v,
+            marketCap: null,
+            dayRange: `${quote.l} - ${quote.h}`,
+            yearRange: 'N/A',
+          }
+        });
+      }
+
+      // Default: fetch from Finnhub for stocks
       const [quote, profile] = await Promise.all([
         finnhubService.getQuote(symbol),
         finnhubService.getProfile(symbol)
