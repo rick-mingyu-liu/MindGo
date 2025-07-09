@@ -173,7 +173,10 @@ export default function Dashboard() {
         confirmButtonColor: '#facc15',
       });
     } catch (err: any) {
-      if (err?.response?.status === 400 && err?.response?.data?.message?.toLowerCase().includes('already checked in')) {
+      if (
+        err?.response?.status === 400 &&
+        err?.response?.data?.error?.toLowerCase().includes('already checked in')
+      ) {
         Swal.fire({
           icon: 'info',
           title: 'Already checked in',
