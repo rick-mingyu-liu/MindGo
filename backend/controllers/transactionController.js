@@ -99,11 +99,11 @@ const transactionController = {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { amount, description, category, type, date } = req.body;
+      const { amount, description, category, type, date, currency } = req.body;
 
       const newTransaction = await db.query(
-        'INSERT INTO transactions (user_id, amount, description, category, type, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [req.user.userId, amount, description, category, type, date]
+        'INSERT INTO transactions (user_id, amount, description, category, type, date, currency) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [req.user.userId, amount, description, category, type, date, currency]
       );
 
       res.status(201).json({
@@ -126,7 +126,7 @@ const transactionController = {
       }
 
       const { id } = req.params;
-      const { amount, description, category, type, date } = req.body;
+      const { amount, description, category, type, date, currency } = req.body;
 
       // Check if transaction belongs to user
       const existingTransaction = await db.query(
@@ -139,8 +139,8 @@ const transactionController = {
       }
 
       const updatedTransaction = await db.query(
-        'UPDATE transactions SET amount = $1, description = $2, category = $3, type = $4, date = $5 WHERE id = $6 AND user_id = $7 RETURNING *',
-        [amount, description, category, type, date, id, req.user.userId]
+        'UPDATE transactions SET amount = $1, description = $2, category = $3, type = $4, date = $5, currency = $6 WHERE id = $7 AND user_id = $8 RETURNING *',
+        [amount, description, category, type, date, currency, id, req.user.userId]
       );
 
       res.json({

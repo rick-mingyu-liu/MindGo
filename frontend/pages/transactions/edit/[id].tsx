@@ -17,6 +17,7 @@ interface Transaction {
   type: 'income' | 'expense'
   category: string
   date: string
+  currency: string // Add currency field
 }
 
 const CATEGORIES = [
@@ -46,7 +47,8 @@ export default function EditTransaction() {
     amount: '',
     type: 'expense' as 'income' | 'expense',
     category: '',
-    date: ''
+    date: '',
+    currency: 'CAD', // Default currency
   })
 
   useEffect(() => {
@@ -78,7 +80,8 @@ export default function EditTransaction() {
         amount: targetTransaction.amount.toString(),
         type: targetTransaction.type,
         category: targetTransaction.category,
-        date: targetTransaction.date.split('T')[0]
+        date: targetTransaction.date.split('T')[0],
+        currency: targetTransaction.currency || 'CAD',
       })
     } catch (error) {
       console.error('Error fetching transaction:', error)
@@ -112,7 +115,8 @@ export default function EditTransaction() {
         amount: parseFloat(formData.amount),
         type: formData.type,
         category: formData.category,
-        date: formData.date
+        date: formData.date,
+        currency: formData.currency,
       })
 
       Swal.fire({
@@ -235,6 +239,26 @@ export default function EditTransaction() {
                       placeholder="0.00"
                       required
                     />
+                  </div>
+                  {/* Currency */}
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency *</Label>
+                    <Select
+                      value={formData.currency}
+                      onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CAD">CAD ($)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="CNY">CNY (¥)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="AUD">AUD (A$)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Type */}

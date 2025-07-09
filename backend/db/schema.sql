@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     category VARCHAR(100) NOT NULL,
     type VARCHAR(20) NOT NULL CHECK (type IN ('income', 'expense')),
     date DATE NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'CAD',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

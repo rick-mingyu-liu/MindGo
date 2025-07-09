@@ -14,7 +14,8 @@ const transactionValidation = [
   body('description').notEmpty().withMessage('Description is required'),
   body('category').notEmpty().withMessage('Category is required'),
   body('type').isIn(['income', 'expense']).withMessage('Type must be either income or expense'),
-  body('date').isISO8601().withMessage('Date must be a valid date')
+  body('date').isISO8601().withMessage('Date must be a valid date'),
+  body('currency').isIn(['CAD', 'USD', 'EUR', 'GBP', 'AUD', 'CNY']).withMessage('Currency must be one of CAD, USD, EUR, GBP, AUD, CNY')
 ];
 
 // Routes
