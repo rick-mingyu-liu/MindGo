@@ -7,7 +7,10 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "db:setup": "node db/setup.js",
-    "db:seed": "node db/seed.js"
+    "db:seed": "node db/seed.js",
+    "docs:generate": "node scripts/generateDocs.js",
+    "lint": "eslint .",
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -15,6 +18,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
