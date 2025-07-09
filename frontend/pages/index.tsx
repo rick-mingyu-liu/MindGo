@@ -22,7 +22,7 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { api, logout } from '@/utils/api'
+import { api, logout, investmentAPI } from '@/utils/api'
 import { formatCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -80,6 +80,24 @@ interface WatchlistItem {
 
 const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4']
 
+const INDEX_CARDS = [
+  {
+    symbol: '^GSPC',
+    label: 'S&P 500',
+    name: 'S&P 500 Index',
+  },
+  {
+    symbol: '^DJI',
+    label: 'DJI',
+    name: 'Dow Jones Industrial Average',
+  },
+  {
+    symbol: '^IXIC',
+    label: 'IXIC',
+    name: 'NASDAQ Composite',
+  },
+];
+
 export default function Dashboard() {
   const router = useRouter()
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
@@ -95,6 +113,9 @@ export default function Dashboard() {
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
   const [hasJustCheckedIn, setHasJustCheckedIn] = useState(false)
   const [checkingIn, setCheckingIn] = useState(false)
+  const [indexRows, setIndexRows] = useState<any[]>([]);
+  const [indexLoading, setIndexLoading] = useState(true);
+  const [indexError, setIndexError] = useState('');
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -229,6 +250,28 @@ export default function Dashboard() {
 
     fetchDashboardData()
   }, [router, fetchDashboardData])
+
+  useEffect(() => {
+    const fetchIndices = async () => {
+      setIndexLoading(true);
+      setIndexError('');
+      try {
+        const results = await Promise.all(
+          INDEX_CARDS.map(idx => investmentAPI.getStockSnapshot(idx.symbol))
+        );
+        setIndexRows(results.map((res, i) => ({
+          ...INDEX_CARDS[i],
+          quote: res.data.quote,
+        })));
+      } catch (err) {
+        setIndexError('Failed to load index data');
+        setIndexRows([]);
+      } finally {
+        setIndexLoading(false);
+      }
+    };
+    fetchIndices();
+  }, []);
 
   // Listen for navigation events to refresh data when returning to dashboard
   useEffect(() => {
@@ -947,31 +990,30 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                {watchlist.length > 0 ? (
+                {indexLoading ? (
+                  <div className="text-center py-6">Loading...</div>
+                ) : indexError ? (
+                  <div className="text-center py-6 text-red-600">{indexError}</div>
+                ) : (
                   <div className="space-y-3">
-                    {watchlist.slice(0, 3).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/20 dark:hover:bg-white/5 dark:hover:border-white/20">
+                    {indexRows.map((idx) => (
+                      <div key={idx.symbol} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/20 dark:hover:bg-white/5 dark:hover:border-white/20">
                         <div>
-                          <div className="font-medium">{item.symbol}</div>
-                          <div className="text-sm text-muted-foreground">{item.company_name}</div>
+                          <div className="font-medium">{idx.label}</div>
+                          <div className="text-sm text-muted-foreground">{idx.name}</div>
                         </div>
                         <div className="text-right">
                           <div className="font-medium">
-                            {item.currentPrice ? formatCurrency(item.currentPrice) : 'N/A'}
+                            {idx.quote?.c ? formatCurrency(idx.quote.c) : 'N/A'}
                           </div>
-                          {item.changePercent !== null && (
-                            <Badge variant={item.changePercent >= 0 ? 'default' : 'destructive'}>
-                              {item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%
+                          {typeof idx.quote?.dp === 'number' && (
+                            <Badge variant={idx.quote.dp >= 0 ? 'default' : 'destructive'}>
+                              {idx.quote.dp >= 0 ? '+' : ''}{idx.quote.dp.toFixed(2)}%
                             </Badge>
                           )}
                         </div>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <TrendingUp className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground mb-4">No stocks in watchlist</p>
                   </div>
                 )}
               </CardContent>
