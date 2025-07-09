@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info, Eye } from 'lucide-react'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info, Eye, ExternalLink } from 'lucide-react'
 import { api, logout, investmentAPI } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +49,40 @@ const INDEX_CARDS = [
   },
 ];
 
+// Add this above the Investments component
+const INDEX_SUMMARIES: Record<string, { title: string; description: string; link: string }> = {
+  '^GSPC': {
+    title: 'S&P 500 Index',
+    description: 'The S&P 500 is a stock market index tracking the stock performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices and is considered a barometer for the overall U.S. stock market.',
+    link: 'https://en.wikipedia.org/wiki/S%26P_500_Index',
+  },
+  '^DJI': {
+    title: 'Dow Jones Industrial Average',
+    description: 'The Dow Jones Industrial Average (DJIA) is a price-weighted index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most widely recognized stock market indices in the world.',
+    link: 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average',
+  },
+  '^IXIC': {
+    title: 'NASDAQ Composite',
+    description: 'The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.',
+    link: 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
+  },
+};
+
+function IndexDetailModal({ open, onOpenChange, symbol }: { open: boolean; onOpenChange: (v: boolean) => void; symbol: string }) {
+  const info = INDEX_SUMMARIES[symbol];
+  if (!info) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{info.title}</DialogTitle>
+          <DialogDescription>{info.description}</DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Investments() {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
@@ -65,6 +99,7 @@ export default function Investments() {
   const [indexRows, setIndexRows] = useState<any[]>([])
   const [indexLoading, setIndexLoading] = useState(true)
   const [indexError, setIndexError] = useState('')
+  const [openIndexModal, setOpenIndexModal] = useState<string | null>(null)
 
   useEffect(() => {
     fetchWatchlist()
@@ -326,8 +361,8 @@ export default function Investments() {
                       <th className="px-1 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
                       <th className="px-1 py-2 text-right font-semibold">Price</th>
                       <th className="px-1 py-2 text-right font-semibold hidden sm:table-cell">Change</th>
-                      <th className="px-1 py-2 text-right font-semibold">Change %</th>
-                      <th className="px-1 py-2 text-center font-semibold">View</th>
+                      <th className="px-1 py-2 text-right font-semibold sm:pr-6 lg:pr-8">Change %</th>
+                      <th className="px-1 py-2 text-center font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -359,7 +394,7 @@ export default function Investments() {
                                 </div>
                               ) : 'N/A'}
                             </td>
-                            <td className="px-1 py-2 text-right">
+                            <td className="px-1 py-2 text-right sm:pr-6 lg:pr-8">
                               {price !== 'N/A' && changePct !== 'N/A' ? (
                                 <Badge variant={changePct >= 0 ? "default" : "destructive"}>
                                   {changePct > 0 ? '+' : ''}{changePct.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}%
@@ -368,17 +403,15 @@ export default function Investments() {
                             </td>
                             <td className="px-1 py-2 text-center">
                               <div className="flex items-center justify-center gap-1">
-                                <Button variant="ghost" size="icon" className="w-7 h-7 p-0" onClick={() => {
-                                  const links: Record<string, string> = {
-                                    '^GSPC': 'https://www.investopedia.com/terms/s/sp500.asp',
-                                    '^DJI': 'https://www.investopedia.com/terms/d/djia.asp',
-                                    '^IXIC': 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
-                                  };
-                                  const url = links[idx.symbol as keyof typeof links] || 'https://www.investopedia.com/';
-                                  window.open(url, '_blank');
-                                }}>
+                                <Button variant="ghost" size="icon" className="w-7 h-7 p-0" onClick={() => setOpenIndexModal(idx.symbol)}>
                                   <Eye className="w-4 h-4" />
                                 </Button>
+                                <Button variant="ghost" size="icon" className="w-7 h-7 p-0" asChild>
+                                  <a href={INDEX_SUMMARIES[idx.symbol].link} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="w-4 h-4" />
+                                  </a>
+                                </Button>
+                                <IndexDetailModal open={openIndexModal === idx.symbol} onOpenChange={(v) => v ? setOpenIndexModal(idx.symbol) : setOpenIndexModal(null)} symbol={idx.symbol} />
                               </div>
                             </td>
                           </tr>
