@@ -16,9 +16,9 @@ async function getExchangeRate(from, to) {
   if (cache[cacheKey] && (now - cache[cacheKey].timestamp < CACHE_DURATION_MS)) {
     return cache[cacheKey].rate;
   }
-  const url = `https://api.exchangerate.host/latest?base=${from}&symbols=${to}`;
+  const url = `https://api.frankfurter.dev/v1/latest?base=${from}&symbols=${to}`;
   const response = await axios.get(url);
-  if (response.data && response.data.success && response.data.rates && response.data.rates[to]) {
+  if (response.data && response.data.rates && typeof response.data.rates[to] === 'number') {
     const rate = response.data.rates[to];
     cache[cacheKey] = { rate, timestamp: now };
     return rate;

@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS savings_goals (
     current_amount DECIMAL(10,2) DEFAULT 0,
     target_date DATE,
     description TEXT,
+    currency VARCHAR(10) NOT NULL DEFAULT 'CAD',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

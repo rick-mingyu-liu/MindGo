@@ -57,7 +57,11 @@ interface FinancialSummary {
     type: 'income' | 'expense'
     category: string
     date: string
+    currency?: string
+    convertedAmount?: number
+    convertedCurrency?: string
   }>
+  targetCurrency?: string
 }
 
 interface Goal {
@@ -131,12 +135,13 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
-      
+      const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+      const currency = prefs.currency || 'CAD';
       const [summaryRes, goalsRes, watchlistRes, transactionsRes, streakRes] = await Promise.all([
-        api.get('/summary/rolling?months=4'),
+        api.get(`/summary/rolling?months=4&targetCurrency=${currency}`),
         api.get('/goals'),
         api.get('/investments/watchlist'),
-        api.get('/transactions?limit=10'),
+        api.get(`/transactions?limit=10&targetCurrency=${currency}`),
         api.get('/summary/checkin-streak')
       ])
 
@@ -346,7 +351,7 @@ export default function Dashboard() {
                 {entry.name}:
               </span>
               <span className="text-sm font-bold" style={{ color: entry.color }}>
-                {formatCurrency(entry.value, defaultCurrency)}
+                {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
               </span>
             </div>
           ))}
@@ -387,7 +392,7 @@ export default function Dashboard() {
           fill={resolvedTheme === 'dark' ? '#e5e7eb' : '#374151'}
           fontSize={11}
         >
-          {new Intl.NumberFormat('en-US', { style: 'currency', currency: defaultCurrency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
+          {new Intl.NumberFormat('en-US', { style: 'currency', currency: summary?.targetCurrency || defaultCurrency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
         </text>
       </g>
     )
@@ -445,7 +450,7 @@ export default function Dashboard() {
           dominantBaseline={dominantBaseline}
           fontSize={10}
         >
-          {formatCurrency(value, defaultCurrency)} ({(percent * 100).toFixed(1)}%)
+          {formatCurrency(value, summary?.targetCurrency || defaultCurrency)} ({(percent * 100).toFixed(1)}%)
         </text>
       </g>
     )
@@ -672,7 +677,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {formatCurrency(summary?.totalIncome || 0, defaultCurrency)}
+                    {formatCurrency(summary?.totalIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -687,7 +692,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {formatCurrency(summary?.totalExpenses || 0, defaultCurrency)}
+                    {formatCurrency(summary?.totalExpenses || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -702,7 +707,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${(summary?.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(summary?.netIncome || 0, defaultCurrency)}
+                    {formatCurrency(summary?.netIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -745,19 +750,19 @@ export default function Dashboard() {
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1), defaultCurrency)}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Expenses</p>
                       <p className="text-lg font-bold text-red-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1), defaultCurrency)}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Net</p>
                       <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1), defaultCurrency)}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                   </div>
@@ -883,7 +888,7 @@ export default function Dashboard() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} style={{ cursor: 'pointer' }} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number, defaultCurrency)} />
+                        <Tooltip formatter={(value) => formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -900,7 +905,7 @@ export default function Dashboard() {
                             />
                             <span className="text-foreground whitespace-normal">{entry.name}</span>
                             <span className="text-muted-foreground ml-1">
-                              {formatCurrency(entry.value, defaultCurrency)}
+                              {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
                             </span>
                           </div>
                         ))}
@@ -958,7 +963,7 @@ export default function Dashboard() {
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
                             <span className="text-sm text-muted-foreground">
-                              {formatCurrency(goal.current_amount, defaultCurrency)} / {formatCurrency(goal.target_amount, defaultCurrency)}
+                              {formatCurrency(goal.current_amount, summary?.targetCurrency || defaultCurrency)} / {formatCurrency(goal.target_amount, summary?.targetCurrency || defaultCurrency)}
                             </span>
                           </div>
                           <Progress value={progress} className="h-2" />
@@ -1074,7 +1079,11 @@ export default function Dashboard() {
                       <div className="flex items-center space-x-2">
                         <div className="text-right">
                           <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount, defaultCurrency)}
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(
+                              transaction.convertedAmount ?? transaction.amount,
+                              transaction.convertedCurrency ?? transaction.currency ?? defaultCurrency
+                            )}
                           </p>
                           <Badge variant="secondary" className="text-xs">
                             {transaction.type}

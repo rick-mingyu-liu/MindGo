@@ -47,7 +47,14 @@ export default function Transactions() {
   const fetchTransactions = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/transactions')
+      const prefs = localStorage.getItem('userPreferences');
+      let currency = 'CAD';
+      if (prefs) {
+        try {
+          currency = JSON.parse(prefs).currency || 'CAD';
+        } catch {}
+      }
+      const response = await api.get(`/transactions?targetCurrency=${currency}`)
       setTransactions(response.data.transactions)
     } catch (error) {
       console.error('Error fetching transactions:', error)
@@ -270,10 +277,10 @@ export default function Transactions() {
                         <div className="text-right">
                           <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                             {transaction.type === 'income' ? '+' : '-'}
-                            {transaction.convertedAmount && transaction.convertedCurrency && transaction.convertedCurrency !== transaction.currency
-                              ? `≈ ${formatCurrency(transaction.convertedAmount, defaultCurrency)}${shouldShowCode(defaultCurrency) ? ' ' + defaultCurrency : ''}`
-                              : `${formatCurrency(transaction.amount, defaultCurrency)}${shouldShowCode(defaultCurrency) ? ' ' + defaultCurrency : ''}`
-                            }
+                            {formatCurrency(
+                              transaction.convertedAmount ?? transaction.amount,
+                              transaction.convertedCurrency ?? transaction.currency ?? defaultCurrency
+                            )}
                           </p>
                           <Badge
                             className={`text-xs px-3 py-1 rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
@@ -328,4 +335,4 @@ export default function Transactions() {
       </div>
     </>
   )
-} 
+}

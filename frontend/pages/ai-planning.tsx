@@ -75,6 +75,7 @@ export default function AIPlanning() {
     reset: resetMoveGoal,
     formState: { errors: moveGoalErrors },
     setValue: setMoveGoalValue,
+    watch: watchMoveGoal,
   } = useForm({
     defaultValues: {
       name: moveGoalName,
@@ -82,6 +83,7 @@ export default function AIPlanning() {
       current_amount: '0',
       target_date: moveGoalDate,
       description: planningResponse?.analysis || '',
+      currency: 'CAD',
     },
   })
 
@@ -313,7 +315,7 @@ export default function AIPlanning() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="currentIncome">Monthly Income ($)</Label>
+                        <Label htmlFor="currentIncome">Monthly Income</Label>
                         <Input
                           id="currentIncome"
                           type="number"
@@ -333,7 +335,7 @@ export default function AIPlanning() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="currentExpenses">Monthly Expenses ($)</Label>
+                        <Label htmlFor="currentExpenses">Monthly Expenses</Label>
                         <Input
                           id="currentExpenses"
                           type="number"
@@ -503,7 +505,7 @@ export default function AIPlanning() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-target-amount">Target Amount ($)</Label>
+                  <Label htmlFor="movegoal-target-amount">Target Amount</Label>
                   <Input
                     id="movegoal-target-amount"
                     type="number"
@@ -527,7 +529,7 @@ export default function AIPlanning() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-current-amount">Current Amount ($)</Label>
+                  <Label htmlFor="movegoal-current-amount">Current Amount</Label>
                   <Input
                     id="movegoal-current-amount"
                     type="number"
@@ -543,19 +545,43 @@ export default function AIPlanning() {
                   )}
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="movegoal-target-date">Target Date <span className="text-red-500">*</span></Label>
-                <Input
-                  id="movegoal-target-date"
-                  type="date"
-                  placeholder="Select a date"
-                  {...registerMoveGoal('target_date', { required: 'Target date is required' })}
-                />
-                {moveGoalErrors.target_date && (
-                  <p className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
-                    {moveGoalErrors.target_date.message}
-                  </p>
-                )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="movegoal-target-date">Target Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="movegoal-target-date"
+                    type="date"
+                    placeholder="Select a date"
+                    {...registerMoveGoal('target_date', { required: 'Target date is required' })}
+                  />
+                  {moveGoalErrors.target_date && (
+                    <p className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
+                      {moveGoalErrors.target_date.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="movegoal-currency">Currency</Label>
+                  <Select
+                    value={watchMoveGoal('currency') || 'CAD'}
+                    onValueChange={value => setMoveGoalValue('currency', value, { shouldValidate: true })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CAD">CAD ($)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="CNY">CNY (¥)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="AUD">AUD (A$)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {moveGoalErrors.currency && (
+                    <p className="text-sm text-destructive">{moveGoalErrors.currency.message}</p>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="movegoal-description">Description (optional)</Label>
