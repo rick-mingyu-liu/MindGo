@@ -172,10 +172,10 @@ const summaryController = {
 
       netIncome = totalIncome - totalExpenses;
 
-      // Group by month (for monthlyBreakdown, still use original amounts for now)
+      // Group by month (for monthlyBreakdown, use converted amounts)
       const monthlyData = {};
-      txs.forEach(transaction => {
-        const transactionDate = new Date(transaction.date);
+      for (const tx of convertedTxs) {
+        const transactionDate = new Date(tx.date);
         const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
@@ -186,14 +186,14 @@ const summaryController = {
             transactions: []
           };
         }
-        if (transaction.type === 'income') {
-          monthlyData[monthKey].income += parseFloat(transaction.amount);
+        if (tx.type === 'income') {
+          monthlyData[monthKey].income += tx.convertedAmount;
         } else {
-          monthlyData[monthKey].expenses += parseFloat(transaction.amount);
+          monthlyData[monthKey].expenses += tx.convertedAmount;
         }
-        monthlyData[monthKey].transactions.push(transaction);
+        monthlyData[monthKey].transactions.push(tx);
         monthlyData[monthKey].netIncome = monthlyData[monthKey].income - monthlyData[monthKey].expenses;
-      });
+      }
 
       // Calculate averages for categories
       Object.keys(categories).forEach(category => {
