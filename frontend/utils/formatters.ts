@@ -1,6 +1,6 @@
 export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
-  // For dollar-based currencies, always use '$' only
-  const dollarCurrencies = ['USD', 'CAD', 'AUD', 'NZD', 'SGD', 'HKD'];
+  // For USD and CAD, always use '$' only
+  const dollarCurrencies = ['USD', 'CAD'];
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -9,8 +9,8 @@ export const formatCurrency = (amount: number, currency: string = 'USD'): string
     maximumFractionDigits: 2,
   }).format(amount);
   if (dollarCurrencies.includes(currency)) {
-    // Remove any country code prefix (e.g., 'CA$', 'A$', etc.), keep only '$'
-    return formatted.replace(/[^\d.,-]+/, '$');
+    // Remove any country code prefix (e.g., 'CA$', 'US$'), keep only '$'
+    return formatted.replace(/[A-Z]*\$/g, '$');
   }
   return formatted;
 }

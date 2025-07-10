@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next';
 
 interface Transaction {
   id: number
@@ -32,6 +33,7 @@ export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const { t } = useTranslation('common');
 
   // Get user's default currency from localStorage (preferences)
   let defaultCurrency = 'CAD';
@@ -60,8 +62,8 @@ export default function Transactions() {
       console.error('Error fetching transactions:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to load transactions',
-        text: 'There was an error fetching transactions. Please try again later.'
+        title: t('Failed to load transactions'),
+        text: t('There was an error fetching transactions. Please try again later.')
       })
     } finally {
       setLoading(false)
@@ -101,14 +103,14 @@ export default function Transactions() {
 
   const handleDelete = async (id: number) => {
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      title: t('Are you sure?'),
+      text: t('Are you sure you want to delete this transaction? This action cannot be undone.'),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: t('Yes, delete it!'),
+      cancelButtonText: t('Cancel'),
     });
     if (!result.isConfirmed) {
       return;
@@ -118,16 +120,16 @@ export default function Transactions() {
       await api.delete(`/transactions/${id}`)
       Swal.fire({
         icon: 'success',
-        title: 'Transaction deleted successfully',
-        text: 'The transaction has been deleted successfully.'
+        title: t('Transaction deleted successfully'),
+        text: t('The transaction has been deleted successfully.')
       })
       fetchTransactions() // Refresh the list
     } catch (error) {
       console.error('Error deleting transaction:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to delete transaction',
-        text: 'There was an error deleting the transaction. Please try again later.'
+        title: t('Failed to delete transaction'),
+        text: t('There was an error deleting the transaction. Please try again later.')
       })
     } finally {
       setDeletingId(null)
@@ -168,19 +170,19 @@ export default function Transactions() {
                   className="flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Transactions</h1>
+                  <h1 className="text-3xl font-bold">{t('Transactions')}</h1>
                   <p className="text-muted-foreground">
-                    Manage and track your financial activities
+                    {t('Manage and track your financial activities')}
                   </p>
                 </div>
               </div>
               <div className="hidden sm:flex items-center space-x-2">
                 <Button onClick={() => router.push('/transactions/new')}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Transaction
+                  {t('Add Transaction')}
                 </Button>
               </div>
             </div>
@@ -191,7 +193,7 @@ export default function Transactions() {
         <button
           className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
           onClick={() => router.push('/transactions/new')}
-          aria-label="Add Transaction"
+          aria-label={t('Add Transaction')}
         >
           <Plus className="w-8 h-8" />
         </button>
@@ -202,7 +204,7 @@ export default function Transactions() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Filter className="h-5 w-5" />
-                Filters
+                {t('Filters')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -210,7 +212,7 @@ export default function Transactions() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search transactions..."
+                    placeholder={t('Search transactions...')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-12 py-3 rounded-lg text-base"
@@ -218,20 +220,20 @@ export default function Transactions() {
                 </div>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger className="py-3 rounded-lg text-base">
-                    <SelectValue placeholder="Filter by type" />
+                    <SelectValue placeholder={t('Filter by type')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="income">Income</SelectItem>
-                    <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="all">{t('All Types')}</SelectItem>
+                    <SelectItem value="income">{t('Income')}</SelectItem>
+                    <SelectItem value="expense">{t('Expense')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                   <SelectTrigger className="py-3 rounded-lg text-base">
-                    <SelectValue placeholder="Filter by category" />
+                    <SelectValue placeholder={t('Filter by category')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="all">{t('All Categories')}</SelectItem>
                     {categories.map(category => (
                       <SelectItem key={category} value={category}>
                         {category}
@@ -246,9 +248,9 @@ export default function Transactions() {
           {/* Transactions Table */}
           <Card>
             <CardHeader>
-              <CardTitle>All Transactions</CardTitle>
+              <CardTitle>{t('All Transactions')}</CardTitle>
               <CardDescription>
-                {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
+                {filteredTransactions.length} {t('transaction', { count: filteredTransactions.length })} {t('found')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -285,7 +287,7 @@ export default function Transactions() {
                           <Badge
                             className={`text-xs px-3 py-1 rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
                           >
-                            {transaction.type}
+                            {t(transaction.type)}
                           </Badge>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -294,7 +296,7 @@ export default function Transactions() {
                             size="icon"
                             onClick={() => router.push(`/transactions/edit/${transaction.id}`)}
                             className="h-10 w-10 p-0 flex items-center justify-center"
-                            aria-label="Edit Transaction"
+                            aria-label={t('Edit Transaction')}
                           >
                             <Edit className="w-6 h-6" />
                           </Button>
@@ -304,7 +306,7 @@ export default function Transactions() {
                             onClick={() => handleDelete(transaction.id)}
                             disabled={deletingId === transaction.id}
                             className="h-10 w-10 p-0 flex items-center justify-center text-red-600 hover:text-red-700 hover:bg-red-50"
-                            aria-label="Delete Transaction"
+                            aria-label={t('Delete Transaction')}
                           >
                             <Trash2 className="w-6 h-6" />
                           </Button>
@@ -316,16 +318,16 @@ export default function Transactions() {
               ) : (
                 <div className="text-center py-12">
                   <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No transactions found</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('No transactions found')}</h3>
                   <p className="text-muted-foreground mb-4">
                     {searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' 
-                      ? 'Try adjusting your filters' 
-                      : 'Start by adding your first transaction'
+                      ? t('Try adjusting your filters') 
+                      : t('Start by adding your first transaction')
                     }
                   </p>
                   <Button onClick={() => router.push('/transactions/new')}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Transaction
+                    {t('Add Transaction')}
                   </Button>
                 </div>
               )}
