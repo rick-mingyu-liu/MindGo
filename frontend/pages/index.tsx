@@ -33,6 +33,7 @@ import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
+import { categories as categoryTypeMap } from './transactions/new';
 
 interface FinancialSummary {
   period: string
@@ -57,7 +58,11 @@ interface FinancialSummary {
     type: 'income' | 'expense'
     category: string
     date: string
+    currency?: string
+    convertedAmount?: number
+    convertedCurrency?: string
   }>
+  targetCurrency?: string
 }
 
 interface Goal {
@@ -67,6 +72,10 @@ interface Goal {
   current_amount: number
   target_date: string
   description: string
+  currency?: string
+  convertedCurrentAmount?: number
+  convertedTargetAmount?: number
+  convertedCurrency?: string
 }
 
 interface WatchlistItem {
@@ -117,15 +126,27 @@ export default function Dashboard() {
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState('');
 
+  // Get user's default currency from localStorage (preferences)
+  let defaultCurrency = 'CAD';
+  if (typeof window !== 'undefined') {
+    const prefs = localStorage.getItem('userPreferences');
+    if (prefs) {
+      try {
+        defaultCurrency = JSON.parse(prefs).currency || 'CAD';
+      } catch {}
+    }
+  }
+
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
-      
+      const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+      const currency = prefs.currency || 'CAD';
       const [summaryRes, goalsRes, watchlistRes, transactionsRes, streakRes] = await Promise.all([
-        api.get('/summary/rolling?months=4'),
+        api.get(`/summary/rolling?months=4&targetCurrency=${currency}`),
         api.get('/goals'),
         api.get('/investments/watchlist'),
-        api.get('/transactions?limit=10'),
+        api.get(`/transactions?limit=10&targetCurrency=${currency}`),
         api.get('/summary/checkin-streak')
       ])
 
@@ -173,7 +194,10 @@ export default function Dashboard() {
         confirmButtonColor: '#facc15',
       });
     } catch (err: any) {
-      if (err?.response?.status === 400 && err?.response?.data?.message?.toLowerCase().includes('already checked in')) {
+      if (
+        err?.response?.status === 400 &&
+        err?.response?.data?.error?.toLowerCase().includes('already checked in')
+      ) {
         Swal.fire({
           icon: 'info',
           title: 'Already checked in',
@@ -288,14 +312,20 @@ export default function Dashboard() {
   }, [router, fetchDashboardData])
 
   const getCategoryChartData = () => {
-    if (!summary?.categories) return []
-    
+    if (!summary?.categories) return [];
     return Object.entries(summary.categories)
-      .map(([name, data]) => ({
-        name,
-        value: data.total
-      }))
-      .sort((a, b) => b.value - a.value) // Sort by value descending
+      .map(([name, data]) => {
+        // Determine type from categoryTypeMap
+        let type: 'income' | 'expense' = 'expense';
+        if (categoryTypeMap.income.includes(name)) type = 'income';
+        else if (categoryTypeMap.expense.includes(name)) type = 'expense';
+        return {
+          name,
+          value: data.total,
+          type,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
   }
 
   const getMonthlyChartData = () => {
@@ -332,7 +362,7 @@ export default function Dashboard() {
                 {entry.name}:
               </span>
               <span className="text-sm font-bold" style={{ color: entry.color }}>
-                {formatCurrency(entry.value)}
+                {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
               </span>
             </div>
           ))}
@@ -373,69 +403,35 @@ export default function Dashboard() {
           fill={resolvedTheme === 'dark' ? '#e5e7eb' : '#374151'}
           fontSize={11}
         >
-          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
+          {new Intl.NumberFormat('en-US', { style: 'currency', currency: summary?.targetCurrency || defaultCurrency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
         </text>
       </g>
     )
   }
 
   // Custom label renderer for pie chart
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
-    const RADIAN = Math.PI / 180
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-    const x = cx + radius * Math.cos(-midAngle * RADIAN)
-    const y = cy + radius * Math.sin(-midAngle * RADIAN)
-    
-    // Calculate label position outside the pie
-    const labelRadius = outerRadius + 20
-    const labelX = cx + labelRadius * Math.cos(-midAngle * RADIAN)
-    const labelY = cy + labelRadius * Math.sin(-midAngle * RADIAN)
-    
-    // Determine text anchor based on angle
-    const textAnchor = x > cx ? 'start' : 'end'
-    const dominantBaseline = y > cy ? 'auto' : 'middle'
-    
-    // Only show labels for segments > 5%
-    if (percent < 0.05) return null
-    
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value, type }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const labelRadius = outerRadius + 20;
+    const labelX = cx + labelRadius * Math.cos(-midAngle * RADIAN);
+    const labelY = cy + labelRadius * Math.sin(-midAngle * RADIAN);
+    const textAnchor = x > cx ? 'start' : 'end';
+    const dominantBaseline = y > cy ? 'auto' : 'middle';
+    if (percent < 0.05) return null;
+    const sign = type === 'income' ? '+' : '-';
     return (
       <g key={`label-${index}`}>
-        {/* Line from pie to label */}
-        <line
-          x1={x}
-          y1={y}
-          x2={labelX}
-          y2={labelY}
-          stroke="hsl(var(--muted-foreground))"
-          strokeWidth={1}
-          opacity={0.6}
-        />
-        {/* Label */}
-        <text
-          x={labelX}
-          y={labelY}
-          fill="hsl(var(--foreground))"
-          textAnchor={textAnchor}
-          dominantBaseline={dominantBaseline}
-          fontSize={12}
-          fontWeight={500}
-        >
-          {name}
-        </text>
-        {/* Percentage */}
-        <text
-          x={labelX}
-          y={labelY + 15}
-          fill="hsl(var(--muted-foreground))"
-          textAnchor={textAnchor}
-          dominantBaseline={dominantBaseline}
-          fontSize={10}
-        >
-          {formatCurrency(value)} ({(percent * 100).toFixed(1)}%)
+        <line x1={x} y1={y} x2={labelX} y2={labelY} stroke="hsl(var(--muted-foreground))" strokeWidth={1} opacity={0.6} />
+        <text x={labelX} y={labelY} fill="hsl(var(--foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={12} fontWeight={500}>{name}</text>
+        <text x={labelX} y={labelY + 15} fill="hsl(var(--muted-foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={10}>
+          {sign}{formatCurrency(value, summary?.targetCurrency || defaultCurrency)} ({(percent * 100).toFixed(1)}%)
         </text>
       </g>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
@@ -658,7 +654,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {formatCurrency(summary?.totalIncome || 0)}
+                    {formatCurrency(summary?.totalIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -673,7 +669,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {formatCurrency(summary?.totalExpenses || 0)}
+                    {formatCurrency(summary?.totalExpenses || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -688,7 +684,7 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${(summary?.netIncome || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(summary?.netIncome || 0)}
+                    {formatCurrency(summary?.netIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Last 4 months
@@ -731,19 +727,19 @@ export default function Dashboard() {
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
                       <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1))}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Expenses</p>
                       <p className="text-lg font-bold text-red-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1))}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">Avg Net</p>
                       <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1))}
+                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                   </div>
@@ -869,7 +865,7 @@ export default function Dashboard() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} style={{ cursor: 'pointer' }} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Tooltip formatter={(value) => formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -886,7 +882,7 @@ export default function Dashboard() {
                             />
                             <span className="text-foreground whitespace-normal">{entry.name}</span>
                             <span className="text-muted-foreground ml-1">
-                              {formatCurrency(entry.value)}
+                              {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
                             </span>
                           </div>
                         ))}
@@ -944,7 +940,7 @@ export default function Dashboard() {
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
                             <span className="text-sm text-muted-foreground">
-                              {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
+                              {formatCurrency(goal.convertedCurrentAmount ?? goal.current_amount, goal.convertedCurrency ?? goal.currency ?? summary?.targetCurrency ?? defaultCurrency)} / {formatCurrency(goal.convertedTargetAmount ?? goal.target_amount, goal.convertedCurrency ?? goal.currency ?? summary?.targetCurrency ?? defaultCurrency)}
                             </span>
                           </div>
                           <Progress value={progress} className="h-2" />
@@ -1004,7 +1000,12 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="font-medium">
-                            {idx.quote?.c ? formatCurrency(idx.quote.c) : 'N/A'}
+                            {idx.quote?.c ? formatCurrency(
+                              idx.quote.c,
+                              (idx.symbol === '^GSPC' || idx.symbol === '^DJI' || idx.symbol === '^IXIC')
+                                ? 'USD'
+                                : (idx.quote?.currency || defaultCurrency)
+                            ) : 'N/A'}
                           </div>
                           {typeof idx.quote?.dp === 'number' && (
                             <Badge variant={idx.quote.dp >= 0 ? 'default' : 'destructive'}>
@@ -1055,7 +1056,11 @@ export default function Dashboard() {
                       <div className="flex items-center space-x-2">
                         <div className="text-right">
                           <p className={`font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(
+                              transaction.convertedAmount ?? transaction.amount,
+                              transaction.convertedCurrency ?? transaction.currency ?? defaultCurrency
+                            )}
                           </p>
                           <Badge variant="secondary" className="text-xs">
                             {transaction.type}

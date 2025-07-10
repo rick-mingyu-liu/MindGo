@@ -464,8 +464,8 @@ async function createSampleDataForNewUser(userId) {
     // Insert sample transactions
     for (const transaction of sampleTransactions) {
       await db.query(
-        'INSERT INTO transactions (user_id, amount, description, category, type, date) VALUES ($1, $2, $3, $4, $5, $6)',
-        [userId, transaction.amount, transaction.description, transaction.category, transaction.type, transaction.date]
+        'INSERT INTO transactions (user_id, amount, description, category, type, date, currency) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [userId, transaction.amount, transaction.description, transaction.category, transaction.type, transaction.date, 'CAD']
       );
     }
 

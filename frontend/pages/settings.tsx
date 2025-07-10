@@ -50,6 +50,7 @@ interface DataRetentionSettings {
 interface UserPreferences {
   currency: string
   dateFormat: string
+  language: string // Added language property
   notifications: {
     email: boolean
     push: boolean
@@ -79,8 +80,9 @@ export default function Settings() {
     lastCleanup: null
   })
   const [preferences, setPreferences] = useState<UserPreferences>({
-    currency: 'USD',
+    currency: 'CAD', // Default currency
     dateFormat: 'MM/DD/YYYY',
+    language: 'System', // Default language is now 'System'
     notifications: {
       email: true,
       push: false,
@@ -106,7 +108,11 @@ export default function Settings() {
 
   useEffect(() => {
     fetchSettings()
-    fetchPreferences()
+    // Only set language if not already saved in localStorage
+    const savedPrefs = typeof window !== 'undefined' ? localStorage.getItem('userPreferences') : null;
+    if (savedPrefs) {
+      setPreferences(JSON.parse(savedPrefs))
+    }
     const saved = typeof window !== 'undefined' ? localStorage.getItem('planningPrefs') : null;
     if (saved) {
       setPlanningPrefs(JSON.parse(saved));
@@ -382,28 +388,31 @@ export default function Settings() {
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="CAD">CAD ($)</SelectItem>
                         <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="CNY">CNY (¥)</SelectItem>
                         <SelectItem value="EUR">EUR (€)</SelectItem>
                         <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="CAD">CAD (C$)</SelectItem>
                         <SelectItem value="AUD">AUD (A$)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="dateFormat">Date Format</Label>
+                    <Label htmlFor="language">Language</Label>
                     <Select
-                      value={preferences.dateFormat}
-                      onValueChange={(value) => setPreferences({ ...preferences, dateFormat: value })}
+                      value={preferences.language}
+                      onValueChange={(value) => setPreferences({ ...preferences, language: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select date format" />
+                        <SelectValue placeholder="Select language">
+                          {preferences.language || 'System'}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                        <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
-                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                        <SelectItem value="System">System</SelectItem>
+                        <SelectItem value="English">English</SelectItem>
+                        <SelectItem value="Mandarin">Mandarin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -670,8 +679,9 @@ export default function Settings() {
                 variant="outline"
                 onClick={() => {
                   setPreferences({
-                    currency: 'USD',
+                    currency: 'CAD',
                     dateFormat: 'MM/DD/YYYY',
+                    language: 'System',
                     notifications: {
                       email: true,
                       push: false,

@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import ReactMarkdown from 'react-markdown'
 import React from 'react'
 import Swal from 'sweetalert2'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Goal {
   id: number
@@ -23,6 +25,7 @@ interface Goal {
   current_amount: number
   target_date: string
   description: string
+  currency: string // Add currency to Goal
 }
 
 interface GoalForm {
@@ -31,6 +34,7 @@ interface GoalForm {
   current_amount: string
   target_date: string
   description: string
+  currency: string // Add currency to GoalForm
 }
 
 function GoalDescription({ description }: { description: string }) {
@@ -83,6 +87,8 @@ export default function Goals() {
     handleSubmit,
     reset,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm<GoalForm>()
 
   useEffect(() => {
@@ -146,6 +152,7 @@ export default function Goals() {
       current_amount: goal.current_amount.toString(),
       target_date: formattedDate,
       description: goal.description,
+      currency: goal.currency, // Ensure currency is set
     });
     setIsDialogOpen(true);
   }
@@ -170,13 +177,6 @@ export default function Goals() {
     if (progress >= 75) return 'bg-blue-500'
     if (progress >= 50) return 'bg-yellow-500'
     return 'bg-red-500'
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount)
   }
 
   if (loading) {
@@ -247,7 +247,7 @@ export default function Goals() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="target_amount">Target Amount ($)</Label>
+                          <Label htmlFor="target_amount">Target Amount</Label>
                           <Input
                             id="target_amount"
                             type="number"
@@ -265,9 +265,8 @@ export default function Goals() {
                             <p className="text-sm text-destructive">{errors.target_amount.message}</p>
                           )}
                         </div>
-
                         <div className="space-y-2">
-                          <Label htmlFor="current_amount">Current Amount ($)</Label>
+                          <Label htmlFor="current_amount">Current Amount</Label>
                           <Input
                             id="current_amount"
                             type="number"
@@ -287,24 +286,48 @@ export default function Goals() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="target_date">Target Date <span className="text-red-500">*</span></Label>
-                        <Input
-                          id="target_date"
-                          type="date"
-                          placeholder="Select a date"
-                          aria-invalid={!!errors.target_date}
-                          aria-describedby={errors.target_date ? 'target_date-error' : undefined}
-                          className={errors.target_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                          {...register('target_date', {
-                            required: 'Target date is required',
-                          })}
-                        />
-                        {errors.target_date && (
-                          <p id="target_date-error" className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
-                            <Calendar className="w-4 h-4 text-red-500" /> {errors.target_date.message}
-                          </p>
-                        )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="target_date">Target Date <span className="text-red-500">*</span></Label>
+                          <Input
+                            id="target_date"
+                            type="date"
+                            placeholder="Select a date"
+                            aria-invalid={!!errors.target_date}
+                            aria-describedby={errors.target_date ? 'target_date-error' : undefined}
+                            className={errors.target_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+                            {...register('target_date', {
+                              required: 'Target date is required',
+                            })}
+                          />
+                          {errors.target_date && (
+                            <p id="target_date-error" className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
+                              <Calendar className="w-4 h-4 text-red-500" /> {errors.target_date.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="currency">Currency</Label>
+                          <Select
+                            value={watch('currency') || 'CAD'}
+                            onValueChange={value => setValue('currency', value, { shouldValidate: true })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CAD">CAD ($)</SelectItem>
+                              <SelectItem value="USD">USD ($)</SelectItem>
+                              <SelectItem value="CNY">CNY (¥)</SelectItem>
+                              <SelectItem value="EUR">EUR (€)</SelectItem>
+                              <SelectItem value="GBP">GBP (£)</SelectItem>
+                              <SelectItem value="AUD">AUD (A$)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {errors.currency && (
+                            <p className="text-sm text-destructive">{errors.currency.message}</p>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
@@ -432,11 +455,11 @@ export default function Goals() {
                       <div className="grid grid-cols-2 gap-4 text-base">
                         <div>
                           <p className="text-muted-foreground">Current</p>
-                          <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount)}</p>
+                          <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount, goal.currency)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Target</p>
-                          <p className="font-bold text-lg">{formatCurrency(goal.target_amount)}</p>
+                          <p className="font-bold text-lg">{formatCurrency(goal.target_amount, goal.currency)}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between">

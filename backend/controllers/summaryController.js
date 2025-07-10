@@ -1,10 +1,11 @@
 const db = require('../db/connection');
+const { getExchangeRate } = require('../services/exchangeRateService');
 
 const summaryController = {
   // Get monthly summary
   async getMonthlySummary(req, res) {
     try {
-      const { year, month } = req.query;
+      const { year, month, targetCurrency = 'CAD' } = req.query;
       const currentDate = new Date();
       const targetYear = year || currentDate.getFullYear();
       const targetMonth = month || currentDate.getMonth() + 1;
@@ -19,46 +20,77 @@ const summaryController = {
         [req.user.userId, targetYear, targetMonth]
       );
 
-      // Calculate summaries
-      const summary = {
-        year: parseInt(targetYear),
-        month: parseInt(targetMonth),
-        totalIncome: 0,
-        totalExpenses: 0,
-        netIncome: 0,
-        categories: {},
-        transactions: transactions.rows
-      };
+      // Prepare for conversion
+      const txs = transactions.rows;
+      const convertedTxs = [];
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      let netIncome = 0;
+      const categories = {};
 
-      transactions.rows.forEach(transaction => {
+      // Cache for rates in this request
+      const rateCache = {};
+      async function getRate(from, to) {
+        const key = `${from}_${to}`;
+        if (rateCache[key]) return rateCache[key];
+        const rate = await getExchangeRate(from, to);
+        rateCache[key] = rate;
+        return rate;
+      }
+
+      // Convert all transactions
+      for (const transaction of txs) {
+        let convertedAmount = parseFloat(transaction.amount);
+        let convertedCurrency = transaction.currency || 'CAD';
+        if (transaction.currency && transaction.currency !== targetCurrency) {
+          const rate = await getRate(transaction.currency, targetCurrency);
+          convertedAmount = convertedAmount * rate;
+          convertedCurrency = targetCurrency;
+        }
+        // Add converted fields
+        const txWithConversion = {
+          ...transaction,
+          convertedAmount,
+          convertedCurrency
+        };
+        convertedTxs.push(txWithConversion);
+
+        // Sum totals in target currency
         if (transaction.type === 'income') {
-          summary.totalIncome += parseFloat(transaction.amount);
+          totalIncome += convertedAmount;
         } else {
-          summary.totalExpenses += parseFloat(transaction.amount);
+          totalExpenses += convertedAmount;
         }
 
         // Group by category
-        if (!summary.categories[transaction.category]) {
-          summary.categories[transaction.category] = {
+        if (!categories[transaction.category]) {
+          categories[transaction.category] = {
             income: 0,
             expenses: 0,
             transactions: []
           };
         }
-
         if (transaction.type === 'income') {
-          summary.categories[transaction.category].income += parseFloat(transaction.amount);
+          categories[transaction.category].income += convertedAmount;
         } else {
-          summary.categories[transaction.category].expenses += parseFloat(transaction.amount);
+          categories[transaction.category].expenses += convertedAmount;
         }
+        categories[transaction.category].transactions.push(txWithConversion);
+      }
+      netIncome = totalIncome - totalExpenses;
 
-        summary.categories[transaction.category].transactions.push(transaction);
-      });
-
-      summary.netIncome = summary.totalIncome - summary.totalExpenses;
+      const summary = {
+        year: parseInt(targetYear),
+        month: parseInt(targetMonth),
+        totalIncome,
+        totalExpenses,
+        netIncome,
+        categories,
+        transactions: convertedTxs,
+        targetCurrency
+      };
 
       res.json(summary);
-
     } catch (error) {
       console.error('Get monthly summary error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -68,7 +100,7 @@ const summaryController = {
   // Get 4-month rolling summary
   async getRollingSummary(req, res) {
     try {
-      const { months = 4 } = req.query;
+      const { months = 4, targetCurrency = 'CAD' } = req.query;
       const currentDate = new Date();
       
       // Calculate date range for the last N months (including current month)
@@ -85,24 +117,66 @@ const summaryController = {
         [req.user.userId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
       );
 
-      // Group by month
-      const monthlyData = {};
-      const summary = {
-        period: `${months}-month rolling`,
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        totalIncome: 0,
-        totalExpenses: 0,
-        netIncome: 0,
-        monthlyBreakdown: [],
-        categories: {},
-        transactions: transactions.rows
-      };
+      // Prepare for conversion
+      const txs = transactions.rows;
+      const convertedTxs = [];
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      let netIncome = 0;
+      const categories = {};
+      // Cache for rates in this request
+      const rateCache = {};
+      async function getRate(from, to) {
+        const key = `${from}_${to}`;
+        if (rateCache[key]) return rateCache[key];
+        const rate = await getExchangeRate(from, to);
+        rateCache[key] = rate;
+        return rate;
+      }
 
-      transactions.rows.forEach(transaction => {
-        const transactionDate = new Date(transaction.date);
+      // Convert all transactions and build category totals in target currency
+      for (const transaction of txs) {
+        let convertedAmount = parseFloat(transaction.amount);
+        let convertedCurrency = transaction.currency || 'CAD';
+        if (transaction.currency && transaction.currency !== targetCurrency) {
+          const rate = await getRate(transaction.currency, targetCurrency);
+          convertedAmount = convertedAmount * rate;
+          convertedCurrency = targetCurrency;
+        }
+        // Add converted fields
+        const txWithConversion = {
+          ...transaction,
+          convertedAmount,
+          convertedCurrency
+        };
+        convertedTxs.push(txWithConversion);
+
+        // Sum totals in target currency
+        if (transaction.type === 'income') {
+          totalIncome += convertedAmount;
+        } else {
+          totalExpenses += convertedAmount;
+        }
+
+        // Group by category (in target currency)
+        if (!categories[transaction.category]) {
+          categories[transaction.category] = {
+            total: 0,
+            count: 0,
+            average: 0
+          };
+        }
+        categories[transaction.category].total += convertedAmount;
+        categories[transaction.category].count += 1;
+      }
+
+      netIncome = totalIncome - totalExpenses;
+
+      // Group by month (for monthlyBreakdown, use converted amounts)
+      const monthlyData = {};
+      for (const tx of convertedTxs) {
+        const transactionDate = new Date(tx.date);
         const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
-        
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
             month: monthKey,
@@ -112,41 +186,34 @@ const summaryController = {
             transactions: []
           };
         }
-
-        if (transaction.type === 'income') {
-          monthlyData[monthKey].income += parseFloat(transaction.amount);
-          summary.totalIncome += parseFloat(transaction.amount);
+        if (tx.type === 'income') {
+          monthlyData[monthKey].income += tx.convertedAmount;
         } else {
-          monthlyData[monthKey].expenses += parseFloat(transaction.amount);
-          summary.totalExpenses += parseFloat(transaction.amount);
+          monthlyData[monthKey].expenses += tx.convertedAmount;
         }
-
-        monthlyData[monthKey].transactions.push(transaction);
+        monthlyData[monthKey].transactions.push(tx);
         monthlyData[monthKey].netIncome = monthlyData[monthKey].income - monthlyData[monthKey].expenses;
+      }
 
-        // Category breakdown
-        if (!summary.categories[transaction.category]) {
-          summary.categories[transaction.category] = {
-            total: 0,
-            count: 0,
-            average: 0
-          };
-        }
-
-        summary.categories[transaction.category].total += parseFloat(transaction.amount);
-        summary.categories[transaction.category].count += 1;
+      // Calculate averages for categories
+      Object.keys(categories).forEach(category => {
+        categories[category].average = categories[category].total / categories[category].count;
       });
 
-      // Calculate averages and add monthly breakdown
-      Object.keys(summary.categories).forEach(category => {
-        summary.categories[category].average = summary.categories[category].total / summary.categories[category].count;
-      });
-
-      summary.monthlyBreakdown = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
-      summary.netIncome = summary.totalIncome - summary.totalExpenses;
+      const summary = {
+        period: `${months}-month rolling`,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        totalIncome,
+        totalExpenses,
+        netIncome,
+        monthlyBreakdown: Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month)),
+        categories,
+        transactions: convertedTxs,
+        targetCurrency
+      };
 
       res.json(summary);
-
     } catch (error) {
       console.error('Get rolling summary error:', error);
       res.status(500).json({ error: 'Server error' });

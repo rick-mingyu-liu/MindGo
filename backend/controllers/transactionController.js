@@ -1,11 +1,12 @@
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
+const { getExchangeRate } = require('../services/exchangeRateService');
 
 const transactionController = {
   // Get all transactions for user
   async getTransactions(req, res) {
     try {
-      const { page = 1, limit = 20, type, category, startDate, endDate } = req.query;
+      const { page = 1, limit = 20, type, category, startDate, endDate, targetCurrency } = req.query;
       const offset = (page - 1) * limit;
 
       let query = 'SELECT * FROM transactions WHERE user_id = $1';
@@ -75,8 +76,40 @@ const transactionController = {
       const countResult = await db.query(countQuery, countParams);
       const totalCount = parseInt(countResult.rows[0].count);
 
+      // Currency conversion logic
+      const userDefaultCurrency = req.user?.preferences?.currency || 'CAD';
+      const displayCurrency = targetCurrency || userDefaultCurrency;
+      const rateCache = {};
+      async function getRate(from, to) {
+        const key = `${from}_${to}`;
+        if (rateCache[key]) return rateCache[key];
+        const rate = await getExchangeRate(from, to);
+        rateCache[key] = rate;
+        return rate;
+      }
+      const convertedTransactions = await Promise.all(transactions.rows.map(async (tx) => {
+        let convertedAmount = parseFloat(tx.amount);
+        let convertedCurrency = tx.currency || displayCurrency;
+        if (tx.currency && tx.currency !== displayCurrency) {
+          try {
+            const rate = await getRate(tx.currency, displayCurrency);
+            convertedAmount = convertedAmount * rate;
+            convertedCurrency = displayCurrency;
+          } catch (e) {
+            // fallback: show original if conversion fails
+            convertedAmount = parseFloat(tx.amount);
+            convertedCurrency = tx.currency;
+          }
+        }
+        return {
+          ...tx,
+          convertedAmount,
+          convertedCurrency
+        };
+      }));
+
       res.json({
-        transactions: transactions.rows,
+        transactions: convertedTransactions,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -99,11 +132,11 @@ const transactionController = {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { amount, description, category, type, date } = req.body;
+      const { amount, description, category, type, date, currency } = req.body;
 
       const newTransaction = await db.query(
-        'INSERT INTO transactions (user_id, amount, description, category, type, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [req.user.userId, amount, description, category, type, date]
+        'INSERT INTO transactions (user_id, amount, description, category, type, date, currency) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [req.user.userId, amount, description, category, type, date, currency]
       );
 
       res.status(201).json({
@@ -126,7 +159,7 @@ const transactionController = {
       }
 
       const { id } = req.params;
-      const { amount, description, category, type, date } = req.body;
+      const { amount, description, category, type, date, currency } = req.body;
 
       // Check if transaction belongs to user
       const existingTransaction = await db.query(
@@ -139,8 +172,8 @@ const transactionController = {
       }
 
       const updatedTransaction = await db.query(
-        'UPDATE transactions SET amount = $1, description = $2, category = $3, type = $4, date = $5 WHERE id = $6 AND user_id = $7 RETURNING *',
-        [amount, description, category, type, date, id, req.user.userId]
+        'UPDATE transactions SET amount = $1, description = $2, category = $3, type = $4, date = $5, currency = $6 WHERE id = $7 AND user_id = $8 RETURNING *',
+        [amount, description, category, type, date, currency, id, req.user.userId]
       );
 
       res.json({

@@ -1,10 +1,18 @@
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
+export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  // For dollar-based currencies, always use '$' only
+  const dollarCurrencies = ['USD', 'CAD', 'AUD', 'NZD', 'SGD', 'HKD'];
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency,
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount)
+  }).format(amount);
+  if (dollarCurrencies.includes(currency)) {
+    // Remove any country code prefix (e.g., 'CA$', 'A$', etc.), keep only '$'
+    return formatted.replace(/[^\d.,-]+/, '$');
+  }
+  return formatted;
 }
 
 export const formatPercentage = (value: number, decimals: number = 2): string => {

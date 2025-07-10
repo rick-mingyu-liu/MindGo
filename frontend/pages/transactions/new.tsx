@@ -19,9 +19,10 @@ interface TransactionForm {
   category: string
   date: string
   notes: string
+  currency: string // Add currency field
 }
 
-const categories = {
+export const categories = {
   income: [
     'Salary',
     'Freelance',
@@ -58,6 +59,7 @@ export default function NewTransaction() {
     defaultValues: {
       type: 'expense',
       date: new Date().toISOString().split('T')[0],
+      currency: 'CAD', // Default currency
     }
   })
 
@@ -68,6 +70,7 @@ export default function NewTransaction() {
       const response = await api.post('/transactions', {
         ...data,
         amount: parseFloat(data.amount),
+        currency: data.currency,
       })
       
       toast.success('Transaction added successfully!')
@@ -173,7 +176,7 @@ export default function NewTransaction() {
 
                 {/* Amount */}
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount ($)</Label>
+                  <Label htmlFor="amount">Amount</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -189,6 +192,30 @@ export default function NewTransaction() {
                   />
                   {errors.amount && (
                     <p className="text-sm text-destructive">{errors.amount.message}</p>
+                  )}
+                </div>
+                {/* Currency */}
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select
+                    defaultValue="CAD"
+                    {...register('currency', { required: 'Currency is required' })}
+                    onValueChange={(value) => setValue('currency', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CAD">CAD ($)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="CNY">CNY (¥)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="AUD">AUD (A$)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.currency && (
+                    <p className="text-sm text-destructive">{errors.currency.message}</p>
                   )}
                 </div>
 

@@ -19,6 +19,9 @@ interface Transaction {
   category: string
   date: string
   created_at: string
+  currency?: string
+  convertedAmount?: number
+  convertedCurrency?: string
 }
 
 export default function Transactions() {
@@ -30,10 +33,28 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
+  // Get user's default currency from localStorage (preferences)
+  let defaultCurrency = 'CAD';
+  if (typeof window !== 'undefined') {
+    const prefs = localStorage.getItem('userPreferences');
+    if (prefs) {
+      try {
+        defaultCurrency = JSON.parse(prefs).currency || 'CAD';
+      } catch {}
+    }
+  }
+
   const fetchTransactions = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/transactions')
+      const prefs = localStorage.getItem('userPreferences');
+      let currency = 'CAD';
+      if (prefs) {
+        try {
+          currency = JSON.parse(prefs).currency || 'CAD';
+        } catch {}
+      }
+      const response = await api.get(`/transactions?targetCurrency=${currency}`)
       setTransactions(response.data.transactions)
     } catch (error) {
       console.error('Error fetching transactions:', error)
@@ -111,6 +132,12 @@ export default function Transactions() {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  // Helper to determine if a currency symbol is ambiguous
+  const ambiguousSymbols = ['CAD', 'USD', 'AUD', 'NZD', 'SGD', 'HKD'];
+  function shouldShowCode(currency: string) {
+    return ambiguousSymbols.includes(currency);
   }
 
   if (loading) {
@@ -249,7 +276,11 @@ export default function Transactions() {
                       <div className="flex items-center space-x-4">
                         <div className="text-right">
                           <p className={`font-semibold text-lg ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                            {transaction.type === 'income' ? '+' : '-'}
+                            {formatCurrency(
+                              transaction.convertedAmount ?? transaction.amount,
+                              transaction.convertedCurrency ?? transaction.currency ?? defaultCurrency
+                            )}
                           </p>
                           <Badge
                             className={`text-xs px-3 py-1 rounded-full ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
@@ -304,4 +335,4 @@ export default function Transactions() {
       </div>
     </>
   )
-} 
+}
