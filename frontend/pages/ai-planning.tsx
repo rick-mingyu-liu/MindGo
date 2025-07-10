@@ -22,6 +22,7 @@ interface PlanningForm {
   currentExpenses: string
   timeline: string
   additionalContext: string
+  currency: string // Add this
 }
 
 interface PlanningResponse {
@@ -108,14 +109,27 @@ export default function AIPlanning() {
       setLoading(true)
       setPlanningResponse(null)
       const planningPrefs = JSON.parse(localStorage.getItem('planningPrefs') || '{}')
-      const response = await api.post('/ai/plan', {
+      // Append currency info to the additionalContext or financialGoal
+      const currencySymbols = {
+        CAD: '$',
+        USD: '$',
+        CNY: '¥',
+        EUR: '€',
+        GBP: '£',
+        AUD: 'A$'
+      };
+      const symbol = Object.prototype.hasOwnProperty.call(currencySymbols, data.currency) ? currencySymbols[data.currency as keyof typeof currencySymbols] : data.currency;
+      const currencyNote = `All responses should use the currency symbol (${symbol}) for ${data.currency}. For example, use '${symbol}10,000' instead of '${data.currency} 10,000'.`;
+      const newData = {
         ...data,
+        additionalContext: (data.additionalContext ? data.additionalContext + '\n' : '') + currencyNote,
         currentIncome: parseFloat(data.currentIncome),
         currentExpenses: parseFloat(data.currentExpenses),
         riskTolerance: planningPrefs.riskTolerance,
         lifeStage: planningPrefs.lifeStage,
         investmentExperience: planningPrefs.investmentExperience,
-      })
+      };
+      const response = await api.post('/ai/plan', newData)
       setPlanningResponse(response.data)
       Swal.fire({
         icon: 'success',
@@ -373,6 +387,23 @@ export default function AIPlanning() {
                       {errors.timeline && (
                         <p className="text-sm text-destructive">{errors.timeline.message}</p>
                       )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="currency">Currency</Label>
+                      <Select value={watch('currency') || 'CAD'} onValueChange={value => setValue('currency', value, { shouldValidate: true })}>
+                        <SelectTrigger className="w-full rounded-lg py-3 px-4 text-base">
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CAD">CAD ($)</SelectItem>
+                          <SelectItem value="USD">USD ($)</SelectItem>
+                          <SelectItem value="CNY">CNY (¥)</SelectItem>
+                          <SelectItem value="EUR">EUR (€)</SelectItem>
+                          <SelectItem value="GBP">GBP (£)</SelectItem>
+                          <SelectItem value="AUD">AUD (A$)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">
