@@ -33,6 +33,7 @@ import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
+import { categories as categoryTypeMap } from './transactions/new';
 
 interface FinancialSummary {
   period: string
@@ -307,14 +308,20 @@ export default function Dashboard() {
   }, [router, fetchDashboardData])
 
   const getCategoryChartData = () => {
-    if (!summary?.categories) return []
-    
+    if (!summary?.categories) return [];
     return Object.entries(summary.categories)
-      .map(([name, data]) => ({
-        name,
-        value: data.total
-      }))
-      .sort((a, b) => b.value - a.value) // Sort by value descending
+      .map(([name, data]) => {
+        // Determine type from categoryTypeMap
+        let type: 'income' | 'expense' = 'expense';
+        if (categoryTypeMap.income.includes(name)) type = 'income';
+        else if (categoryTypeMap.expense.includes(name)) type = 'expense';
+        return {
+          name,
+          value: data.total,
+          type,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
   }
 
   const getMonthlyChartData = () => {
@@ -399,62 +406,28 @@ export default function Dashboard() {
   }
 
   // Custom label renderer for pie chart
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value }: any) => {
-    const RADIAN = Math.PI / 180
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-    const x = cx + radius * Math.cos(-midAngle * RADIAN)
-    const y = cy + radius * Math.sin(-midAngle * RADIAN)
-    
-    // Calculate label position outside the pie
-    const labelRadius = outerRadius + 20
-    const labelX = cx + labelRadius * Math.cos(-midAngle * RADIAN)
-    const labelY = cy + labelRadius * Math.sin(-midAngle * RADIAN)
-    
-    // Determine text anchor based on angle
-    const textAnchor = x > cx ? 'start' : 'end'
-    const dominantBaseline = y > cy ? 'auto' : 'middle'
-    
-    // Only show labels for segments > 5%
-    if (percent < 0.05) return null
-    
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name, value, type }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const labelRadius = outerRadius + 20;
+    const labelX = cx + labelRadius * Math.cos(-midAngle * RADIAN);
+    const labelY = cy + labelRadius * Math.sin(-midAngle * RADIAN);
+    const textAnchor = x > cx ? 'start' : 'end';
+    const dominantBaseline = y > cy ? 'auto' : 'middle';
+    if (percent < 0.05) return null;
+    const sign = type === 'income' ? '+' : '-';
     return (
       <g key={`label-${index}`}>
-        {/* Line from pie to label */}
-        <line
-          x1={x}
-          y1={y}
-          x2={labelX}
-          y2={labelY}
-          stroke="hsl(var(--muted-foreground))"
-          strokeWidth={1}
-          opacity={0.6}
-        />
-        {/* Label */}
-        <text
-          x={labelX}
-          y={labelY}
-          fill="hsl(var(--foreground))"
-          textAnchor={textAnchor}
-          dominantBaseline={dominantBaseline}
-          fontSize={12}
-          fontWeight={500}
-        >
-          {name}
-        </text>
-        {/* Percentage */}
-        <text
-          x={labelX}
-          y={labelY + 15}
-          fill="hsl(var(--muted-foreground))"
-          textAnchor={textAnchor}
-          dominantBaseline={dominantBaseline}
-          fontSize={10}
-        >
-          {formatCurrency(value, summary?.targetCurrency || defaultCurrency)} ({(percent * 100).toFixed(1)}%)
+        <line x1={x} y1={y} x2={labelX} y2={labelY} stroke="hsl(var(--muted-foreground))" strokeWidth={1} opacity={0.6} />
+        <text x={labelX} y={labelY} fill="hsl(var(--foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={12} fontWeight={500}>{name}</text>
+        <text x={labelX} y={labelY + 15} fill="hsl(var(--muted-foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={10}>
+          {sign}{formatCurrency(value, summary?.targetCurrency || defaultCurrency)} ({(percent * 100).toFixed(1)}%)
         </text>
       </g>
-    )
-  }
+    );
+  };
 
   if (loading) {
     return (
@@ -905,7 +878,7 @@ export default function Dashboard() {
                             />
                             <span className="text-foreground whitespace-normal">{entry.name}</span>
                             <span className="text-muted-foreground ml-1">
-                              {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
+                              {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
                             </span>
                           </div>
                         ))}

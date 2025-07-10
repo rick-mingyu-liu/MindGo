@@ -22,7 +22,7 @@ interface TransactionForm {
   currency: string // Add currency field
 }
 
-const categories = {
+export const categories = {
   income: [
     'Salary',
     'Freelance',
