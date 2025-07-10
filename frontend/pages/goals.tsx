@@ -16,6 +16,7 @@ import ReactMarkdown from 'react-markdown'
 import React from 'react'
 import Swal from 'sweetalert2'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Goal {
   id: number
@@ -151,6 +152,7 @@ export default function Goals() {
       current_amount: goal.current_amount.toString(),
       target_date: formattedDate,
       description: goal.description,
+      currency: goal.currency, // Ensure currency is set
     });
     setIsDialogOpen(true);
   }
@@ -175,13 +177,6 @@ export default function Goals() {
     if (progress >= 75) return 'bg-blue-500'
     if (progress >= 50) return 'bg-yellow-500'
     return 'bg-red-500'
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount)
   }
 
   if (loading) {
@@ -460,11 +455,11 @@ export default function Goals() {
                       <div className="grid grid-cols-2 gap-4 text-base">
                         <div>
                           <p className="text-muted-foreground">Current</p>
-                          <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount)}</p>
+                          <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount, goal.currency)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Target</p>
-                          <p className="font-bold text-lg">{formatCurrency(goal.target_amount)}</p>
+                          <p className="font-bold text-lg">{formatCurrency(goal.target_amount, goal.currency)}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between">

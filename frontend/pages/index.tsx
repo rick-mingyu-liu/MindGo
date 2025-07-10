@@ -72,6 +72,10 @@ interface Goal {
   current_amount: number
   target_date: string
   description: string
+  currency?: string
+  convertedCurrentAmount?: number
+  convertedTargetAmount?: number
+  convertedCurrency?: string
 }
 
 interface WatchlistItem {
@@ -936,7 +940,7 @@ export default function Dashboard() {
                           <div className="flex justify-between items-center">
                             <span className="font-medium">{goal.name}</span>
                             <span className="text-sm text-muted-foreground">
-                              {formatCurrency(goal.current_amount, summary?.targetCurrency || defaultCurrency)} / {formatCurrency(goal.target_amount, summary?.targetCurrency || defaultCurrency)}
+                              {formatCurrency(goal.convertedCurrentAmount ?? goal.current_amount, goal.convertedCurrency ?? goal.currency ?? summary?.targetCurrency ?? defaultCurrency)} / {formatCurrency(goal.convertedTargetAmount ?? goal.target_amount, goal.convertedCurrency ?? goal.currency ?? summary?.targetCurrency ?? defaultCurrency)}
                             </span>
                           </div>
                           <Progress value={progress} className="h-2" />
