@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next';
+import { i18n } from 'next-i18next';
 
 interface Transaction {
   id: number
@@ -33,7 +34,7 @@ export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
 
   // Get user's default currency from localStorage (preferences)
   let defaultCurrency = 'CAD';
@@ -79,6 +80,20 @@ export default function Transactions() {
 
     fetchTransactions()
   }, [router])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const prefs = localStorage.getItem('userPreferences');
+      if (prefs) {
+        try {
+          const lang = JSON.parse(prefs).language;
+          if (lang && i18n.language !== lang) {
+            i18n.changeLanguage(lang);
+          }
+        } catch {}
+      }
+    }
+  }, [i18n]);
 
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,7 +251,7 @@ export default function Transactions() {
                     <SelectItem value="all">{t('All Categories')}</SelectItem>
                     {categories.map(category => (
                       <SelectItem key={category} value={category}>
-                        {category}
+                        {t(category)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -266,7 +281,7 @@ export default function Transactions() {
                         <div>
                           <p className="font-medium text-base">{transaction.description}</p>
                           <div className="flex flex-wrap items-center space-x-2 text-sm text-muted-foreground">
-                            <span>{transaction.category}</span>
+                            <span>{t(transaction.category)}</span>
                             <span>•</span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />

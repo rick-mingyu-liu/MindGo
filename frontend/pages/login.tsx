@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
@@ -40,6 +40,21 @@ export default function Login() {
 
   const email = watch('email')
   const { t } = useTranslation()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const sysLang = navigator.language || navigator.languages?.[0] || 'en';
+        if (sysLang.startsWith('zh')) {
+          // Set app language to Mandarin
+          localStorage.setItem('userLanguage', 'zh');
+        } else {
+          localStorage.setItem('userLanguage', 'en');
+        }
+      }
+    }
+  }, []);
 
   const onSubmit = async (data: LoginForm) => {
     try {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
@@ -82,6 +82,18 @@ export default function Register() {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [registerError, setRegisterError] = useState('')
+  const [language, setLanguage] = useState('en');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sysLang = navigator.language || navigator.languages?.[0] || 'en';
+      if (sysLang.startsWith('zh')) {
+        setLanguage('zh');
+      } else {
+        setLanguage('en');
+      }
+    }
+  }, []);
   
   const {
     register,
@@ -98,7 +110,10 @@ export default function Register() {
       setLoading(true)
       setRegisterError('')
       const { confirmPassword, ...registerData } = data
-      const response = await api.post('/auth/register', registerData)
+      const response = await api.post('/auth/register', {
+        ...registerData,
+        language,
+      })
       if (response.data.requiresVerification) {
         setRegistrationSuccess(true)
         setUserEmail(data.email)

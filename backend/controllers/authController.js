@@ -327,18 +327,21 @@ const authController = {
   // Update user profile
   async updateProfile(req, res) {
     try {
-      const { first_name, last_name } = req.body;
-
-      const updatedUser = await db.query(
-        'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3 RETURNING id, email, first_name, last_name, updated_at',
-        [first_name, last_name, req.user.userId]
-      );
-
+      const { first_name, last_name, language } = req.body;
+      let query = 'UPDATE users SET first_name = $1, last_name = $2';
+      let params = [first_name, last_name, req.user.userId];
+      if (language) {
+        query = 'UPDATE users SET first_name = $1, last_name = $2, language = $3 WHERE id = $4 RETURNING id, email, first_name, last_name, language, updated_at';
+        params = [first_name, last_name, language, req.user.userId];
+      } else {
+        query = 'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3 RETURNING id, email, first_name, last_name, language, updated_at';
+        params = [first_name, last_name, req.user.userId];
+      }
+      const updatedUser = await db.query(query, params);
       res.json({
         message: 'Profile updated successfully',
         user: updatedUser.rows[0]
       });
-
     } catch (error) {
       console.error('Update profile error:', error);
       res.status(500).json({ error: 'Server error' });
