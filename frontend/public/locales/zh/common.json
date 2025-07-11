@@ -484,5 +484,13 @@
   "Media": "媒体",
   "NEW YORK STOCK EXCHANGE, INC.": "纽约证券交易所",
   "Alphabet Inc": "谷歌母公司",
-  "Spotify Technology SA": "Spotify科技公司"
+  "Spotify Technology SA": "Spotify科技公司",
+  "This project is made by these amazing open source projects:": "本应用开发时使用了以下开源项目：",
+  "Open Source Acknowledgements": "开源项目申明",
+  "APIs (free)": "免费API",
+  "Frontend": "前段",
+  "Backend": "后端",
+  "Close": "关闭",
+  "Checked in!": "签到成功",
+  "You have checked in for today. Keep up the streak! 🔥": "你今日已签到。请继续保持火花！🔥"
 }

@@ -19,7 +19,8 @@ import {
   EyeOff,
   Smartphone,
   Globe,
-  LogOut
+  LogOut,
+  BookOpen
 } from 'lucide-react'
 import { api, logout } from '@/utils/api'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -107,6 +108,7 @@ export default function Settings() {
   })
   const [savingPlanningPrefs, setSavingPlanningPrefs] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const [ackDialogOpen, setAckDialogOpen] = useState(false);
   const { t, i18n } = useTranslation('common');
 
   useEffect(() => {
@@ -684,6 +686,16 @@ export default function Settings() {
             </Card>
 
             {/* Save All Preferences */}
+            <div className="flex justify-end space-x-4 mb-6">
+              <Button
+                variant="outline"
+                onClick={() => setAckDialogOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                {t('Open Source Acknowledgements')}
+              </Button>
+            </div>
             <div className="flex justify-end space-x-4">
               <Button
                 variant="outline"
@@ -756,6 +768,78 @@ export default function Settings() {
             <Button variant="destructive" onClick={handleClearData} disabled={clearing}>
               {clearing ? 'Clearing...' : t('Yes, Delete Everything')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={ackDialogOpen} onOpenChange={setAckDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('Open Source Acknowledgements')}</DialogTitle>
+            <DialogDescription>{t('This project is made by these amazing open source projects:')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <h4 className="font-semibold mb-2">{t('Frontend')}</h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li>Next.js</li>
+                <li>React</li>
+                <li>TypeScript</li>
+                <li>Tailwind CSS</li>
+                <li>shadcn/ui</li>
+                <li>Radix UI (@radix-ui/react-*)</li>
+                <li>lucide-react</li>
+                <li>recharts</li>
+                <li>react-financial-charts</li>
+                <li>d3-format</li>
+                <li>date-fns</li>
+                <li>react-hook-form</li>
+                <li>@hookform/resolvers</li>
+                <li>next-i18next</li>
+                <li>react-i18next</li>
+                <li>i18next</li>
+                <li>sweetalert2</li>
+                <li>react-hot-toast</li>
+                <li>react-markdown</li>
+                <li>axios</li>
+                <li>clsx</li>
+                <li>class-variance-authority</li>
+                <li>autoprefixer</li>
+                <li>postcss</li>
+                <li>tailwind-merge</li>
+                <li>@vercel/analytics</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">{t('Backend')}</h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li>Express.js</li>
+                <li>PostgreSQL (pg)</li>
+                <li>bcryptjs</li>
+                <li>helmet</li>
+                <li>express-rate-limit</li>
+                <li>cors</li>
+                <li>jsonwebtoken</li>
+                <li>nodemailer</li>
+                <li>node-cron</li>
+                <li>dotenv</li>
+                <li>morgan</li>
+                <li>axios</li>
+                <li>express-validator</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">{t('APIs (free)')}</h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li>ExchangeRate.host (currency conversion)</li>
+                <li>Frankfurter.dev (currency conversion)</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">{t('Close')}</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
