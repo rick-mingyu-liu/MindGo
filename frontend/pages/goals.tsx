@@ -17,6 +17,8 @@ import React from 'react'
 import Swal from 'sweetalert2'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { formatCurrency } from '@/utils/formatters';
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface Goal {
   id: number
@@ -73,6 +75,7 @@ function GoalDescriptionPreview({ description }: { description: string }) {
 }
 
 export default function Goals() {
+  const { t } = useTranslation('common');
   const router = useRouter()
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
@@ -117,7 +120,7 @@ export default function Goals() {
         })
         Swal.fire({
           icon: 'success',
-          title: 'Goal updated successfully!',
+          title: t('Goal updated successfully!'),
         })
       } else {
         await api.post('/goals', {
@@ -127,7 +130,7 @@ export default function Goals() {
         })
         Swal.fire({
           icon: 'success',
-          title: 'Goal created successfully!',
+          title: t('Goal created successfully!'),
         })
       }
       
@@ -163,7 +166,7 @@ export default function Goals() {
         await api.delete(`/goals/${goalId}`)
         Swal.fire({
           icon: 'success',
-          title: 'Goal deleted successfully!',
+          title: t('Goal deleted successfully!'),
         })
         fetchGoals()
       } catch (error) {
@@ -190,8 +193,8 @@ export default function Goals() {
   return (
     <>
       <Head>
-        <title>Goals - MindGo</title>
-        <meta name="description" content="Manage your savings goals" />
+        <title>{t('Savings Goals')} - MindGo</title>
+        <meta name="description" content={t('Manage your savings goals')} />
       </Head>
 
       <div className="min-h-screen bg-background">
@@ -206,11 +209,11 @@ export default function Goals() {
                   className="mr-4 flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Savings Goals</h1>
-                  <p className="text-muted-foreground">Track and manage your financial goals</p>
+                  <h1 className="text-3xl font-bold">{t('Savings Goals')}</h1>
+                  <p className="text-muted-foreground">{t('Track and manage your financial goals')}</p>
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -218,26 +221,26 @@ export default function Goals() {
                   <DialogTrigger asChild>
                     <Button className="w-full sm:w-auto">
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Goal
+                      {t('Add Goal')}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>
-                        {editingGoal ? 'Edit Goal' : 'Create New Goal'}
+                        {editingGoal ? t('Edit Goal') : t('Create New Goal')}
                       </DialogTitle>
                       <DialogDescription>
-                        Set up a new savings goal with target amount and timeline
+                        {t('Set up a new savings goal with target amount and timeline')}
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Goal Name</Label>
+                        <Label htmlFor="name">{t('Goal Name')}</Label>
                         <Input
                           id="name"
-                          placeholder="e.g., Emergency Fund, House Down Payment"
+                          placeholder={t('e.g., Emergency Fund, House Down Payment')}
                           {...register('name', {
-                            required: 'Goal name is required',
+                            required: t('Goal name is required'),
                           })}
                         />
                         {errors.name && (
@@ -247,17 +250,17 @@ export default function Goals() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="target_amount">Target Amount</Label>
+                          <Label htmlFor="target_amount">{t('Target Amount')}</Label>
                           <Input
                             id="target_amount"
                             type="number"
                             step="0.01"
-                            placeholder="0.00"
+                            placeholder={t('0.00')}
                             {...register('target_amount', {
-                              required: 'Target amount is required',
+                              required: t('Target amount is required'),
                               min: {
                                 value: 0.01,
-                                message: 'Target amount must be greater than 0',
+                                message: t('Target amount must be greater than 0'),
                               },
                             })}
                           />
@@ -266,17 +269,17 @@ export default function Goals() {
                           )}
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="current_amount">Current Amount</Label>
+                          <Label htmlFor="current_amount">{t('Current Amount')}</Label>
                           <Input
                             id="current_amount"
                             type="number"
                             step="0.01"
-                            placeholder="0.00"
+                            placeholder={t('0.00')}
                             {...register('current_amount', {
-                              required: 'Current amount is required',
+                              required: t('Current amount is required'),
                               min: {
                                 value: 0,
-                                message: 'Current amount cannot be negative',
+                                message: t('Current amount cannot be negative'),
                               },
                             })}
                           />
@@ -288,16 +291,16 @@ export default function Goals() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="target_date">Target Date <span className="text-red-500">*</span></Label>
+                          <Label htmlFor="target_date">{t('Target Date')} <span className="text-red-500">*</span></Label>
                           <Input
                             id="target_date"
                             type="date"
-                            placeholder="Select a date"
+                            placeholder={t('Select a date')}
                             aria-invalid={!!errors.target_date}
                             aria-describedby={errors.target_date ? 'target_date-error' : undefined}
                             className={errors.target_date ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
                             {...register('target_date', {
-                              required: 'Target date is required',
+                              required: t('Target date is required'),
                             })}
                           />
                           {errors.target_date && (
@@ -307,21 +310,21 @@ export default function Goals() {
                           )}
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="currency">Currency</Label>
+                          <Label htmlFor="currency">{t('Currency')}</Label>
                           <Select
                             value={watch('currency') || 'CAD'}
                             onValueChange={value => setValue('currency', value, { shouldValidate: true })}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select currency" />
+                              <SelectValue placeholder={t('Select currency')} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="CAD">CAD ($)</SelectItem>
-                              <SelectItem value="USD">USD ($)</SelectItem>
-                              <SelectItem value="CNY">CNY (¥)</SelectItem>
-                              <SelectItem value="EUR">EUR (€)</SelectItem>
-                              <SelectItem value="GBP">GBP (£)</SelectItem>
-                              <SelectItem value="AUD">AUD (A$)</SelectItem>
+                              <SelectItem value="CAD">{t('CAD ($)')}</SelectItem>
+                              <SelectItem value="USD">{t('USD ($)')}</SelectItem>
+                              <SelectItem value="CNY">{t('CNY (¥)')}</SelectItem>
+                              <SelectItem value="EUR">{t('EUR (€)')}</SelectItem>
+                              <SelectItem value="GBP">{t('GBP (£)')}</SelectItem>
+                              <SelectItem value="AUD">{t('AUD (A$)')}</SelectItem>
                             </SelectContent>
                           </Select>
                           {errors.currency && (
@@ -331,10 +334,10 @@ export default function Goals() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="description">Description (optional)</Label>
+                        <Label htmlFor="description">{t('Description (optional)')}</Label>
                         <Textarea
                           id="description"
-                          placeholder="Additional details about your goal..."
+                          placeholder={t('Additional details about your goal...')}
                           {...register('description')}
                           className="min-h-[360px]"
                         />
@@ -351,7 +354,7 @@ export default function Goals() {
                               setDeleteDialogOpen(true);
                             }}
                           >
-                            Delete Goal
+                            {t('Delete Goal')}
                           </Button>
                         ) : (
                           <Button
@@ -364,11 +367,11 @@ export default function Goals() {
                             }}
                             className="flex-1"
                           >
-                            Cancel
+                            {t('Cancel')}
                           </Button>
                         )}
                         <Button type="submit" className="flex-1">
-                          {editingGoal ? 'Update Goal' : 'Create Goal'}
+                          {editingGoal ? t('Update Goal') : t('Create Goal')}
                         </Button>
                       </div>
                     </form>
@@ -380,7 +383,7 @@ export default function Goals() {
                   className="w-full sm:w-auto"
                 >
                   <Brain className="w-4 h-4 mr-2" />
-                  AI Planning
+                  {t('AI Planning')}
                 </Button>
               </div>
             </div>
@@ -392,13 +395,13 @@ export default function Goals() {
             <Card>
               <CardContent className="text-center py-12">
                 <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No savings goals yet</h3>
+                <h3 className="text-lg font-medium mb-2">{t('No savings goals yet')}</h3>
                 <p className="text-muted-foreground mb-4">
-                  Create your first savings goal to start tracking your progress
+                  {t('Create your first savings goal to start tracking your progress')}
                 </p>
                 <Button onClick={() => setIsDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Goal
+                  {t('Create Your First Goal')}
                 </Button>
               </CardContent>
             </Card>
@@ -427,6 +430,7 @@ export default function Goals() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label={t('View Goal')}
                             onClick={e => { e.stopPropagation(); setViewingGoal(goal); }}
                           >
                             <Eye className="w-4 h-4" />
@@ -441,24 +445,24 @@ export default function Goals() {
                         </div>
                       </div>
                       <div className="mt-2">
-                        <GoalDescriptionPreview description={goal.description || 'No description provided'} />
+                        <GoalDescriptionPreview description={goal.description || t('No description provided')} />
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex justify-between text-base font-semibold">
-                          <span className="text-muted-foreground">Progress</span>
+                          <span className="text-muted-foreground">{t('Progress')}</span>
                           <span className="font-bold">{progress.toFixed(1)}%</span>
                         </div>
                         <Progress value={progress} className="h-3" />
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-base">
                         <div>
-                          <p className="text-muted-foreground">Current</p>
+                          <p className="text-muted-foreground">{t('Current')}</p>
                           <p className="font-bold text-green-600 text-lg">{formatCurrency(goal.current_amount, goal.currency)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Target</p>
+                          <p className="text-muted-foreground">{t('Target')}</p>
                           <p className="font-bold text-lg">{formatCurrency(goal.target_amount, goal.currency)}</p>
                         </div>
                       </div>
@@ -470,7 +474,7 @@ export default function Goals() {
                           </span>
                         </div>
                         <Badge variant={daysRemaining < 0 ? "destructive" : daysRemaining < 30 ? "default" : "secondary"} className="text-base px-3 py-1 rounded-full">
-                          {daysRemaining < 0 ? 'Overdue' : `${daysRemaining} days left`}
+                          {daysRemaining < 0 ? t('Overdue') : `${daysRemaining} ${t('days left')}`}
                         </Badge>
                       </div>
                     </CardContent>
@@ -485,33 +489,33 @@ export default function Goals() {
       <Dialog open={!!viewingGoal} onOpenChange={open => { if (!open) setViewingGoal(null) }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Goal Details</DialogTitle>
+            <DialogTitle>{t('Goal Details')}</DialogTitle>
             <DialogDescription>
-              View your goal details
+              {t('View your goal details')}
             </DialogDescription>
           </DialogHeader>
           {viewingGoal && (
             <div className="space-y-6">
               <div>
-                <Label className="font-semibold">Goal Name</Label>
+                <Label className="font-semibold">{t('Goal Name')}</Label>
                 <div className="mt-1 text-lg">{viewingGoal.name}</div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="font-semibold">Target Amount ($)</Label>
+                  <Label className="font-semibold">{t('Target Amount ($)')}</Label>
                   <div className="mt-1">{viewingGoal.target_amount}</div>
                 </div>
                 <div>
-                  <Label className="font-semibold">Current Amount ($)</Label>
+                  <Label className="font-semibold">{t('Current Amount ($)')}</Label>
                   <div className="mt-1">{viewingGoal.current_amount}</div>
                 </div>
               </div>
               <div>
-                <Label className="font-semibold">Target Date</Label>
+                <Label className="font-semibold">{t('Target Date')}</Label>
                 <div className="mt-1">{viewingGoal.target_date ? new Date(viewingGoal.target_date).toISOString().slice(0, 10) : ''}</div>
               </div>
               <div>
-                <Label className="font-semibold">Description</Label>
+                <Label className="font-semibold">{t('Description')}</Label>
                 <div className="mt-1 prose prose-sm max-w-none bg-muted/60 rounded-md px-3 py-2">
                   {React.createElement(ReactMarkdown as any, {}, viewingGoal.description)}
                 </div>
@@ -524,9 +528,9 @@ export default function Goals() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Goal</DialogTitle>
+            <DialogTitle>{t('Delete Goal')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this goal? This action cannot be undone.
+              {t('Are you sure you want to delete this goal? This action cannot be undone.')}
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 mt-4">
@@ -537,7 +541,7 @@ export default function Goals() {
                   await api.delete(`/goals/${goalToDelete.id}`);
                   Swal.fire({
                     icon: 'success',
-                    title: 'Goal deleted successfully!',
+                    title: t('Goal deleted successfully!'),
                   })
                   setDeleteDialogOpen(false);
                   setViewingGoal(null);
@@ -548,14 +552,22 @@ export default function Goals() {
                 }
               }}
             >
-              Delete
+              {t('Delete')}
             </Button>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
+              {t('Cancel')}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </>
   )
+}
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 
