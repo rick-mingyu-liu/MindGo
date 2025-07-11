@@ -14,6 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFir
 import { StockDetailModal } from '@/components/StockDetailModal'
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { GetServerSidePropsContext } from 'next';
 
 interface WatchlistItem {
   id: number
@@ -50,40 +52,6 @@ const INDEX_CARDS = [
   },
 ];
 
-// Add this above the Investments component
-const INDEX_SUMMARIES: Record<string, { title: string; description: string; link: string }> = {
-  '^GSPC': {
-    title: 'S&P 500 Index',
-    description: 'The S&P 500 is a stock market index tracking the stock performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices and is considered a barometer for the overall U.S. stock market.',
-    link: 'https://en.wikipedia.org/wiki/S%26P_500_Index',
-  },
-  '^DJI': {
-    title: 'Dow Jones Industrial Average',
-    description: 'The Dow Jones Industrial Average (DJIA) is a price-weighted index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most widely recognized stock market indices in the world.',
-    link: 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average',
-  },
-  '^IXIC': {
-    title: 'NASDAQ Composite',
-    description: 'The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.',
-    link: 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
-  },
-};
-
-function IndexDetailModal({ open, onOpenChange, symbol }: { open: boolean; onOpenChange: (v: boolean) => void; symbol: string }) {
-  const info = INDEX_SUMMARIES[symbol];
-  if (!info) return null;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{info.title}</DialogTitle>
-          <DialogDescription>{info.description}</DialogDescription>
-        </DialogHeader>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function Investments() {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
@@ -102,6 +70,41 @@ export default function Investments() {
   const [indexError, setIndexError] = useState('')
   const [openIndexModal, setOpenIndexModal] = useState<string | null>(null)
   const { t } = useTranslation('common');
+
+  // Move INDEX_SUMMARIES inside the component to access t()
+  const INDEX_SUMMARIES: Record<string, { title: string; description: string; link: string }> = {
+    '^GSPC': {
+      title: t('S&P 500 Index'),
+      description: t('The S&P 500 is a stock market index tracking the stock performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices and is considered a barometer for the overall U.S. stock market.'),
+      link: 'https://en.wikipedia.org/wiki/S%26P_500_Index',
+    },
+    '^DJI': {
+      title: t('Dow Jones Industrial Average'),
+      description: t('The Dow Jones Industrial Average (DJIA) is a price-weighted index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most widely recognized stock market indices in the world.'),
+      link: 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average',
+    },
+    '^IXIC': {
+      title: t('NASDAQ Composite'),
+      description: t('The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.'),
+      link: 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
+    },
+  };
+
+  // Move IndexDetailModal inside Investments to access INDEX_SUMMARIES and t()
+  function IndexDetailModal({ open, onOpenChange, symbol }: { open: boolean; onOpenChange: (v: boolean) => void; symbol: string }) {
+    const info = INDEX_SUMMARIES[symbol];
+    if (!info) return null;
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{info.title}</DialogTitle>
+            <DialogDescription>{info.description}</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   useEffect(() => {
     fetchWatchlist()
@@ -178,7 +181,7 @@ export default function Investments() {
       await api.delete(`/investments/watchlist/${pendingDeleteId}`)
         Swal.fire({
           icon: 'success',
-          title: 'Stock removed from watchlist!',
+          title: t('Stock removed from watchlist!'),
         })
         fetchWatchlist()
       } catch (error) {
@@ -214,7 +217,7 @@ export default function Investments() {
       await api.post('/investments/watchlist', { symbol, company_name: companyName })
       Swal.fire({
         icon: 'success',
-        title: 'Stock added to watchlist!',
+        title: t('Stock added to watchlist!'),
       })
       setIsDialogOpen(false)
       setSearchAddQuery('')
@@ -223,7 +226,7 @@ export default function Investments() {
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Failed to add stock',
+        title: t('Failed to add stock'),
       })
     }
   }
@@ -239,8 +242,8 @@ export default function Investments() {
   return (
     <>
       <Head>
-        <title>Watchlist - MindGo</title>
-        <meta name="description" content="Track your favorite stocks" />
+        <title>{t('Investment Watchlist')} - MindGo</title>
+        <meta name="description" content={t('Track your favorite stocks')} />
       </Head>
 
       <div className="min-h-screen bg-background">
@@ -551,4 +554,13 @@ export default function Investments() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const locale = context.locale || 'en';
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 

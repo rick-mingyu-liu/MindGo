@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { 
   Table, 
@@ -20,10 +19,11 @@ import {
   Eye,
   Trash2
 } from 'lucide-react'
-import { StockDetailModal } from './StockDetailModal'
 import { formatCurrency } from '@/utils/formatters'
 import { enhancedStockAPI, investmentAPI } from '@/utils/api'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next'
+
 
 interface Stock {
   id: number
@@ -41,6 +41,7 @@ interface Stock {
 }
 
 export function StockWatchlist() {
+  const { t, i18n } = useTranslation('common');
   const [stocks, setStocks] = useState<Stock[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
@@ -63,8 +64,8 @@ export function StockWatchlist() {
       console.error('Error fetching watchlist:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to load watchlist',
-        text: 'Please try again later.'
+        title: t('Failed to load watchlist'),
+        text: t('Please try again later.')
       })
     } finally {
       setLoading(false)
@@ -107,8 +108,8 @@ export function StockWatchlist() {
     if (!newStockSymbol.trim() || !newStockCompany.trim()) {
       Swal.fire({
         icon: 'error',
-        title: 'Please enter both symbol and company name',
-        text: 'Please fill in all fields.'
+        title: t('Please enter both symbol and company name'),
+        text: t('Please fill in all fields.')
       })
       return
     }
@@ -118,8 +119,8 @@ export function StockWatchlist() {
       await enhancedStockAPI.addToWatchlist(newStockSymbol.trim(), newStockCompany.trim())
       Swal.fire({
         icon: 'success',
-        title: 'Stock added to watchlist',
-        text: 'The stock has been successfully added to your watchlist.'
+        title: t('Stock added to watchlist'),
+        text: t('The stock has been successfully added to your watchlist.')
       })
       setNewStockSymbol('')
       setNewStockCompany('')
@@ -138,8 +139,8 @@ export function StockWatchlist() {
       await enhancedStockAPI.removeFromWatchlist(symbol)
       Swal.fire({
         icon: 'success',
-        title: 'Stock removed from watchlist',
-        text: 'The stock has been successfully removed from your watchlist.'
+        title: t('Stock removed from watchlist'),
+        text: t('The stock has been successfully removed from your watchlist.')
       })
       fetchWatchlist() // Refresh the list
     } catch (error) {
@@ -162,8 +163,8 @@ export function StockWatchlist() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Stock Watchlist</CardTitle>
-          <CardDescription>Track your favorite stocks and get detailed information</CardDescription>
+          <CardTitle>{t('Stock Watchlist')}</CardTitle>
+          <CardDescription>{t('Track your favorite stocks and get detailed information')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
@@ -181,10 +182,10 @@ export function StockWatchlist() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Star className="w-5 h-5 text-primary" />
-              Stock Watchlist
+              {t('Stock Watchlist')}
             </CardTitle>
             <CardDescription>
-              Track your favorite stocks and get detailed information
+              {t('Track your favorite stocks and get detailed information')}
             </CardDescription>
           </div>
           <Button 
@@ -192,7 +193,7 @@ export function StockWatchlist() {
             className="aurora-glow"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Stock
+            {t('Add Stock')}
           </Button>
         </div>
       </CardHeader>
@@ -201,7 +202,7 @@ export function StockWatchlist() {
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search stocks by symbol or company name..."
+            placeholder={t('Search stocks by symbol or company name...')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -212,18 +213,18 @@ export function StockWatchlist() {
         {showAddStock && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-background p-6 rounded-lg shadow-lg w-96">
-              <h3 className="text-lg font-semibold mb-4">Add Stock to Watchlist</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('Add Stock to Watchlist')}</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Search by Symbol or Company Name</label>
+                  <label className="block text-sm font-medium mb-2">{t('Search by Symbol or Company Name')}</label>
                   <Input
-                    placeholder="Type symbol or company name..."
+                    placeholder={t('Type symbol or company name...')}
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     autoFocus
                   />
-                  {searching && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
-                  {searchError && <div className="text-xs text-red-600 mt-1">{searchError}</div>}
+                  {searching && <div className="text-xs text-muted-foreground mt-1">{t('Searching...')}</div>}
+                  {searchError && <div className="text-xs text-red-600 mt-1">{t('Failed to search stocks')}</div>}
                   {searchResults.length > 0 && (
                     <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
                       {searchResults.map((result, idx) => (
@@ -244,18 +245,18 @@ export function StockWatchlist() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Stock Symbol</label>
+                  <label className="block text-sm font-medium mb-2">{t('Stock Symbol')}</label>
                   <Input
-                    placeholder="Enter stock symbol (e.g., AAPL)"
+                    placeholder={t('Enter stock symbol (e.g., AAPL)')}
                     value={newStockSymbol}
                     onChange={(e) => setNewStockSymbol(e.target.value.toUpperCase())}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Company Name</label>
+                  <label className="block text-sm font-medium mb-2">{t('Company Name')}</label>
                   <Input
-                    placeholder="Enter company name (e.g., Apple Inc.)"
+                    placeholder={t('Enter company name (e.g., Apple Inc.)')}
                     value={newStockCompany}
                     onChange={(e) => setNewStockCompany(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddStock()}
@@ -268,7 +269,7 @@ export function StockWatchlist() {
                   className="flex-1"
                   disabled={addingStock}
                 >
-                  {addingStock ? 'Adding...' : 'Add Stock'}
+                  {addingStock ? t('Adding...') : t('Add Stock')}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -276,7 +277,7 @@ export function StockWatchlist() {
                   className="flex-1"
                   disabled={addingStock}
                 >
-                  Cancel
+                  {t('Cancel')}
                 </Button>
               </div>
             </div>
@@ -288,19 +289,19 @@ export function StockWatchlist() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Change</TableHead>
-                <TableHead className="text-right">% Change</TableHead>
-                <TableHead className="text-center">Actions</TableHead>
+                <TableHead>{t('Symbol')}</TableHead>
+                <TableHead>{t('Company')}</TableHead>
+                <TableHead className="text-right">{t('Price')}</TableHead>
+                <TableHead className="text-right">{t('Change')}</TableHead>
+                <TableHead className="text-right">{t('% Change')}</TableHead>
+                <TableHead className="text-center">{t('Actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStocks.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No stocks found matching your search.' : 'No stocks in your watchlist.'}
+                    {searchTerm ? t('No stocks found matching your search.') : t('No stocks in your watchlist.')}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -309,13 +310,13 @@ export function StockWatchlist() {
                     <TableCell className="font-mono font-semibold">{stock.symbol}</TableCell>
                     <TableCell>{stock.companyName}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {stock.currentPrice ? formatCurrency(stock.currentPrice) : 'N/A'}
+                      {stock.currentPrice ? formatCurrency(stock.currentPrice) : t('N/A')}
                     </TableCell>
                     <TableCell className={`text-right font-mono ${stock.change > 0 ? 'text-green-600' : stock.change < 0 ? 'text-red-600' : ''}`}>
-                      {stock.change !== null ? `${stock.change > 0 ? '+' : ''}${stock.change.toFixed(2)}` : 'N/A'}
+                      {stock.change !== null ? `${stock.change > 0 ? '+' : ''}${stock.change.toFixed(2)}` : t('N/A')}
                     </TableCell>
                     <TableCell className={`text-right font-mono ${stock.changePercent > 0 ? 'text-green-600' : stock.changePercent < 0 ? 'text-red-600' : ''}`}>
-                      {stock.changePercent !== null ? `${stock.changePercent > 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : 'N/A'}
+                      {stock.changePercent !== null ? `${stock.changePercent > 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%` : t('N/A')}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 
@@ -324,7 +325,7 @@ export function StockWatchlist() {
                         onClick={() => handleRemoveStock(stock.symbol)}
                         className="text-red-600 hover:text-red-700"
                       >
-                        Remove
+                        {t('Remove')}
                       </Button>
                     </TableCell>
                   </TableRow>

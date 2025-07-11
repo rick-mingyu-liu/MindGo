@@ -33,6 +33,7 @@ import { formatCurrency } from '@/utils/formatters'
 import { investmentAPI } from '@/utils/api'
 import Swal from 'sweetalert2'
 import { BarChart, Bar, Legend, ResponsiveContainer, CartesianGrid, XAxis as RechartsXAxis, YAxis as RechartsYAxis, Tooltip, LineChart, Line } from 'recharts';
+import { useTranslation } from 'next-i18next';
 
 interface StockDetailModalProps {
   symbol: string
@@ -111,6 +112,7 @@ export function StockDetailModal({
   changePercent,
   children 
 }: StockDetailModalProps) {
+  const { t } = useTranslation('common');
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [stockData, setStockData] = useState<any | null>(null)
@@ -271,16 +273,16 @@ export function StockDetailModal({
             </div>
           </DialogTitle>
           <DialogDescription>
-            Detailed information and analysis for the selected stock.
+            {t('Detailed information and analysis for the selected stock.')}
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="financials">Financials</TabsTrigger>
-            <TabsTrigger value="news">News</TabsTrigger>
-            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="overview">{t('Overview')}</TabsTrigger>
+            <TabsTrigger value="financials">{t('Financials')}</TabsTrigger>
+            <TabsTrigger value="news">{t('News')}</TabsTrigger>
+            <TabsTrigger value="analysis">{t('Analysis')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -295,26 +297,26 @@ export function StockDetailModal({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <BarChart3 className="w-5 h-5" />
-                      Key Metrics
+                      {t('Key Metrics')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Current Price</p>
-                        <p className="font-medium">{stockData?.quote?.c !== undefined ? stockData.quote.c : 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Current Price')}</p>
+                        <p className="font-medium">{stockData?.quote?.c !== undefined ? stockData.quote.c : t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Change</p>
+                        <p className="text-sm text-muted-foreground">{t('Change')}</p>
                         <p className="font-medium">{stockData?.quote?.d !== undefined ? stockData.quote.d : '0.00'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Change %</p>
+                        <p className="text-sm text-muted-foreground">{t('Change %')}</p>
                         <p className="font-medium">{stockData?.quote?.dp !== undefined ? stockData.quote.dp + '%' : '0.00%'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Day Range</p>
-                        <p className="font-medium">{stockData?.tradingInfo?.dayRange || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Day Range')}</p>
+                        <p className="font-medium">{stockData?.tradingInfo?.dayRange || t('N/A')}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -325,48 +327,48 @@ export function StockDetailModal({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Building className="w-5 h-5" />
-                      Company Information
+                      {t('Company Information')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Name</p>
-                        <p className="font-medium">{stockData?.companyInfo?.name || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Name')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.name || t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Market Cap</p>
-                        <p className="font-medium">{stockData?.tradingInfo?.marketCap !== undefined && stockData?.tradingInfo?.marketCap !== null ? stockData.tradingInfo.marketCap : 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Market Cap')}</p>
+                        <p className="font-medium">{stockData?.tradingInfo?.marketCap !== undefined && stockData?.tradingInfo?.marketCap !== null ? stockData.tradingInfo.marketCap : t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Industry</p>
-                        <p className="font-medium">{stockData?.companyInfo?.industry || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Industry')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.industry || t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Country</p>
-                        <p className="font-medium">{stockData?.companyInfo?.country || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Country')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.country || t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Website</p>
+                        <p className="text-sm text-muted-foreground">{t('Website')}</p>
                         <p className="font-medium">
                           {stockData?.companyInfo?.website ? (
                             <a href={stockData.companyInfo.website} target="_blank" rel="noopener noreferrer" className="underline">
                               {stockData.companyInfo.website}
                             </a>
-                          ) : 'N/A'}
+                          ) : t('N/A')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Exchange</p>
-                        <p className="font-medium">{stockData?.companyInfo?.exchange || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Exchange')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.exchange || t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">IPO Date</p>
-                        <p className="font-medium">{stockData?.companyInfo?.ipo || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('IPO Date')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.ipo || t('N/A')}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Ticker</p>
-                        <p className="font-medium">{stockData?.companyInfo?.ticker || 'N/A'}</p>
+                        <p className="text-sm text-muted-foreground">{t('Ticker')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.ticker || t('N/A')}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -377,15 +379,15 @@ export function StockDetailModal({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <TrendingUp className="w-5 h-5" />
-                      Price Trend (1 Month)
+                      {t('Price Trend (1 Month)')}
                     </CardTitle>
                     <CardDescription>
-                      Historical price movement for {symbol}
+                      {t('Historical price movement for {{symbol}}', { symbol })}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {loadingHistorical ? (
-                      <div className="text-center py-8">Loading...</div>
+                      <div className="text-center py-8">{t('Loading...')}</div>
                     ) : errorHistorical ? (
                       <div className="text-center py-8 text-red-600">{errorHistorical}</div>
                     ) : historicalData && historicalData.data && historicalData.data.o && historicalData.data.o.length > 0 ? (
@@ -396,13 +398,13 @@ export function StockDetailModal({
                         />
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-muted-foreground">No historical data available.</div>
+                      <div className="text-center py-8 text-muted-foreground">{t('No historical data available.')}</div>
                     )}
                   </CardContent>
                 </Card>
               </>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No data available.</div>
+              <div className="text-center py-8 text-muted-foreground">{t('No data available.')}</div>
             )}
           </TabsContent>
 
@@ -411,21 +413,21 @@ export function StockDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Financial Reports
+                  {t('Financial Reports')}
                 </CardTitle>
                 <CardDescription>
-                  Access quarterly and annual financial reports
+                  {t('Access quarterly and annual financial reports')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingFinancials ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">{t('Loading...')}</div>
                 ) : errorFinancials ? (
                   <div className="text-center py-8 text-red-600">{errorFinancials}</div>
                 ) : financials ? (
                   <FinancialsTable financials={financials} />
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No financials available.</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('No financials available.')}</div>
                 )}
               </CardContent>
             </Card>
@@ -436,15 +438,15 @@ export function StockDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Newspaper className="w-5 h-5" />
-                  Latest News
+                  {t('Latest News')}
                 </CardTitle>
                 <CardDescription>
-                  Recent news and announcements about {symbol}
+                  {t('Recent news and announcements about {{symbol}}', { symbol })}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingNews ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">{t('Loading...')}</div>
                 ) : errorNews ? (
                   <div className="text-center py-8 text-red-600">{errorNews}</div>
                 ) : news.length > 0 ? (
@@ -465,7 +467,7 @@ export function StockDetailModal({
                               <Button variant="outline" size="sm" asChild>
                                 <a href={item.url} target="_blank" rel="noopener noreferrer">
                                   <ExternalLink className="w-4 h-4 mr-2" />
-                                  Read More
+                                  {t('Read More')}
                                 </a>
                               </Button>
                             )}
@@ -475,7 +477,7 @@ export function StockDetailModal({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No news available.</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('No news available.')}</div>
                 )}
               </CardContent>
             </Card>
@@ -487,15 +489,15 @@ export function StockDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Recommendation Trends
+                  {t('Recommendation Trends')}
                 </CardTitle>
                 <CardDescription>
-                  Analyst recommendations over time
+                  {t('Analyst recommendations over time')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingAnalysis ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">{t('Loading...')}</div>
                 ) : errorAnalysis ? (
                   <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
                 ) : analysis && analysis.recommendations && analysis.recommendations.length > 0 ? (
@@ -506,13 +508,13 @@ export function StockDetailModal({
                       <RechartsYAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="buy" fill="#22c55e" name="Buy" />
-                      <Bar dataKey="hold" fill="#f59e0b" name="Hold" />
-                      <Bar dataKey="sell" fill="#ef4444" name="Sell" />
+                      <Bar dataKey="buy" fill="#22c55e" name={t('Buy')} />
+                      <Bar dataKey="hold" fill="#f59e0b" name={t('Hold')} />
+                      <Bar dataKey="sell" fill="#ef4444" name={t('Sell')} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No recommendation data available.</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('No recommendation data available.')}</div>
                 )}
               </CardContent>
             </Card>
@@ -521,15 +523,15 @@ export function StockDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5" />
-                  EPS Surprises (Last 4 Quarters)
+                  {t('EPS Surprises (Last 4 Quarters)')}
                 </CardTitle>
                 <CardDescription>
-                  Actual vs. estimated EPS for the last 4 quarters
+                  {t('Actual vs. estimated EPS for the last 4 quarters')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingAnalysis ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">{t('Loading...')}</div>
                 ) : errorAnalysis ? (
                   <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
                 ) : analysis && analysis.epsSurprises && analysis.epsSurprises.length > 0 ? (
@@ -537,26 +539,26 @@ export function StockDetailModal({
                     <table className="min-w-full text-xs border">
                       <thead>
                         <tr>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Period</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Actual EPS</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Estimate</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Surprise</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Period')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Actual EPS')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Estimate')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Surprise')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {analysis.epsSurprises.map((row: any, idx: number) => (
                           <tr key={idx} className="border-b">
-                            <td className="px-2 py-1">{row.period || row.date || 'N/A'}</td>
-                            <td className="px-2 py-1">{row.actual !== undefined ? row.actual : 'N/A'}</td>
-                            <td className="px-2 py-1">{row.estimate !== undefined ? row.estimate : 'N/A'}</td>
-                            <td className="px-2 py-1">{row.surprise !== undefined ? row.surprise : (row.actual !== undefined && row.estimate !== undefined ? (row.actual - row.estimate).toFixed(2) : 'N/A')}</td>
+                            <td className="px-2 py-1">{row.period || row.date || t('N/A')}</td>
+                            <td className="px-2 py-1">{row.actual !== undefined ? row.actual : t('N/A')}</td>
+                            <td className="px-2 py-1">{row.estimate !== undefined ? row.estimate : t('N/A')}</td>
+                            <td className="px-2 py-1">{row.surprise !== undefined ? row.surprise : (row.actual !== undefined && row.estimate !== undefined ? (row.actual - row.estimate).toFixed(2) : t('N/A'))}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No EPS surprise data available.</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('No EPS surprise data available.')}</div>
                 )}
               </CardContent>
             </Card>
@@ -565,15 +567,15 @@ export function StockDetailModal({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
-                  Earnings Calendar (Next Month)
+                  {t('Earnings Calendar (Next Month)')}
                 </CardTitle>
                 <CardDescription>
-                  Upcoming earnings events (US only)
+                  {t('Upcoming earnings events (US only)')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingAnalysis ? (
-                  <div className="text-center py-8">Loading...</div>
+                  <div className="text-center py-8">{t('Loading...')}</div>
                 ) : errorAnalysis ? (
                   <div className="text-center py-8 text-red-600">{errorAnalysis}</div>
                 ) : analysis && analysis.earningsCalendar && analysis.earningsCalendar.earnings && analysis.earningsCalendar.earnings.length > 0 ? (
@@ -581,26 +583,26 @@ export function StockDetailModal({
                     <table className="min-w-full text-xs border">
                       <thead>
                         <tr>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Date</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Time</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">EPS Estimate</th>
-                          <th className="px-2 py-1 border-b text-left font-semibold">Actual EPS</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Date')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Time')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('EPS Estimate')}</th>
+                          <th className="px-2 py-1 border-b text-left font-semibold">{t('Actual EPS')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {analysis.earningsCalendar.earnings.map((row: any, idx: number) => (
                           <tr key={idx} className="border-b">
-                            <td className="px-2 py-1">{row.date || 'N/A'}</td>
-                            <td className="px-2 py-1">{row.hour || row.time || 'N/A'}</td>
-                            <td className="px-2 py-1">{row.epsEstimate !== undefined ? row.epsEstimate : 'N/A'}</td>
-                            <td className="px-2 py-1">{row.epsActual !== undefined ? row.epsActual : 'N/A'}</td>
+                            <td className="px-2 py-1">{row.date || t('N/A')}</td>
+                            <td className="px-2 py-1">{row.hour || row.time || t('N/A')}</td>
+                            <td className="px-2 py-1">{row.epsEstimate !== undefined ? row.epsEstimate : t('N/A')}</td>
+                            <td className="px-2 py-1">{row.epsActual !== undefined ? row.epsActual : t('N/A')}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">No upcoming earnings events.</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('No upcoming earnings events.')}</div>
                 )}
               </CardContent>
             </Card>
@@ -612,22 +614,23 @@ export function StockDetailModal({
 }
 
 function FinancialsTable({ financials }: { financials: any }) {
+  const { t } = useTranslation('common');
   // Only show annual reports
   const reports = financials.annualReports || []
   const columns = [
-    { key: 'period', label: 'Year' },
-    { key: 'revenue', label: 'Revenue' },
-    { key: 'netIncome', label: 'Net Income' },
-    { key: 'eps', label: 'EPS' },
-    { key: 'assets', label: 'Assets' },
-    { key: 'liabilities', label: 'Liabilities' },
-    { key: 'filingUrl', label: 'Filing' },
+    { key: 'period', label: t('Year') },
+    { key: 'revenue', label: t('Revenue') },
+    { key: 'netIncome', label: t('Net Income') },
+    { key: 'eps', label: t('EPS') },
+    { key: 'assets', label: t('Assets') },
+    { key: 'liabilities', label: t('Liabilities') },
+    { key: 'filingUrl', label: t('Filing') },
   ]
   const getYear = (period: any) => {
-    if (!period) return 'N/A';
+    if (!period) return t('N/A');
     // Try to extract year from YYYY-MM-DD or YYYYMMDD or YYYY
     const match = String(period).match(/(\d{4})/);
-    return match ? match[1] : 'N/A';
+    return match ? match[1] : t('N/A');
   }
   return (
     <div>
@@ -642,7 +645,7 @@ function FinancialsTable({ financials }: { financials: any }) {
           </thead>
           <tbody>
             {reports.length === 0 ? (
-              <tr><td colSpan={columns.length} className="text-center py-4">No data</td></tr>
+              <tr><td colSpan={columns.length} className="text-center py-4">{t('No data')}</td></tr>
             ) : (
               reports.map((row: any, idx: number) => (
                 <tr key={idx} className="border-b">
@@ -651,14 +654,14 @@ function FinancialsTable({ financials }: { financials: any }) {
                       {col.key === 'filingUrl' ? (
                         row.filingUrl ? (
                           <a href={row.filingUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 flex items-center gap-1">
-                            View Filing
+                            {t('View Filing')}
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-10 10m0 0h7m-7 0v-7" /></svg>
                           </a>
-                        ) : 'N/A'
+                        ) : t('N/A')
                       ) : col.key === 'period' ? (
                         getYear(row.period)
                       ) : (
-                        row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : 'N/A'
+                        row[col.key] !== undefined && row[col.key] !== null ? row[col.key] : t('N/A')
                       )}
                     </td>
                   ))}
@@ -674,6 +677,7 @@ function FinancialsTable({ financials }: { financials: any }) {
 
 // OHLC Chart Component
 const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
+  const { t } = useTranslation('common');
   // Transform Finnhub data to the format expected by Recharts
   const chartData = data.t.map((timestamp: number, index: number) => ({
     date: new Date(timestamp * 1000).toLocaleDateString(),
@@ -707,7 +711,7 @@ const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
           stroke="#3b82f6" 
           strokeWidth={2}
           dot={false}
-          name="Open"
+          name={t('Open')}
         />
         <Line 
           type="monotone" 
@@ -715,7 +719,7 @@ const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
           stroke="#22c55e" 
           strokeWidth={2}
           dot={false}
-          name="High"
+          name={t('High')}
         />
         <Line 
           type="monotone" 
@@ -723,7 +727,7 @@ const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
           stroke="#ef4444" 
           strokeWidth={2}
           dot={false}
-          name="Low"
+          name={t('Low')}
         />
         <Line 
           type="monotone" 
@@ -731,7 +735,7 @@ const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
           stroke="#f59e0b" 
           strokeWidth={2}
           dot={false}
-          name="Close"
+          name={t('Close')}
         />
       </LineChart>
     </ResponsiveContainer>
