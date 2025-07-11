@@ -174,21 +174,32 @@ export default function Settings() {
   }
 
   const handleSavePreferences = async () => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: t('Are you sure?'),
+      text: t('Do you want to save all your preferences?'),
+      showCancelButton: true,
+      confirmButtonText: t('Yes, save them!'),
+      cancelButtonText: t('Cancel'),
+    });
+    if (!result.isConfirmed) return;
     try {
       setSaving(true)
       // In a real app, you'd save to API
       localStorage.setItem('userPreferences', JSON.stringify(preferences))
-      Swal.fire({
+      await Swal.fire({
         icon: 'success',
         title: t('Preferences saved successfully'),
-        text: t('Your preferences have been saved successfully!')
+        text: t('Your preferences have been saved successfully!'),
+        confirmButtonText: t('OK'),
       })
+      router.push('/')
     } catch (error) {
       console.error('Error saving preferences:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to save preferences',
-        text: 'There was an error saving your preferences. Please try again later.'
+        title: t('Failed to save preferences'),
+        text: t('There was an error saving your preferences. Please try again later.')
       })
     } finally {
       setSaving(false)
@@ -676,7 +687,16 @@ export default function Settings() {
             <div className="flex justify-end space-x-4">
               <Button
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    icon: 'question',
+                    title: t('Are you sure?'),
+                    text: t('Do you want to reset your preferences to defaults?'),
+                    showCancelButton: true,
+                    confirmButtonText: t('Yes, reset them!'),
+                    cancelButtonText: t('Cancel'),
+                  });
+                  if (!result.isConfirmed) return;
                   setPreferences({
                     currency: 'CAD',
                     dateFormat: 'MM/DD/YYYY',
@@ -695,12 +715,14 @@ export default function Settings() {
                       compactMode: false,
                       showCharts: true
                     }
-                  })
-                  Swal.fire({
+                  });
+                  await Swal.fire({
                     icon: 'success',
                     title: t('Preferences reset to defaults'),
-                    text: t('Your preferences have been reset to defaults successfully!')
-                  })
+                    text: t('Your preferences have been reset to defaults successfully!'),
+                    confirmButtonText: t('OK'),
+                  });
+                  router.push('/');
                 }}
                 className="aurora-border"
               >

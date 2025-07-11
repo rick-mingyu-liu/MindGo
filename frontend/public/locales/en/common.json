@@ -81,9 +81,12 @@
   "Try adjusting your filters": "Try adjusting your filters",
   "Start by adding your first transaction": "Start by adding your first transaction",
   "Are you sure?": "Are you sure?",
+  "Do you want to save all your preferences?": "Do you want to save all your preferences?",
+  "Yes, save them!": "Yes, save them!",
+  "Cancel": "Cancel",
+  "OK": "OK",
   "Are you sure you want to delete this transaction? This action cannot be undone.": "Are you sure you want to delete this transaction? This action cannot be undone.",
   "Yes, delete it!": "Yes, delete it!",
-  "Cancel": "Cancel",
   "Transaction deleted successfully": "Transaction deleted successfully",
   "The transaction has been deleted successfully.": "The transaction has been deleted successfully.",
   "Failed to delete transaction": "Failed to delete transaction",
@@ -265,5 +268,7 @@
   "There was an error verifying your email address.": "There was an error verifying your email address.",
   "Please wait while we verify your email address...": "Please wait while we verify your email address...",
   "Go to Login": "Go to Login",
-  "Register New Account": "Register New Account"
+  "Register New Account": "Register New Account",
+  "Do you want to reset your preferences to defaults?": "Do you want to reset your preferences to defaults?",
+  "Yes, reset them!": "Yes, reset them!"
 }
