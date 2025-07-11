@@ -334,7 +334,7 @@ export function StockDetailModal({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">{t('Name')}</p>
-                        <p className="font-medium">{stockData?.companyInfo?.name || t('N/A')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.name ? t(stockData.companyInfo.name) : t('N/A')}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('Market Cap')}</p>
@@ -342,7 +342,7 @@ export function StockDetailModal({
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('Industry')}</p>
-                        <p className="font-medium">{stockData?.companyInfo?.industry || t('N/A')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.industry ? t(stockData.companyInfo.industry) : t('N/A')}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('Country')}</p>
@@ -360,7 +360,7 @@ export function StockDetailModal({
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('Exchange')}</p>
-                        <p className="font-medium">{stockData?.companyInfo?.exchange || t('N/A')}</p>
+                        <p className="font-medium">{stockData?.companyInfo?.exchange ? t(stockData.companyInfo.exchange) : t('N/A')}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">{t('IPO Date')}</p>
