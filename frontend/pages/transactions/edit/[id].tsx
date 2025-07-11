@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface Transaction {
   id: number
@@ -38,6 +40,7 @@ const CATEGORIES = [
 export default function EditTransaction() {
   const router = useRouter()
   const { id } = router.query
+  const { t } = useTranslation('common');
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -67,8 +70,8 @@ export default function EditTransaction() {
       if (!targetTransaction) {
         Swal.fire({
           icon: 'error',
-          title: 'Transaction not found',
-          text: 'The transaction you are trying to edit does not exist.'
+          title: t('Transaction not found'),
+          text: t('The transaction you are trying to edit does not exist.')
         })
         router.push('/transactions')
         return
@@ -87,8 +90,8 @@ export default function EditTransaction() {
       console.error('Error fetching transaction:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to load transaction',
-        text: 'There was an error loading the transaction. Please try again later.'
+        title: t('Failed to load transaction'),
+        text: t('There was an error loading the transaction. Please try again later.')
       })
       router.push('/transactions')
     } finally {
@@ -102,8 +105,8 @@ export default function EditTransaction() {
     if (!formData.description || !formData.amount || !formData.category || !formData.date) {
       Swal.fire({
         icon: 'error',
-        title: 'Please fill in all required fields',
-        text: 'You must provide a description, amount, category, and date for the transaction.'
+        title: t('Please fill in all required fields'),
+        text: t('You must provide a description, amount, category, and date for the transaction.')
       })
       return
     }
@@ -121,16 +124,16 @@ export default function EditTransaction() {
 
       Swal.fire({
         icon: 'success',
-        title: 'Transaction updated successfully',
-        text: 'The transaction has been updated successfully.'
+        title: t('Transaction updated successfully'),
+        text: t('The transaction has been updated successfully.')
       })
       router.push('/transactions')
     } catch (error) {
       console.error('Error updating transaction:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to update transaction',
-        text: 'There was an error updating the transaction. Please try again later.'
+        title: t('Failed to update transaction'),
+        text: t('There was an error updating the transaction. Please try again later.')
       })
     } finally {
       setSaving(false)
@@ -138,7 +141,7 @@ export default function EditTransaction() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
+    if (!confirm(t('Are you sure you want to delete this transaction? This action cannot be undone.'))) {
       return
     }
 
@@ -147,16 +150,16 @@ export default function EditTransaction() {
       await api.delete(`/transactions/${id}`)
       Swal.fire({
         icon: 'success',
-        title: 'Transaction deleted successfully',
-        text: 'The transaction has been deleted successfully.'
+        title: t('Transaction deleted successfully'),
+        text: t('The transaction has been deleted successfully.')
       })
       router.push('/transactions')
     } catch (error) {
       console.error('Error deleting transaction:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to delete transaction',
-        text: 'There was an error deleting the transaction. Please try again later.'
+        title: t('Failed to delete transaction'),
+        text: t('There was an error deleting the transaction. Please try again later.')
       })
     } finally {
       setDeleting(false)
@@ -190,12 +193,12 @@ export default function EditTransaction() {
                   onClick={() => router.push('/transactions')}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Transactions
+                  {t('Back to Transactions')}
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Edit Transaction</h1>
+                  <h1 className="text-3xl font-bold">{t('Edit Transaction')}</h1>
                   <p className="text-muted-foreground">
-                    Update your transaction details
+                    {t('Update your transaction details')}
                   </p>
                 </div>
               </div>
@@ -207,42 +210,40 @@ export default function EditTransaction() {
           <div className="max-w-2xl mx-auto">
             <Card>
               <CardHeader>
-                <CardTitle>Edit Transaction</CardTitle>
-                <CardDescription>
-                  Update the details of your transaction
-                </CardDescription>
+                <CardTitle>{t('Edit Transaction')}</CardTitle>
+                <CardDescription>{t('Update the details of your transaction')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Description */}
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description *</Label>
+                    <Label htmlFor="description">{t('Description')} *</Label>
                     <Input
                       id="description"
+                      placeholder={t('e.g., Grocery shopping, Salary payment')}
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Enter transaction description"
                       required
                     />
                   </div>
 
                   {/* Amount */}
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Amount *</Label>
+                    <Label htmlFor="amount">{t('Amount')} *</Label>
                     <Input
                       id="amount"
                       type="number"
                       step="0.01"
                       min="0.01"
+                      placeholder={t('0.00')}
                       value={formData.amount}
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      placeholder="0.00"
                       required
                     />
                   </div>
                   {/* Currency */}
                   <div className="space-y-2">
-                    <Label htmlFor="currency">Currency *</Label>
+                    <Label htmlFor="currency">{t('Currency')} *</Label>
                     <Select
                       value={formData.currency}
                       onValueChange={(value) => setFormData({ ...formData, currency: value })}
@@ -251,19 +252,19 @@ export default function EditTransaction() {
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="CAD">CAD ($)</SelectItem>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="CNY">CNY (¥)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                        <SelectItem value="AUD">AUD (A$)</SelectItem>
+                        <SelectItem value="CAD">{t('CAD ($)')}</SelectItem>
+                        <SelectItem value="USD">{t('USD ($)')}</SelectItem>
+                        <SelectItem value="CNY">{t('CNY (¥)')}</SelectItem>
+                        <SelectItem value="EUR">{t('EUR (€)')}</SelectItem>
+                        <SelectItem value="GBP">{t('GBP (£)')}</SelectItem>
+                        <SelectItem value="AUD">{t('AUD (A$)')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Type */}
                   <div className="space-y-2">
-                    <Label htmlFor="type">Type *</Label>
+                    <Label htmlFor="type">{t('Type')} *</Label>
                     <Select
                       value={formData.type}
                       onValueChange={(value: 'income' | 'expense') => setFormData({ ...formData, type: value })}
@@ -272,15 +273,15 @@ export default function EditTransaction() {
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="income">Income</SelectItem>
-                        <SelectItem value="expense">Expense</SelectItem>
+                        <SelectItem value="expense">{t('Expense')}</SelectItem>
+                        <SelectItem value="income">{t('Income')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Category */}
                   <div className="space-y-2">
-                    <Label htmlFor="category">Category *</Label>
+                    <Label htmlFor="category">{t('Category')} *</Label>
                     <Select
                       value={formData.category}
                       onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -291,7 +292,7 @@ export default function EditTransaction() {
                       <SelectContent>
                         {CATEGORIES.map((category) => (
                           <SelectItem key={category} value={category}>
-                            {category}
+                            {t(category)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -300,7 +301,7 @@ export default function EditTransaction() {
 
                   {/* Date */}
                   <div className="space-y-2">
-                    <Label htmlFor="date">Date *</Label>
+                    <Label htmlFor="date">{t('Date')} *</Label>
                     <Input
                       id="date"
                       type="date"
@@ -311,33 +312,33 @@ export default function EditTransaction() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-6">
+                  <div className="flex gap-2 pt-6">
                     <Button
                       type="button"
                       variant="destructive"
                       onClick={handleDelete}
                       disabled={deleting}
+                      className="flex-1"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {deleting ? 'Deleting...' : 'Delete Transaction'}
+                      {t('Delete Transaction')}
                     </Button>
-                    
-                    <div className="flex space-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => router.push('/transactions')}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={saving}
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.push('/transactions')}
+                      className="flex-1"
+                    >
+                      {t('Cancel')}
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={saving}
+                      className="flex-1"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {t('Save Changes')}
+                    </Button>
                   </div>
                 </form>
               </CardContent>
@@ -347,4 +348,12 @@ export default function EditTransaction() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 

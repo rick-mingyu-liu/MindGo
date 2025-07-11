@@ -7,6 +7,8 @@ import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useTranslation } from 'next-i18next'
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
 
 export default function VerifyEmail() {
   const router = useRouter()
@@ -15,6 +17,7 @@ export default function VerifyEmail() {
   const [message, setMessage] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [hasAttemptedVerification, setHasAttemptedVerification] = useState(false)
+  const { t } = useTranslation()
 
   useEffect(() => {
     const { token } = router.query
@@ -63,22 +66,22 @@ export default function VerifyEmail() {
   const getStatusTitle = () => {
     switch (verificationStatus) {
       case 'success':
-        return 'Email Verified Successfully!'
+        return t('Email Verified Successfully!')
       case 'error':
-        return 'Verification Failed'
+        return t('Verification Failed')
       default:
-        return 'Verifying Your Email...'
+        return t('Verifying Your Email...')
     }
   }
 
   const getStatusDescription = () => {
     switch (verificationStatus) {
       case 'success':
-        return 'Your email has been verified. You can now log in to your MindGo account.'
+        return t('Your email has been verified. You can now log in to your MindGo account.')
       case 'error':
-        return message || 'There was an error verifying your email address.'
+        return message ? t(message) : t('There was an error verifying your email address.')
       default:
-        return 'Please wait while we verify your email address...'
+        return t('Please wait while we verify your email address...')
     }
   }
 
@@ -102,7 +105,7 @@ export default function VerifyEmail() {
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
+            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
           </div>
         </div>
 
@@ -124,14 +127,14 @@ export default function VerifyEmail() {
                 <div className="space-y-4">
                   <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                     <p className="text-sm text-green-800 dark:text-green-200">
-                      <strong>Email:</strong> {userEmail}
+                      <strong>{t('Email:')}</strong> {userEmail}
                     </p>
                   </div>
                   <Button 
                     onClick={() => router.push('/login')}
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                   >
-                    Continue to Login
+                    {t('Continue to Login')}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
@@ -149,14 +152,14 @@ export default function VerifyEmail() {
                       onClick={() => router.push('/login')}
                       className="w-full bg-green-600 hover:bg-green-700 text-white"
                     >
-                      Go to Login
+                      {t('Go to Login')}
                     </Button>
                     <Button 
                       onClick={() => router.push('/register')}
                       variant="outline"
                       className="w-full border-yellow-400 dark:border-yellow-500 text-yellow-700 dark:text-yellow-300"
                     >
-                      Register New Account
+                      {t('Register New Account')}
                     </Button>
                   </div>
                 </div>
@@ -173,4 +176,12 @@ export default function VerifyEmail() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  }
 } 

@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    net_worth DECIMAL(12,2) DEFAULT 0.00
+    net_worth DECIMAL(12,2) DEFAULT 0.00,
+    language VARCHAR(10) NOT NULL DEFAULT 'en'
 );
 
 -- Transactions table

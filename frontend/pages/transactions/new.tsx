@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface TransactionForm {
   description: string
@@ -48,6 +50,7 @@ export default function NewTransaction() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense')
+  const { t } = useTranslation('common');
   
   const {
     register,
@@ -73,7 +76,7 @@ export default function NewTransaction() {
         currency: data.currency,
       })
       
-      toast.success('Transaction added successfully!')
+      toast.success(t('Transaction added successfully!'))
       router.push('/')
       
     } catch (error) {
@@ -109,11 +112,11 @@ export default function NewTransaction() {
                   className="mr-4 flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Add Transaction</h1>
-                  <p className="text-muted-foreground">Record a new income or expense</p>
+                  <h1 className="text-3xl font-bold">{t('Add Transaction')}</h1>
+                  <p className="text-muted-foreground">{t('Record a new income or expense')}</p>
                 </div>
               </div>
             </div>
@@ -123,16 +126,16 @@ export default function NewTransaction() {
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Card>
             <CardHeader>
-              <CardTitle>Transaction Details</CardTitle>
+              <CardTitle>{t('Transaction Details')}</CardTitle>
               <CardDescription>
-                Fill in the details of your transaction
+                {t('Fill in the details of your transaction')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                 {/* Transaction Type */}
                 <div className="space-y-2">
-                  <Label>Transaction Type</Label>
+                  <Label>{t('Transaction Type')}</Label>
                   <div className="flex gap-4">
                     <Button
                       type="button"
@@ -141,7 +144,7 @@ export default function NewTransaction() {
                       className="flex-1"
                     >
                       <DollarSign className="w-4 h-4 mr-2" />
-                      Expense
+                      {t('Expense')}
                     </Button>
                     <Button
                       type="button"
@@ -150,22 +153,22 @@ export default function NewTransaction() {
                       className="flex-1"
                     >
                       <DollarSign className="w-4 h-4 mr-2" />
-                      Income
+                      {t('Income')}
                     </Button>
                   </div>
                 </div>
 
                 {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('Description')}</Label>
                   <Input
                     id="description"
-                    placeholder="e.g., Grocery shopping, Salary payment"
+                    placeholder={t('e.g., Grocery shopping, Salary payment')}
                     {...register('description', {
-                      required: 'Description is required',
+                      required: t('Description is required'),
                       minLength: {
                         value: 3,
-                        message: 'Description must be at least 3 characters',
+                        message: t('Description must be at least 3 characters'),
                       },
                     })}
                   />
@@ -176,17 +179,17 @@ export default function NewTransaction() {
 
                 {/* Amount */}
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount</Label>
+                  <Label htmlFor="amount">{t('Amount')}</Label>
                   <Input
                     id="amount"
                     type="number"
                     step="0.01"
-                    placeholder="0.00"
+                    placeholder={t('0.00')}
                     {...register('amount', {
-                      required: 'Amount is required',
+                      required: t('Amount is required'),
                       min: {
                         value: 0.01,
-                        message: 'Amount must be greater than 0',
+                        message: t('Amount must be greater than 0'),
                       },
                     })}
                   />
@@ -196,22 +199,22 @@ export default function NewTransaction() {
                 </div>
                 {/* Currency */}
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
+                  <Label htmlFor="currency">{t('Currency')}</Label>
                   <Select
                     defaultValue="CAD"
                     {...register('currency', { required: 'Currency is required' })}
                     onValueChange={(value) => setValue('currency', value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
+                      <SelectValue placeholder={t('Select currency')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CAD">CAD ($)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="CNY">CNY (¥)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="AUD">AUD (A$)</SelectItem>
+                      <SelectItem value="CAD">{t('CAD ($)')}</SelectItem>
+                      <SelectItem value="USD">{t('USD ($)')}</SelectItem>
+                      <SelectItem value="CNY">{t('CNY (¥)')}</SelectItem>
+                      <SelectItem value="EUR">{t('EUR (€)')}</SelectItem>
+                      <SelectItem value="GBP">{t('GBP (£)')}</SelectItem>
+                      <SelectItem value="AUD">{t('AUD (A$)')}</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.currency && (
@@ -221,15 +224,15 @@ export default function NewTransaction() {
 
                 {/* Category */}
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="category">{t('Category')}</Label>
                   <Select onValueChange={(value) => setValue('category', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder={t('Select a category')} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories[transactionType].map((category) => (
                         <SelectItem key={category} value={category}>
-                          {category}
+                          {t(category)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -241,7 +244,7 @@ export default function NewTransaction() {
 
                 {/* Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="date">Date</Label>
+                  <Label htmlFor="date">{t('Date')}</Label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -249,7 +252,7 @@ export default function NewTransaction() {
                       type="date"
                       className="pl-10"
                       {...register('date', {
-                        required: 'Date is required',
+                        required: t('Date is required'),
                       })}
                     />
                   </div>
@@ -260,10 +263,10 @@ export default function NewTransaction() {
 
                 {/* Notes */}
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Label htmlFor="notes">{t('Notes (optional)')}</Label>
                   <Textarea
                     id="notes"
-                    placeholder="Any additional notes about this transaction..."
+                    placeholder={t('Any additional notes about this transaction...')}
                     className="min-h-[100px]"
                     {...register('notes')}
                   />
@@ -279,18 +282,18 @@ export default function NewTransaction() {
                     onClick={() => router.push('/')}
                     className="flex-1"
                   >
-                    Cancel
+                    {t('Cancel')}
                   </Button>
                   <Button type="submit" className="flex-1" disabled={loading}>
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
+                        {t('Saving...')}
                       </>
                     ) : (
                       <>
                         <Save className="w-4 h-4 mr-2" />
-                        Save Transaction
+                        {t('Save Transaction')}
                       </>
                     )}
                   </Button>
@@ -302,4 +305,12 @@ export default function NewTransaction() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 

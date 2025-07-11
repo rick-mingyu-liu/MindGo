@@ -11,9 +11,10 @@ class AIPlanner {
    * Generate AI financial plan based on user prompt and financial data
    * @param {string} userPrompt - User's financial question or request
    * @param {Object} financialData - User's financial data (optional)
+   * @param {string} language - Language code (e.g., 'en', 'zh')
    * @returns {Promise<string>} AI-generated financial plan
    */
-  async generatePlan(userPrompt, financialData = null) {
+  async generatePlan(userPrompt, financialData = null, language = 'en') {
     try {
       if (!process.env.OPENAI_API_KEY) {
         throw new Error('OpenAI API key not configured');
@@ -25,7 +26,7 @@ class AIPlanner {
         context = this.buildFinancialContext(financialData);
       }
 
-      const systemPrompt = `
+      let systemPrompt = `
 You are a personal finance AI assistant that helps users make smart money decisions. Your tone should be professional but clear, encouraging, and easy to follow.
 
 Your goal is to provide concise, structured, and visually scannable financial plans that fit a web UI. Only include what’s essential.
@@ -58,6 +59,9 @@ Use markdown formatting.
 Add 2 blank lines between major sections.
 Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
 `;
+      if (language === 'zh') {
+        systemPrompt += '\n\nRespond in Mandarin Chinese.';
+      }
 
 
       const completion = await this.openai.chat.completions.create({
@@ -99,11 +103,16 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
     
     // Add form data if available
     if (financialData.formData) {
+      const income = (typeof financialData.formData.currentIncome === 'number' && !isNaN(financialData.formData.currentIncome)) ? financialData.formData.currentIncome : 0;
+      const expenses = (typeof financialData.formData.currentExpenses === 'number' && !isNaN(financialData.formData.currentExpenses)) ? financialData.formData.currentExpenses : 0;
+      const savings = income - expenses;
+      const timeline = financialData.formData.timeline || '';
+      const currency = financialData.formData.currency || 'USD';
       context += `**Current Financial Situation:**\n`;
-      context += `• Monthly Income: $${financialData.formData.currentIncome}\n`;
-      context += `• Monthly Expenses: $${financialData.formData.currentExpenses}\n`;
-      context += `• Monthly Savings: $${financialData.formData.currentIncome - financialData.formData.currentExpenses}\n`;
-      context += `• Timeline: ${financialData.formData.timeline}\n`;
+      context += `• Monthly Income: $${income}\n`;
+      context += `• Monthly Expenses: $${expenses}\n`;
+      context += `• Monthly Savings: $${savings}\n`;
+      context += `• Timeline: ${timeline}\n`;
       if (financialData.formData.additionalContext) {
         context += `• Additional Context: ${financialData.formData.additionalContext}\n`;
       }

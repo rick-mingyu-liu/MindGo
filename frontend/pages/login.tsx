@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useTheme } from '@/contexts/ThemeContext'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next'
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
 
 interface LoginForm {
   email: string
@@ -37,6 +39,22 @@ export default function Login() {
   } = useForm<LoginForm>()
 
   const email = watch('email')
+  const { t } = useTranslation()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const sysLang = navigator.language || navigator.languages?.[0] || 'en';
+        if (sysLang.startsWith('zh')) {
+          // Set app language to Mandarin
+          localStorage.setItem('userLanguage', 'zh');
+        } else {
+          localStorage.setItem('userLanguage', 'en');
+        }
+      }
+    }
+  }, []);
 
   const onSubmit = async (data: LoginForm) => {
     try {
@@ -52,8 +70,8 @@ export default function Login() {
       
       Swal.fire({
         icon: 'success',
-        title: 'Login successful!',
-        text: 'Welcome back!',
+        title: t('Login successful!'),
+        text: t('Welcome back!'),
         confirmButtonColor: '#facc15',
       })
       router.push('/')
@@ -131,12 +149,12 @@ export default function Login() {
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
+            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
             <button
               onClick={() => setShowIntro(true)}
               className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer transition-colors"
             >
-              Who are we?
+              {t('Who are we?')}
             </button>
           </div>
         </div>
@@ -144,9 +162,9 @@ export default function Login() {
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <Card className="shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center text-green-700 dark:text-green-400">Welcome back</CardTitle>
+              <CardTitle className="text-2xl text-center text-green-700 dark:text-green-400">{t('Welcome back')}</CardTitle>
               <CardDescription className="text-center">
-                Enter your credentials to access your account
+                {t('Enter your credentials to access your account')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -156,7 +174,7 @@ export default function Login() {
                     <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                        {loginError}
+                        {t(loginError)}
                       </p>
                     </div>
                   </div>
@@ -186,13 +204,13 @@ export default function Login() {
 
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
+                  <Label htmlFor="email">{t('Email address')}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder={t('Enter your email')}
                       className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       onInput={handleInputChange}
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -212,23 +230,23 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('Password')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
+                      placeholder={t('Enter your password')}
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       onInput={handleInputChange}
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
                       {...register('password', {
-                        required: 'Password is required',
+                        required: t('Password is required'),
                         minLength: {
                           value: 6,
-                          message: 'Password must be at least 6 characters',
+                          message: t('Password must be at least 6 characters'),
                         },
-                        validate: (value) => !/\s/.test(value) || 'Password cannot contain spaces',
+                        validate: (value) => !/\s/.test(value) || t('Password cannot contain spaces'),
                       })}
                     />
                     <Button
@@ -251,7 +269,7 @@ export default function Login() {
                 </div>
 
                 <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
-                  {loading ? 'Signing in...' : 'Sign in'}
+                  {loading ? t('Signing in...') : t('Sign in')}
                 </Button>
               </form>
 
@@ -262,7 +280,7 @@ export default function Login() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                      Don't have an account?
+                      {t("Don't have an account?")}
                     </span>
                   </div>
                 </div>
@@ -272,7 +290,7 @@ export default function Login() {
                   className="w-full mt-4 border-yellow-400 dark:border-yellow-500 text-yellow-700 dark:text-yellow-300"
                   onClick={() => router.push('/register')}
                 >
-                  Create new account
+                  {t('Create new account')}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -280,14 +298,14 @@ export default function Login() {
               {/* Demo credentials */}
               <div className="mt-6 p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary" className="bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950">Demo Account</Badge>
+                  <Badge variant="secondary" className="bg-yellow-400 dark:bg-yellow-500 text-yellow-900 dark:text-yellow-950">{t('Demo Account')}</Badge>
                 </div>
                 <div className="space-y-1 text-sm">
                   <p className="text-muted-foreground">
-                    <span className="font-medium">Email:</span> john.doe@example.com
+                    <span className="font-medium">{t('Email')}:</span> john.doe@example.com
                   </p>
                   <p className="text-muted-foreground">
-                    <span className="font-medium">Password:</span> password123
+                    <span className="font-medium">{t('Password')}:</span> password123
                   </p>
                 </div>
               </div>
@@ -309,8 +327,8 @@ export default function Login() {
                 className="h-15 w-auto"
               />
               <div>
-                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">Welcome to MindGo</h2>
-                <p className="text-sm text-muted-foreground">Your AI-Powered Personal Finance Companion</p>
+                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">{t('Welcome to MindGo')}</h2>
+                <p className="text-sm text-muted-foreground">{t('Your AI-Powered Personal Finance Companion')}</p>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -318,10 +336,9 @@ export default function Login() {
           <div className="space-y-6">
             {/* Mission Statement */}
             <div className="text-center py-4">
-              <h3 className="text-xl font-semibold mb-2 text-green-700 dark:text-green-400">Our Mission</h3>
+              <h3 className="text-xl font-semibold mb-2 text-green-700 dark:text-green-400">{t('Our Mission')}</h3>
               <p className="text-muted-foreground">
-                To democratize financial intelligence by providing everyone with AI-powered tools 
-                to make smarter financial decisions, track their progress, and achieve their goals.
+                {t('To democratize financial intelligence by providing everyone with AI-powered tools to make smarter financial decisions, track their progress, and achieve their goals.')}
               </p>
             </div>
 
@@ -333,9 +350,9 @@ export default function Login() {
                     <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">Smart Investment Tracking</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Smart Investment Tracking')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Real-time stock analysis, K-charts, and AI-powered investment insights to help you make informed decisions.
+                      {t('Real-time stock analysis, K-charts, and AI-powered investment insights to help you make informed decisions.')}
                     </p>
                   </div>
                 </div>
@@ -345,9 +362,9 @@ export default function Login() {
                     <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">Goal Setting & Tracking</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Goal Setting & Tracking')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Set financial goals, track your progress, and get personalized recommendations to stay on target.
+                      {t('Set financial goals, track your progress, and get personalized recommendations to stay on target.')}
                     </p>
                   </div>
                 </div>
@@ -357,9 +374,9 @@ export default function Login() {
                     <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">Expense Analytics</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Expense Analytics')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Comprehensive spending analysis with AI-powered insights to identify saving opportunities.
+                      {t('Comprehensive spending analysis with AI-powered insights to identify saving opportunities.')}
                     </p>
                   </div>
                 </div>
@@ -371,9 +388,9 @@ export default function Login() {
                     <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">AI Financial Planning</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('AI Financial Planning')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Get personalized financial plans, budget recommendations, and investment advice powered by AI.
+                      {t('Get personalized financial plans, budget recommendations, and investment advice powered by AI.')}
                     </p>
                   </div>
                 </div>
@@ -383,9 +400,9 @@ export default function Login() {
                     <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">Secure & Private</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Secure & Private')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Bank-level security with end-to-end encryption to keep your financial data safe and private.
+                      {t('Bank-level security with end-to-end encryption to keep your financial data safe and private.')}
                     </p>
                   </div>
                 </div>
@@ -395,9 +412,9 @@ export default function Login() {
                     <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">Community Driven</h4>
+                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Community Driven')}</h4>
                     <p className="text-sm text-muted-foreground">
-                      Join a community of financially conscious individuals sharing insights and strategies.
+                      {t('Join a community of financially conscious individuals sharing insights and strategies.')}
                     </p>
                   </div>
                 </div>
@@ -407,22 +424,22 @@ export default function Login() {
             {/* Call to Action */}
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                Ready to take control of your financial future? Start your journey with MindGo today.
+                {t('Ready to take control of your financial future? Start your journey with MindGo today.')}
               </p>
               <div className="flex gap-3 justify-center">
                 <Button onClick={() => router.push('/register')}>
-                  Get Started Free
+                  {t('Get Started Free')}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <Button variant="outline" onClick={() => setShowIntro(false)}>
-                  Continue to Login
+                  {t('Continue to Login')}
                 </Button>
               </div>
             </div>
 
             {/* Ads and Collaboration Opportunities */}
             <div className="border-t border-border pt-6">
-              <h3 className="text-xl font-semibold mb-4 text-green-700 dark:text-green-400">Partnership & Collaboration</h3>
+              <h3 className="text-xl font-semibold mb-4 text-green-700 dark:text-green-400">{t('Partnership & Collaboration')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="flex items-start gap-3">
@@ -430,10 +447,9 @@ export default function Login() {
                       <Volume2 className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-green-700 dark:text-green-400">Advertising Opportunities</h4>
+                      <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Advertising Opportunities')}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Reach our engaged community of financially conscious users. We offer targeted advertising solutions 
-                        for financial services, investment products, and educational content.
+                        {t('Reach our engaged community of financially conscious users. We offer targeted advertising solutions for financial services, investment products, and educational content.')}
                       </p>
                     </div>
                   </div>
@@ -445,10 +461,9 @@ export default function Login() {
                       <Users2 className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-green-700 dark:text-green-400">Collaboration Opportunities</h4>
+                      <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Collaboration Opportunities')}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Partner with us to create innovative financial solutions. We're open to strategic partnerships, 
-                        API integrations, and joint ventures that benefit our users.
+                        {t('Partner with us to create innovative financial solutions. We\'re open to strategic partnerships, API integrations, and joint ventures that benefit our users.')}
                       </p>
                     </div>
                   </div>
@@ -457,13 +472,13 @@ export default function Login() {
               
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Interested in advertising or collaboration? Get in touch with us.
+                  {t('Interested in advertising or collaboration? Get in touch with us.')}
                 </p>
                 <a 
                   href="mailto:mindgofinance@gmail.com" 
                   className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
                 >
-                  Contact Us
+                  {t('Contact Us')}
                   <Mail className="ml-2 h-4 w-4" />
                 </a>
               </div>
@@ -473,6 +488,14 @@ export default function Login() {
       </Dialog>
     </>
   )
+}
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  }
 }
 
 /* Add this to your global CSS (e.g., globals.css or in a <style jsx global>)

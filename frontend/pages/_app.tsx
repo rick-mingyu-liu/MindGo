@@ -4,8 +4,9 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import '@/styles/globals.css'
 import Head from 'next/head'
 import { Analytics } from "@vercel/analytics/react";
+import { appWithTranslation } from 'next-i18next';
 
-export default function App({ Component, pageProps }: AppProps) {
+function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider>
       <Head>
@@ -39,4 +40,6 @@ export default function App({ Component, pageProps }: AppProps) {
       />
     </ThemeProvider>
   )
-} 
+}
+
+export default appWithTranslation(MyApp); 

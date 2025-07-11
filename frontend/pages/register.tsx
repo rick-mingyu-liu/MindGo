@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useTheme } from '@/contexts/ThemeContext'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next'
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
 
 interface RegisterForm {
   first_name: string
@@ -80,6 +82,18 @@ export default function Register() {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [registerError, setRegisterError] = useState('')
+  const [language, setLanguage] = useState('en');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sysLang = navigator.language || navigator.languages?.[0] || 'en';
+      if (sysLang.startsWith('zh')) {
+        setLanguage('zh');
+      } else {
+        setLanguage('en');
+      }
+    }
+  }, []);
   
   const {
     register,
@@ -96,14 +110,17 @@ export default function Register() {
       setLoading(true)
       setRegisterError('')
       const { confirmPassword, ...registerData } = data
-      const response = await api.post('/auth/register', registerData)
+      const response = await api.post('/auth/register', {
+        ...registerData,
+        language,
+      })
       if (response.data.requiresVerification) {
         setRegistrationSuccess(true)
         setUserEmail(data.email)
         Swal.fire({
           icon: 'success',
-          title: 'Registration successful!',
-          text: 'Please check your email to verify your account.',
+          title: t('Registration successful!'),
+          text: t('Please check your email to verify your account.'),
         })
       } else {
         localStorage.setItem('token', response.data.token)
@@ -138,6 +155,8 @@ export default function Register() {
     }
   }
 
+  const { t } = useTranslation()
+
   if (registrationSuccess) {
     return (
       <>
@@ -159,7 +178,7 @@ export default function Register() {
                   priority
                 />
               </div>
-              <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
+              <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
             </div>
           </div>
 
@@ -170,23 +189,23 @@ export default function Register() {
                   <CheckCircle className="h-16 w-16 text-green-500" />
                 </div>
                 <CardTitle className="text-2xl text-green-700 dark:text-green-400">
-                  Check Your Email
+                  {t('Check Your Email')}
                 </CardTitle>
                 <CardDescription className="text-center">
-                  We've sent a verification link to your email address
+                  {t('We\'ve sent a verification link to your email address')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Email:</strong> {userEmail}
+                    <strong>{t('Email:')}</strong> {userEmail}
                   </p>
                 </div>
                 
                 <div className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
-                  <p>• Click the verification link in your email to activate your account</p>
-                  <p>• The link will expire in 30 minutes</p>
-                  <p>• Check your spam folder if you don't see the email</p>
+                  <p>{t('• Click the verification link in your email to activate your account')}</p>
+                  <p>{t('• The link will expire in 30 minutes')}</p>
+                  <p>{t('• Check your spam folder if you don\'t see the email')}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -194,7 +213,7 @@ export default function Register() {
                     onClick={() => router.push('/login')}
                     className="w-full bg-green-600 hover:bg-green-700 text-white"
                   >
-                    Continue to Login
+                    {t('Continue to Login')}
                   </Button>
                   <Button 
                     onClick={() => setRegistrationSuccess(false)}
@@ -202,7 +221,7 @@ export default function Register() {
                     className="w-full border-yellow-400 dark:border-yellow-500 text-yellow-700 dark:text-yellow-300"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Registration
+                    {t('Back to Registration')}
                   </Button>
                 </div>
               </CardContent>
@@ -233,31 +252,27 @@ export default function Register() {
                 priority
               />
             </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">MindGo</h1>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Create your account
-            </p>
+            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t('Create your account')}</p>
           </div>
         </div>
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
           <Card className="shadow-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center text-green-700 dark:text-green-400">Create account</CardTitle>
-              <CardDescription className="text-center">
-                Enter your information to create your account
-              </CardDescription>
+              <CardTitle className="text-2xl text-center text-green-700 dark:text-green-400">{t('Create account')}</CardTitle>
+              <CardDescription className="text-center">{t('Enter your information to create your account')}</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="first_name">First name</Label>
+                    <Label htmlFor="first_name">{t('First name')}</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="first_name"
-                        placeholder="First name"
+                        placeholder={t('First name')}
                         className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                         onInput={handleInputChange}
                         onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -277,12 +292,12 @@ export default function Register() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="last_name">Last name</Label>
+                    <Label htmlFor="last_name">{t('Last name')}</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="last_name"
-                        placeholder="Last name"
+                        placeholder={t('Last name')}
                         className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                         onInput={handleInputChange}
                         onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -303,13 +318,13 @@ export default function Register() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
+                  <Label htmlFor="email">{t('Email address')}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder={t('Enter your email')}
                       className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       onInput={handleInputChange}
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -330,13 +345,13 @@ export default function Register() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('Password')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Create a password"
+                      placeholder={t('Create a password')}
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       onInput={handleInputChange}
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -369,13 +384,13 @@ export default function Register() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <Label htmlFor="confirmPassword">{t('Confirm password')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
-                      placeholder="Confirm your password"
+                      placeholder={t('Confirm your password')}
                       className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                       onInput={handleInputChange}
                       onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
@@ -414,7 +429,7 @@ export default function Register() {
                 )}
 
                 <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
-                  {loading ? 'Creating account...' : 'Create account'}
+                  {loading ? t('Creating account...') : t('Create account')}
                 </Button>
               </form>
 
@@ -425,7 +440,7 @@ export default function Register() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-yellow-700 dark:text-yellow-300">
-                      Already have an account?
+                      {t('Already have an account?')}
                     </span>
                   </div>
                 </div>
@@ -436,7 +451,7 @@ export default function Register() {
                   onClick={() => router.push('/login')}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Sign in to existing account
+                  {t('Sign in to existing account')}
                 </Button>
               </div>
             </CardContent>
@@ -445,4 +460,12 @@ export default function Register() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  }
 } 

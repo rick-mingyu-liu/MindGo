@@ -23,7 +23,8 @@ const aiController = {
         additionalContext,
         riskTolerance,
         lifeStage,
-        investmentExperience
+        investmentExperience,
+        language
       } = req.body;
 
       // Use new format if available, otherwise fall back to old format
@@ -74,7 +75,7 @@ const aiController = {
       }
 
       // Generate AI plan
-      const aiResponse = await aiPlanner.generatePlan(comprehensivePrompt, financialData);
+      const aiResponse = await aiPlanner.generatePlan(comprehensivePrompt, financialData, language);
 
       // Parse the AI response to extract structured data
       const structuredResponse = aiController.parseAIResponse(aiResponse);

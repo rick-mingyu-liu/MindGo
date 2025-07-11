@@ -34,6 +34,8 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
 import { categories as categoryTypeMap } from './transactions/new';
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface FinancialSummary {
   period: string
@@ -107,6 +109,14 @@ const INDEX_CARDS = [
   },
 ];
 
+export async function getStaticProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
@@ -125,6 +135,7 @@ export default function Dashboard() {
   const [indexRows, setIndexRows] = useState<any[]>([]);
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState('');
+  const { t, i18n } = useTranslation('common');
 
   // Get user's default currency from localStorage (preferences)
   let defaultCurrency = 'CAD';
@@ -189,8 +200,8 @@ export default function Dashboard() {
       setHasJustCheckedIn(true);
       Swal.fire({
         icon: 'success',
-        title: 'Checked in!',
-        text: 'You have checked in for today. Keep up the streak! 🔥',
+        title: t('Checked in!'),
+        text: t('You have checked in for today. Keep up the streak! 🔥'),
         confirmButtonColor: '#facc15',
       });
     } catch (err: any) {
@@ -200,15 +211,15 @@ export default function Dashboard() {
       ) {
         Swal.fire({
           icon: 'info',
-          title: 'Already checked in',
-          text: 'You have already checked in today. Come back tomorrow!',
+          title: t('Already checked in'),
+          text: t('You have already checked in today. Come back tomorrow!'),
           confirmButtonColor: '#f87171',
         });
       } else {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: 'Unable to check in. Please try again later.',
+          title: t('Error'),
+          text: t('Unable to check in. Please try again later.'),
           confirmButtonColor: '#f87171',
         });
       }
@@ -227,15 +238,15 @@ export default function Dashboard() {
       await api.post('/auth/test-email');
       Swal.fire({
         icon: 'success',
-        title: 'Report Sent!',
-        text: 'Your financial report has been emailed to you. Check your inbox!',
+        title: t('Report Sent!'),
+        text: t('Your financial report has been emailed to you. Check your inbox!'),
         confirmButtonColor: '#facc15',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: 'Failed to send financial report.',
+        title: t('Error'),
+        text: t('Failed to send financial report.'),
         confirmButtonColor: '#f87171',
       });
     }
@@ -351,7 +362,7 @@ export default function Dashboard() {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
-          <p className="font-semibold text-foreground mb-2">{label}</p>
+          <p className="font-semibold text-foreground mb-2">{t(label)}</p>
           {payload.map((entry: any, index: number) => (
             <div key={index} className="flex items-center space-x-2 mb-1">
               <div 
@@ -359,7 +370,7 @@ export default function Dashboard() {
                 style={{ backgroundColor: entry.color }}
               />
               <span className="text-sm font-medium text-muted-foreground">
-                {entry.name}:
+                {t(entry.name)}:
               </span>
               <span className="text-sm font-bold" style={{ color: entry.color }}>
                 {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
@@ -396,14 +407,14 @@ export default function Dashboard() {
     return (
       <g transform={`translate(${x},${y})`}>
         <text 
-          x={0} 
+          x={10} 
           y={0} 
           dy={4} 
           textAnchor="end" 
           fill={resolvedTheme === 'dark' ? '#e5e7eb' : '#374151'}
           fontSize={11}
         >
-          {new Intl.NumberFormat('en-US', { style: 'currency', currency: summary?.targetCurrency || defaultCurrency, maximumFractionDigits: 0, minimumFractionDigits: 0 }).format(payload.value)}
+          {formatCurrency(payload.value, summary?.targetCurrency || defaultCurrency)}
         </text>
       </g>
     )
@@ -425,7 +436,7 @@ export default function Dashboard() {
     return (
       <g key={`label-${index}`}>
         <line x1={x} y1={y} x2={labelX} y2={labelY} stroke="hsl(var(--muted-foreground))" strokeWidth={1} opacity={0.6} />
-        <text x={labelX} y={labelY} fill="hsl(var(--foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={12} fontWeight={500}>{name}</text>
+        <text x={labelX} y={labelY} fill="hsl(var(--foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={12} fontWeight={500}>{t(name)}</text>
         <text x={labelX} y={labelY + 15} fill="hsl(var(--muted-foreground))" textAnchor={textAnchor} dominantBaseline={dominantBaseline} fontSize={10}>
           {sign}{formatCurrency(value, summary?.targetCurrency || defaultCurrency)} ({(percent * 100).toFixed(1)}%)
         </text>
@@ -454,47 +465,57 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div>
-                <h1 className="text-3xl font-bold aurora-text">MindGo</h1>
-                <p className="text-muted-foreground">Your financial overview</p>
+                <h1 className="text-3xl font-bold aurora-text">{t('MindGo')}</h1>
+                <p className="text-muted-foreground">{t('Your financial overview')}</p>
               </div>
               {/* Desktop actions */}
               <div className="hidden sm:flex gap-2 flex-wrap">
                 <ThemeToggle />
                 <Button
                   variant="outline"
+                  onClick={() => {
+                    const nextLang = i18n.language === 'en' ? 'zh' : 'en';
+                    i18n.changeLanguage(nextLang);
+                    router.push(router.asPath, router.asPath, { locale: nextLang });
+                  }}
+                >
+                  {i18n.language === 'en' ? '中文' : 'EN'}
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={handleRefresh}
                   disabled={refreshing}
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  {t('Refresh')}
                 </Button>
                 <Button
                   onClick={() => router.push('/transactions/new')}
                   className="aurora-glow"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Transaction
+                  {t('Add Transaction')}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => router.push('/ai-planning')}
                 >
                   <Brain className="w-4 h-4 mr-2" />
-                  AI Planning
+                  {t('AI Planning')}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleSendReport}
                 >
                   <Mail className="w-4 h-4 mr-2" />
-                  Send Report
+                  {t('Send Report')}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => router.push('/settings')}
                 >
                   <SettingsIcon className="w-4 h-4 mr-2" />
-                  Settings
+                  {t('Settings')}
                 </Button>
               </div>
               {/* Mobile actions: FAB + menu */}
@@ -515,19 +536,19 @@ export default function Dashboard() {
                   <SheetContent side="bottom" className="p-6 flex flex-col gap-4">
                     <Button onClick={handleRefresh} disabled={refreshing}>
                       <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                      Refresh
+                      {t('Refresh')}
                     </Button>
                     <Button onClick={() => router.push('/ai-planning')}>
                       <Brain className="w-4 h-4 mr-2" />
-                      AI Planning
+                      {t('AI Planning')}
                     </Button>
                     <Button onClick={handleSendReport}>
                       <Mail className="w-4 h-4 mr-2" />
-                      Send Report
+                      {t('Send Report')}
                     </Button>
                     <Button onClick={() => router.push('/settings')}>
                       <SettingsIcon className="w-4 h-4 mr-2" />
-                      Settings
+                      {t('Settings')}
                     </Button>
                   </SheetContent>
                 </Sheet>
@@ -549,18 +570,18 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-900 dark:text-white mb-2">
-                      Welcome to MindGo! 🎉
+                      {t('Welcome to MindGo! 🎉')}
                     </h3>
                     <p className="text-blue-800 dark:text-blue-200 mb-4">
-                      You've started your journey to financial freedom. Let's get you started with some basic steps:
+                      {t("You've started your journey to financial freedom. Let's get you started with some basic steps:")}
                     </p>
                     <ul className="text-blue-800 dark:text-blue-200 space-y-1 mb-4">
-                      <li>• <strong>Add your own transactions</strong> by clicking "Add Transaction"</li>
-                      <li>• <strong>Create savings goals</strong> to track your financial targets</li>
-                      <li>• <strong>Get AI-powered financial advice</strong> for personalized planning</li>
-                      <li>• <strong>Track your interested stocks</strong> to see how they perform and financial reports</li>
-                      <li>• <strong>Receive your weekly financial report</strong> to highlight your financial performance</li>
-                      <li>• <strong>Manage your settings</strong> to customize your experience</li>
+                      <li>• <strong>{t('Add your own transactions')}</strong> {t('by clicking "Add Transaction"')}</li>
+                      <li>• <strong>{t('Create savings goals')}</strong> {t('to track your financial targets')}</li>
+                      <li>• <strong>{t('Get AI-powered financial advice')}</strong> {t('for personalized planning')}</li>
+                      <li>• <strong>{t('Track your interested stocks')}</strong> {t('to see how they perform and financial reports')}</li>
+                      <li>• <strong>{t('Receive your weekly financial report')}</strong> {t('to highlight your financial performance')}</li>
+                      <li>• <strong>{t('Manage your settings')}</strong> {t('to customize your experience')}</li>
                     </ul>
                     <div className="flex gap-2 flex-col sm:flex-row">
                       <Button
@@ -568,7 +589,7 @@ export default function Dashboard() {
                         onClick={() => router.push('/transactions/new')}
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        Add Your First Transaction
+                        {t('Add Your First Transaction')}
                       </Button>
                       <Button
                         size="sm"
@@ -576,7 +597,7 @@ export default function Dashboard() {
                         onClick={() => router.push('/goals')}
                       >
                         <Target className="w-4 h-4 mr-2" />
-                        Create a Goal
+                        {t('Create a Goal')}
                       </Button>
                       <Button
                         size="sm"
@@ -584,7 +605,7 @@ export default function Dashboard() {
                         onClick={() => router.push('/ai-planning')}
                       >
                         <Brain className="w-4 h-4 mr-2" />
-                        AI Planning
+                        {t('AI Planning')}
                       </Button>
                       <Button
                         size="sm"
@@ -592,7 +613,7 @@ export default function Dashboard() {
                         onClick={() => router.push('/investments')}
                       >
                         <Eye className="w-4 h-4 mr-2" />
-                        Add to Watchlist
+                        {t('Add to Watchlist')}
                       </Button>
                       <Button
                         size="sm"
@@ -600,7 +621,7 @@ export default function Dashboard() {
                         onClick={handleSendReport}
                       >
                         <Mail className="w-4 h-4 mr-2" />
-                        Send Report
+                        {t('Send Report')}
                       </Button>
                     </div>
                   </div>
@@ -626,7 +647,7 @@ export default function Dashboard() {
                 >
                   <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      {!hasCheckedInToday ? 'Check In' : 'Streak'}
+                      {!hasCheckedInToday ? t('Check In') : t('Streak')}
                       {hasCheckedInToday && (
                         <Sparkles className="h-4 w-4 text-yellow-500 animate-pulse" />
                       )}
@@ -641,7 +662,7 @@ export default function Dashboard() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {!hasCheckedInToday ? 'Click to check in' : 'Days in a row'}
+                      {!hasCheckedInToday ? t('Click to check in') : t('Days in a row')}
                     </p>
                   </CardContent>
                 </button>
@@ -649,7 +670,7 @@ export default function Dashboard() {
               {/* Total Income Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Income</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('Total Income')}</CardTitle>
                   <TrendingUp className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
@@ -657,14 +678,14 @@ export default function Dashboard() {
                     {formatCurrency(summary?.totalIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Last 4 months
+                    {t('Last 4 months')}
                   </p>
                 </CardContent>
               </Card>
               {/* Total Expenses Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('Total Expenses')}</CardTitle>
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
@@ -672,14 +693,14 @@ export default function Dashboard() {
                     {formatCurrency(summary?.totalExpenses || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Last 4 months
+                    {t('Last 4 months')}
                   </p>
                 </CardContent>
               </Card>
               {/* Net Income Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Net Income</CardTitle>
+                  <CardTitle className="text-sm font-medium">{t('Net Income')}</CardTitle>
                   <DollarSign className="h-4 w-4 text-blue-600" />
                 </CardHeader>
                 <CardContent>
@@ -687,7 +708,7 @@ export default function Dashboard() {
                     {formatCurrency(summary?.netIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Last 4 months
+                    {t('Last 4 months')}
                   </p>
                 </CardContent>
               </Card>
@@ -695,13 +716,13 @@ export default function Dashboard() {
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5 flex flex-col items-center justify-center text-center px-2">
                 <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    Active Goals
+                    {t('Active Goals')}
                     <Target className="h-4 w-4 text-orange-600" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center">
                   <div className="text-2xl font-bold">{goals.length}</div>
-                  <p className="text-xs text-muted-foreground">Savings goals</p>
+                  <p className="text-xs text-muted-foreground">{t('Savings goals')}</p>
                 </CardContent>
               </Card>
             </div>
@@ -715,29 +736,29 @@ export default function Dashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    4-Month Income vs Expenses
+                    {t('4-Month Income vs Expenses')}
                   </CardTitle>
                   <CardDescription>
-                    Track your financial trends over time
+                    {t('Track your financial trends over time')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {/* Summary Statistics */}
                   <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-card rounded-lg shadow hover:shadow-md transition-shadow border border-border dark:shadow-white/10 dark:hover:shadow-white/20 relative z-0">
                     <div className="text-center">
-                      <p className="text-sm font-medium text-muted-foreground">Avg Income</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('Avg Income')}</p>
                       <p className="text-lg font-bold text-green-600">
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-muted-foreground">Avg Expenses</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('Avg Expenses')}</p>
                       <p className="text-lg font-bold text-red-600">
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-muted-foreground">Avg Net</p>
+                      <p className="text-sm font-medium text-muted-foreground">{t('Avg Net')}</p>
                       <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                         {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
                       </p>
@@ -770,7 +791,7 @@ export default function Dashboard() {
                         <XAxis
                           dataKey="month"
                           tickFormatter={(str) => {
-                            return str.split(' ')[0]
+                            return t(str.split(' ')[0]);
                           }}
                           tick={{
                             fill: resolvedTheme === 'dark' ? '#e5e7eb' : '#374151',
@@ -823,15 +844,15 @@ export default function Dashboard() {
                     <div className="flex items-center space-x-6">
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-sm font-medium text-foreground">Income</span>
+                        <span className="text-sm font-medium text-foreground">{t('Income')}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-sm font-medium text-foreground">Expenses</span>
+                        <span className="text-sm font-medium text-foreground">{t('Expenses')}</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="text-sm font-medium text-foreground">Net</span>
+                        <span className="text-sm font-medium text-foreground">{t('Net')}</span>
                       </div>
                     </div>
                   </div>
@@ -841,9 +862,9 @@ export default function Dashboard() {
               {/* Category Breakdown */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader>
-                  <CardTitle>Spending by Category</CardTitle>
+                  <CardTitle>{t('Spending by Category')}</CardTitle>
                   <CardDescription>
-                    Breakdown of your expenses by category
+                    {t('Breakdown of your expenses by category')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -865,7 +886,7 @@ export default function Dashboard() {
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} style={{ cursor: 'pointer' }} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value) => formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)} />
+                        <Tooltip formatter={(value, name) => [`${formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)}`, t(typeof name === 'string' ? name : '')]} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -880,7 +901,7 @@ export default function Dashboard() {
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: COLORS[index % COLORS.length] }}
                             />
-                            <span className="text-foreground whitespace-normal">{entry.name}</span>
+                            <span className="text-foreground whitespace-normal">{t(entry.name)}</span>
                             <span className="text-muted-foreground ml-1">
                               {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
                             </span>
@@ -897,13 +918,13 @@ export default function Dashboard() {
               <CardContent className="pt-6">
                 <div className="text-center py-8">
                   <Info className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Financial Data Yet</h3>
+                  <h3 className="text-lg font-semibold mb-2">{t('No Financial Data Yet')}</h3>
                   <p className="text-muted-foreground mb-4">
-                    Start by adding your first transaction to see your financial overview
+                    {t('Start by adding your first transaction to see your financial overview')}
                   </p>
                   <Button onClick={() => router.push('/transactions/new')}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Transaction
+                    {t('Add Your First Transaction')}
                   </Button>
                 </div>
               </CardContent>
@@ -917,15 +938,15 @@ export default function Dashboard() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Savings Goals</CardTitle>
-                    <CardDescription>Track your financial goals</CardDescription>
+                    <CardTitle>{t('Savings Goals')}</CardTitle>
+                    <CardDescription>{t('Track your financial goals')}</CardDescription>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => router.push('/goals')}
                   >
-                    View All
+                    {t('View All')}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -945,7 +966,7 @@ export default function Dashboard() {
                           </div>
                           <Progress value={progress} className="h-2" />
                           <p className="text-xs text-muted-foreground">
-                            {progress.toFixed(1)}% complete
+                            {progress.toFixed(1)}% {t('complete')}
                           </p>
                         </div>
                       );
@@ -954,13 +975,13 @@ export default function Dashboard() {
                 ) : (
                   <div className="text-center py-6">
                     <Target className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground mb-4">No savings goals yet</p>
+                    <p className="text-muted-foreground mb-4">{t('No savings goals yet')}</p>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => router.push('/goals')}
                     >
-                      Create Your First Goal
+                      {t('Create Your First Goal')}
                     </Button>
                   </div>
                 )}
@@ -972,22 +993,22 @@ export default function Dashboard() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Investment Watchlist</CardTitle>
-                    <CardDescription>Track your favorite stocks</CardDescription>
+                    <CardTitle>{t('Investment Watchlist')}</CardTitle>
+                    <CardDescription>{t('Track your favorite stocks')}</CardDescription>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => router.push('/investments')}
                   >
-                    View All
+                    {t('View All')}
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {indexLoading ? (
-                  <div className="text-center py-6">Loading...</div>
+                  <div className="text-center py-6">{t('Loading...')}</div>
                 ) : indexError ? (
                   <div className="text-center py-6 text-red-600">{indexError}</div>
                 ) : (
@@ -995,8 +1016,8 @@ export default function Dashboard() {
                     {indexRows.map((idx) => (
                       <div key={idx.symbol} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/20 dark:hover:bg-white/5 dark:hover:border-white/20">
                         <div>
-                          <div className="font-medium">{idx.label}</div>
-                          <div className="text-sm text-muted-foreground">{idx.name}</div>
+                          <div className="font-medium">{t(idx.label)}</div>
+                          <div className="text-sm text-muted-foreground">{t(idx.name)}</div>
                         </div>
                         <div className="text-right">
                           <div className="font-medium">
@@ -1026,15 +1047,15 @@ export default function Dashboard() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Recent Transactions</CardTitle>
-                  <CardDescription>Your latest financial activities</CardDescription>
+                  <CardTitle>{t('Recent Transactions')}</CardTitle>
+                  <CardDescription>{t('Your latest financial activities')}</CardDescription>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/transactions')}
                 >
-                  View All
+                  {t('View All')}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
@@ -1049,7 +1070,7 @@ export default function Dashboard() {
                         <div>
                           <p className="font-medium">{transaction.description}</p>
                           <p className="text-sm text-muted-foreground">
-                            {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
+                            {t(transaction.category)} • {new Date(transaction.date).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -1063,7 +1084,7 @@ export default function Dashboard() {
                             )}
                           </p>
                           <Badge variant="secondary" className="text-xs">
-                            {transaction.type}
+                            {t(transaction.type)}
                           </Badge>
                         </div>
                         <Button
@@ -1081,13 +1102,13 @@ export default function Dashboard() {
               ) : (
                 <div className="text-center py-6">
                   <DollarSign className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground mb-4">No transactions yet</p>
+                  <p className="text-muted-foreground mb-4">{t('No transactions yet')}</p>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => router.push('/transactions/new')}
                   >
-                    Add Your First Transaction
+                    {t('Add Your First Transaction')}
                   </Button>
                 </div>
               )}

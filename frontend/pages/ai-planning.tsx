@@ -15,6 +15,8 @@ import ReactMarkdown from 'react-markdown'
 import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface PlanningForm {
   financialGoal: string
@@ -47,6 +49,7 @@ function extractTickers(text: string): string[] {
 }
 
 export default function AIPlanning() {
+  const { t, i18n } = useTranslation('common');
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [planningResponse, setPlanningResponse] = useState<PlanningResponse | null>(null)
@@ -104,6 +107,20 @@ export default function AIPlanning() {
     // eslint-disable-next-line
   }, [showMoveGoal]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const prefs = localStorage.getItem('userPreferences');
+      if (prefs) {
+        try {
+          const lang = JSON.parse(prefs).language;
+          if (lang && i18n.language !== lang) {
+            i18n.changeLanguage(lang);
+          }
+        } catch {}
+      }
+    }
+  }, [i18n]);
+
   const onSubmit = async (data: PlanningForm) => {
     try {
       setLoading(true)
@@ -118,23 +135,28 @@ export default function AIPlanning() {
         GBP: '£',
         AUD: 'A$'
       };
-      const symbol = Object.prototype.hasOwnProperty.call(currencySymbols, data.currency) ? currencySymbols[data.currency as keyof typeof currencySymbols] : data.currency;
-      const currencyNote = `All responses should use the currency symbol (${symbol}) for ${data.currency}. For example, use '${symbol}10,000' instead of '${data.currency} 10,000'.`;
+      const safeCurrency = data.currency || 'USD';
+      const symbol = Object.prototype.hasOwnProperty.call(currencySymbols, safeCurrency) ? currencySymbols[safeCurrency as keyof typeof currencySymbols] : safeCurrency;
+      const currencyNote = `All responses should use the currency symbol (${symbol}) for ${safeCurrency}. For example, use '${symbol}10,000' instead of '${safeCurrency} 10,000'.`;
+      const safeCurrentIncome = parseFloat(data.currentIncome) || 0;
+      const safeCurrentExpenses = parseFloat(data.currentExpenses) || 0;
       const newData = {
         ...data,
         additionalContext: (data.additionalContext ? data.additionalContext + '\n' : '') + currencyNote,
-        currentIncome: parseFloat(data.currentIncome),
-        currentExpenses: parseFloat(data.currentExpenses),
+        currentIncome: safeCurrentIncome,
+        currentExpenses: safeCurrentExpenses,
+        currency: safeCurrency,
         riskTolerance: planningPrefs.riskTolerance,
         lifeStage: planningPrefs.lifeStage,
         investmentExperience: planningPrefs.investmentExperience,
+        language: i18n.language // Add language to payload
       };
       const response = await api.post('/ai/plan', newData)
-      setPlanningResponse(response.data)
       Swal.fire({
         icon: 'success',
-        title: 'AI analysis completed!',
+        title: t('AI analysis completed!'),
       })
+      setPlanningResponse(response.data)
     } catch (error) {
       console.error('AI planning error:', error)
       // Error handling is done in api interceptor
@@ -144,7 +166,19 @@ export default function AIPlanning() {
   }
 
   const handleQuickPrompt = (prompt: string) => {
-    setValue('financialGoal', prompt)
+    // Map English prompts to Mandarin if the language is zh
+    const zhPrompts: Record<string, string> = {
+      "I want to save $20,000 for an emergency fund within 1 year": "我想在一年内为应急基金存下$20,000",
+      "Help me plan to buy a $300,000 house with a 20% down payment in 5 years": "帮我规划五年内以20%首付购买$300,000的房子",
+      "I need to pay off $15,000 in credit card debt as quickly as possible": "我需要尽快还清$15,000信用卡债务",
+      "I want to start investing for retirement and have $1M by age 65": "我想为退休投资，65岁时拥有$100万",
+      "Help me create a budget to save for a $10,000 vacation in 2 years": "帮我制定预算，两年内为$10,000的假期存钱"
+    };
+    if (i18n.language === 'zh' && zhPrompts[prompt]) {
+      setValue('financialGoal', zhPrompts[prompt]);
+    } else {
+      setValue('financialGoal', prompt);
+    }
   }
 
   const onMoveGoalSubmit = async (data: any) => {
@@ -169,7 +203,7 @@ export default function AIPlanning() {
       });
       Swal.fire({
         icon: 'success',
-        title: 'Goal moved to active goals!',
+        title: t('Goal moved to active goals!'),
       });
       setShowMoveGoal(false);
       resetMoveGoal();
@@ -203,10 +237,9 @@ export default function AIPlanning() {
   return (
     <>
       <Head>
-        <title>AI Financial Planning - Personal Finance App</title>
-        <meta name="description" content="Get AI-powered financial planning advice" />
+        <title>{t('AI Financial Planning')} - MindGo</title>
+        <meta name="description" content={t('Get AI-powered financial planning advice')} />
       </Head>
-
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="border-b bg-card">
@@ -219,11 +252,11 @@ export default function AIPlanning() {
                   className="mr-4 flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">AI Financial Planning</h1>
-                  <p className="text-muted-foreground">Get personalized financial advice powered by AI</p>
+                  <h1 className="text-3xl font-bold">{t('AI Financial Planning')}</h1>
+                  <p className="text-muted-foreground">{t('Get personalized financial advice powered by AI')}</p>
                 </div>
               </div>
             </div>
@@ -237,59 +270,59 @@ export default function AIPlanning() {
               {planningPrefs && (
                 <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle>Your Financial Planning Preferences</CardTitle>
+                    <CardTitle>{t('Your Financial Planning Preferences')}</CardTitle>
                     <CardDescription>
-                      These preferences are used to personalize your AI financial planning and investment suggestions.
+                      {t('These preferences are used to personalize your AI financial planning and investment suggestions.')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {editingPrefs && prefsDraft ? (
                       <div className="flex flex-col gap-4">
                         <div>
-                          <Label>Risk Tolerance</Label>
+                          <Label>{t('Risk Tolerance')}</Label>
                           <Select value={prefsDraft.riskTolerance} onValueChange={v => setPrefsDraft(p => p ? { ...p, riskTolerance: v } : p)}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="low">Low</SelectItem>
-                              <SelectItem value="moderate">Moderate</SelectItem>
-                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="low">{t('Low')}</SelectItem>
+                              <SelectItem value="moderate">{t('Moderate')}</SelectItem>
+                              <SelectItem value="high">{t('High')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label>Life Stage</Label>
+                          <Label>{t('Life Stage')}</Label>
                           <Select value={prefsDraft.lifeStage} onValueChange={v => setPrefsDraft(p => p ? { ...p, lifeStage: v } : p)}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="student">Student</SelectItem>
-                              <SelectItem value="worker">Worker</SelectItem>
-                              <SelectItem value="retired">Retired</SelectItem>
+                              <SelectItem value="student">{t('Student')}</SelectItem>
+                              <SelectItem value="worker">{t('Worker')}</SelectItem>
+                              <SelectItem value="retired">{t('Retired')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label>Investment Experience</Label>
+                          <Label>{t('Investment Experience')}</Label>
                           <Select value={prefsDraft.investmentExperience} onValueChange={v => setPrefsDraft(p => p ? { ...p, investmentExperience: v } : p)}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="beginner">Beginner</SelectItem>
-                              <SelectItem value="intermediate">Intermediate</SelectItem>
-                              <SelectItem value="advanced">Advanced</SelectItem>
+                              <SelectItem value="beginner">{t('Beginner')}</SelectItem>
+                              <SelectItem value="intermediate">{t('Intermediate')}</SelectItem>
+                              <SelectItem value="advanced">{t('Advanced')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <Button onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? 'Saving...' : 'Save'}</Button>
-                          <Button variant="outline" onClick={handleCancelPrefs} disabled={savingPrefs}>Cancel</Button>
+                          <Button onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? t('Saving...') : t('Save')}</Button>
+                          <Button variant="outline" onClick={handleCancelPrefs} disabled={savingPrefs}>{t('Cancel')}</Button>
                         </div>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-2">
-                        <div><b>Risk Tolerance:</b> {planningPrefs.riskTolerance.charAt(0).toUpperCase() + planningPrefs.riskTolerance.slice(1)}</div>
-                        <div><b>Life Stage:</b> {planningPrefs.lifeStage.charAt(0).toUpperCase() + planningPrefs.lifeStage.slice(1)}</div>
-                        <div><b>Investment Experience:</b> {planningPrefs.investmentExperience.charAt(0).toUpperCase() + planningPrefs.investmentExperience.slice(1)}</div>
+                        <div><b>{t('Risk Tolerance')}:</b> {t(planningPrefs.riskTolerance.charAt(0).toUpperCase() + planningPrefs.riskTolerance.slice(1))}</div>
+                        <div><b>{t('Life Stage')}:</b> {t(planningPrefs.lifeStage.charAt(0).toUpperCase() + planningPrefs.lifeStage.slice(1))}</div>
+                        <div><b>{t('Investment Experience')}:</b> {t(planningPrefs.investmentExperience.charAt(0).toUpperCase() + planningPrefs.investmentExperience.slice(1))}</div>
                         <div className="flex justify-end mt-2">
-                          <Button size="sm" variant="outline" onClick={handleEditPrefs}>Edit</Button>
+                          <Button size="sm" variant="outline" onClick={handleEditPrefs}>{t('Edit')}</Button>
                         </div>
                       </div>
                     )}
@@ -300,25 +333,25 @@ export default function AIPlanning() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Brain className="h-5 w-5" />
-                    Financial Planning Request
+                    {t('Financial Planning Request')}
                   </CardTitle>
                   <CardDescription>
-                    Describe your financial situation and goals to get personalized AI advice
+                    {t('Describe your financial situation and goals to get personalized AI advice')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
                     <div className="space-y-2">
-                      <Label htmlFor="financialGoal">What's your main financial goal?</Label>
+                      <Label htmlFor="financialGoal">{t("What's your main financial goal?")}</Label>
                       <Textarea
                         id="financialGoal"
-                        placeholder="e.g., Save $50,000 for a down payment on a house in 3 years"
+                        placeholder={t('e.g., Save $50,000 for a down payment on a house in 3 years')}
                         className="min-h-[80px] w-full rounded-lg py-3 px-4 text-base"
                         {...register('financialGoal', {
-                          required: 'Financial goal is required',
+                          required: t('Financial goal is required'),
                           minLength: {
                             value: 10,
-                            message: 'Please provide more details about your goal',
+                            message: t('Please provide more details about your goal'),
                           },
                         })}
                       />
@@ -326,20 +359,19 @@ export default function AIPlanning() {
                         <p className="text-sm text-destructive">{errors.financialGoal.message}</p>
                       )}
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="currentIncome">Monthly Income</Label>
+                        <Label htmlFor="currentIncome">{t('Monthly Income')}</Label>
                         <Input
                           id="currentIncome"
                           type="number"
-                          placeholder="5000"
+                          placeholder={t('5000')}
                           className="w-full rounded-lg py-3 px-4 text-base"
                           {...register('currentIncome', {
-                            required: 'Current income is required',
+                            required: t('Current income is required'),
                             min: {
                               value: 0,
-                              message: 'Income must be positive',
+                              message: t('Income must be positive'),
                             },
                           })}
                         />
@@ -347,19 +379,18 @@ export default function AIPlanning() {
                           <p className="text-sm text-destructive">{errors.currentIncome.message}</p>
                         )}
                       </div>
-
                       <div className="space-y-2">
-                        <Label htmlFor="currentExpenses">Monthly Expenses</Label>
+                        <Label htmlFor="currentExpenses">{t('Monthly Expenses')}</Label>
                         <Input
                           id="currentExpenses"
                           type="number"
-                          placeholder="3000"
+                          placeholder={t('3000')}
                           className="w-full rounded-lg py-3 px-4 text-base"
                           {...register('currentExpenses', {
-                            required: 'Current expenses are required',
+                            required: t('Current expenses are required'),
                             min: {
                               value: 0,
-                              message: 'Expenses must be positive',
+                              message: t('Expenses must be positive'),
                             },
                           })}
                         />
@@ -368,85 +399,80 @@ export default function AIPlanning() {
                         )}
                       </div>
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="timeline">Timeline for achieving your goal</Label>
+                      <Label htmlFor="timeline">{t('Timeline for achieving your goal')}</Label>
                       <Select onValueChange={(value) => setValue('timeline', value)}>
                         <SelectTrigger className="w-full rounded-lg py-3 px-4 text-base">
-                          <SelectValue placeholder="Select timeline" />
+                          <SelectValue placeholder={t('Select timeline')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="6 months">6 months</SelectItem>
-                          <SelectItem value="1 year">1 year</SelectItem>
-                          <SelectItem value="2 years">2 years</SelectItem>
-                          <SelectItem value="3 years">3 years</SelectItem>
-                          <SelectItem value="5 years">5 years</SelectItem>
-                          <SelectItem value="10+ years">10+ years</SelectItem>
+                          <SelectItem value="6 months">{t('6 months')}</SelectItem>
+                          <SelectItem value="1 year">{t('1 year')}</SelectItem>
+                          <SelectItem value="2 years">{t('2 years')}</SelectItem>
+                          <SelectItem value="3 years">{t('3 years')}</SelectItem>
+                          <SelectItem value="5 years">{t('5 years')}</SelectItem>
+                          <SelectItem value="10+ years">{t('10+ years')}</SelectItem>
                         </SelectContent>
                       </Select>
                       {errors.timeline && (
                         <p className="text-sm text-destructive">{errors.timeline.message}</p>
                       )}
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
+                      <Label htmlFor="currency">{t('Currency')}</Label>
                       <Select value={watch('currency') || 'CAD'} onValueChange={value => setValue('currency', value, { shouldValidate: true })}>
                         <SelectTrigger className="w-full rounded-lg py-3 px-4 text-base">
-                          <SelectValue placeholder="Select currency" />
+                          <SelectValue placeholder={t('Select currency')} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="CAD">CAD ($)</SelectItem>
-                          <SelectItem value="USD">USD ($)</SelectItem>
-                          <SelectItem value="CNY">CNY (¥)</SelectItem>
-                          <SelectItem value="EUR">EUR (€)</SelectItem>
-                          <SelectItem value="GBP">GBP (£)</SelectItem>
-                          <SelectItem value="AUD">AUD (A$)</SelectItem>
+                          <SelectItem value="CAD">{t('CAD ($)')}</SelectItem>
+                          <SelectItem value="USD">{t('USD ($)')}</SelectItem>
+                          <SelectItem value="CNY">{t('CNY (¥)')}</SelectItem>
+                          <SelectItem value="EUR">{t('EUR (€)')}</SelectItem>
+                          <SelectItem value="GBP">{t('GBP (£)')}</SelectItem>
+                          <SelectItem value="AUD">{t('AUD (A$)')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="additionalContext">Additional context (optional)</Label>
+                      <Label htmlFor="additionalContext">{t('Additional context (optional)')}</Label>
                       <Textarea
                         id="additionalContext"
-                        placeholder="Any additional information about your financial situation, constraints, or preferences..."
+                        placeholder={t('Any additional information about your financial situation, constraints, or preferences...')}
                         className="min-h-[100px] w-full rounded-lg py-3 px-4 text-base"
                         {...register('additionalContext')}
                       />
                     </div>
-
                     <Button type="submit" className="w-full py-3 text-base" disabled={loading}>
                       {loading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Analyzing...
+                          {t('Analyzing...')}
                         </>
                       ) : (
                         <>
                           <Send className="w-4 h-4 mr-2" />
-                          Get AI Analysis
+                          {t('Get AI Analysis')}
                         </>
                       )}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
-
               {/* Quick Prompts - collapsible on mobile */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between cursor-pointer select-none" onClick={() => setShowPrompts(v => !v)}>
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-5 w-5" />
-                    Quick Prompts
+                    {t('Quick Prompts')}
                   </div>
                   <div className="sm:hidden">
                     {showPrompts ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </div>
                 </CardHeader>
-                <CardContent className={`transition-all duration-300 ${showPrompts || typeof window === 'undefined' || window.innerWidth >= 640 ? 'block' : 'hidden'} sm:block`}> 
+                <CardContent className={`transition-all duration-300 ${showPrompts || typeof window === 'undefined' || window.innerWidth >= 640 ? 'block' : 'hidden'} sm:block`}>
                   <div className="grid grid-cols-1 gap-2">
-                    {["I want to save $20,000 for an emergency fund within 1 year","Help me plan to buy a $300,000 house with a 20% down payment in 5 years","I need to pay off $15,000 in credit card debt as quickly as possible","I want to start investing for retirement and have $1M by age 65","Help me create a budget to save for a $10,000 vacation in 2 years"].map((prompt, index) => (
+                    {[t("I want to save $20,000 for an emergency fund within 1 year"), t("Help me plan to buy a $300,000 house with a 20% down payment in 5 years"), t("I need to pay off $15,000 in credit card debt as quickly as possible"), t("I want to start investing for retirement and have $1M by age 65"), t("Help me create a budget to save for a $10,000 vacation in 2 years")].map((prompt, index) => (
                       <Button
                         key={index}
                         variant="outline"
@@ -460,7 +486,6 @@ export default function AIPlanning() {
                 </CardContent>
               </Card>
             </div>
-
             {/* AI Response */}
             <div className="space-y-6">
               {planningResponse && (
@@ -468,9 +493,9 @@ export default function AIPlanning() {
                   {/* Analysis */}
                   <Card>
                     <CardHeader className="pb-0">
-                      <CardTitle>Financial Analysis</CardTitle>
+                      <CardTitle>{t('Financial Analysis')}</CardTitle>
                       <CardDescription className="pb-0">
-                        AI analysis of your financial situation and goal
+                        {t('AI analysis of your financial situation and goal')}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -503,7 +528,7 @@ export default function AIPlanning() {
                         setShowMoveGoal(true)
                       }}
                     >
-                      Move to Active Goals
+                      {t('Move to Active Goals')}
                     </Button>
                   </div>
                 </>
@@ -512,23 +537,22 @@ export default function AIPlanning() {
           </div>
         </main>
       </div>
-
       {showMoveGoal && (
         <Dialog open={showMoveGoal} onOpenChange={setShowMoveGoal}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] min-h-[500px] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Move to Active Goals</DialogTitle>
+              <DialogTitle>{t('Move to Active Goals')}</DialogTitle>
               <DialogDescription>
-                Set up a new savings goal with target amount and timeline
+                {t('Set up a new savings goal with target amount and timeline')}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmitMoveGoal(onMoveGoalSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="movegoal-name">Goal Name</Label>
+                <Label htmlFor="movegoal-name">{t('Goal Name')}</Label>
                 <Input
                   id="movegoal-name"
-                  placeholder="e.g., Emergency Fund, House Down Payment"
-                  {...registerMoveGoal('name', { required: 'Goal name is required' })}
+                  placeholder={t('e.g., Emergency Fund, House Down Payment')}
+                  {...registerMoveGoal('name', { required: t('Goal name is required') })}
                 />
                 {moveGoalErrors.name && (
                   <p className="text-sm text-destructive">{moveGoalErrors.name.message}</p>
@@ -536,15 +560,15 @@ export default function AIPlanning() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-target-amount">Target Amount</Label>
+                  <Label htmlFor="movegoal-target-amount">{t('Target Amount')}</Label>
                   <Input
                     id="movegoal-target-amount"
                     type="number"
                     step="0.01"
-                    placeholder="0.00"
+                    placeholder={t('0.00')}
                     {...registerMoveGoal('target_amount', {
-                      required: 'Target amount is required',
-                      min: { value: 0.01, message: 'Target amount must be greater than 0' },
+                      required: t('Target amount is required'),
+                      min: { value: 0.01, message: t('Target amount must be greater than 0') },
                     })}
                     value={moveGoalAmount}
                     onChange={e => {
@@ -553,22 +577,22 @@ export default function AIPlanning() {
                     }}
                   />
                   {moveGoalAmountHint && (
-                    <p className="text-xs text-muted-foreground">Detected: {moveGoalAmountHint}</p>
+                    <p className="text-xs text-muted-foreground">{t('Detected:')} {moveGoalAmountHint}</p>
                   )}
                   {moveGoalErrors.target_amount && (
                     <p className="text-sm text-destructive">{moveGoalErrors.target_amount.message}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-current-amount">Current Amount</Label>
+                  <Label htmlFor="movegoal-current-amount">{t('Current Amount')}</Label>
                   <Input
                     id="movegoal-current-amount"
                     type="number"
                     step="0.01"
-                    placeholder="0.00"
+                    placeholder={t('0.00')}
                     {...registerMoveGoal('current_amount', {
-                      required: 'Current amount is required',
-                      min: { value: 0, message: 'Current amount cannot be negative' },
+                      required: t('Current amount is required'),
+                      min: { value: 0, message: t('Current amount cannot be negative') },
                     })}
                   />
                   {moveGoalErrors.current_amount && (
@@ -578,12 +602,12 @@ export default function AIPlanning() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-target-date">Target Date <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="movegoal-target-date">{t('Target Date')} <span className="text-red-500">*</span></Label>
                   <Input
                     id="movegoal-target-date"
                     type="date"
-                    placeholder="Select a date"
-                    {...registerMoveGoal('target_date', { required: 'Target date is required' })}
+                    placeholder={t('Select a date')}
+                    {...registerMoveGoal('target_date', { required: t('Target date is required') })}
                   />
                   {moveGoalErrors.target_date && (
                     <p className="text-sm font-semibold text-red-600 flex items-center gap-1 mt-1">
@@ -592,21 +616,21 @@ export default function AIPlanning() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="movegoal-currency">Currency</Label>
+                  <Label htmlFor="movegoal-currency">{t('Currency')}</Label>
                   <Select
                     value={watchMoveGoal('currency') || 'CAD'}
                     onValueChange={value => setMoveGoalValue('currency', value, { shouldValidate: true })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
+                      <SelectValue placeholder={t('Select currency')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CAD">CAD ($)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="CNY">CNY (¥)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="AUD">AUD (A$)</SelectItem>
+                      <SelectItem value="CAD">{t('CAD ($)')}</SelectItem>
+                      <SelectItem value="USD">{t('USD ($)')}</SelectItem>
+                      <SelectItem value="CNY">{t('CNY (¥)')}</SelectItem>
+                      <SelectItem value="EUR">{t('EUR (€)')}</SelectItem>
+                      <SelectItem value="GBP">{t('GBP (£)')}</SelectItem>
+                      <SelectItem value="AUD">{t('AUD (A$)')}</SelectItem>
                     </SelectContent>
                   </Select>
                   {moveGoalErrors.currency && (
@@ -615,20 +639,20 @@ export default function AIPlanning() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="movegoal-description">Description (optional)</Label>
+                <Label htmlFor="movegoal-description">{t('Description (optional)')}</Label>
                 <Textarea
                   id="movegoal-description"
-                  placeholder="Additional details about your goal..."
+                  placeholder={t('Additional details about your goal...')}
                   {...registerMoveGoal('description')}
                   className="min-h-[300px]"
                 />
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => { setShowMoveGoal(false); resetMoveGoal(); }} className="flex-1" disabled={moveGoalLoading}>
-                  Cancel
+                  {t('Cancel')}
                 </Button>
                 <Button type="submit" className="flex-1" disabled={moveGoalLoading}>
-                  {moveGoalLoading ? 'Saving...' : 'Save Goal'}
+                  {moveGoalLoading ? t('Saving...') : t('Save Goal')}
                 </Button>
               </div>
             </form>
@@ -636,5 +660,13 @@ export default function AIPlanning() {
         </Dialog>
       )}
     </>
-  )
+  );
+}
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 

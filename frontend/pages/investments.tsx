@@ -13,6 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFirstRow } from '@/components/ui/table'
 import { StockDetailModal } from '@/components/StockDetailModal'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { GetServerSidePropsContext } from 'next';
 
 interface WatchlistItem {
   id: number
@@ -49,40 +52,6 @@ const INDEX_CARDS = [
   },
 ];
 
-// Add this above the Investments component
-const INDEX_SUMMARIES: Record<string, { title: string; description: string; link: string }> = {
-  '^GSPC': {
-    title: 'S&P 500 Index',
-    description: 'The S&P 500 is a stock market index tracking the stock performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices and is considered a barometer for the overall U.S. stock market.',
-    link: 'https://en.wikipedia.org/wiki/S%26P_500_Index',
-  },
-  '^DJI': {
-    title: 'Dow Jones Industrial Average',
-    description: 'The Dow Jones Industrial Average (DJIA) is a price-weighted index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most widely recognized stock market indices in the world.',
-    link: 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average',
-  },
-  '^IXIC': {
-    title: 'NASDAQ Composite',
-    description: 'The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.',
-    link: 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
-  },
-};
-
-function IndexDetailModal({ open, onOpenChange, symbol }: { open: boolean; onOpenChange: (v: boolean) => void; symbol: string }) {
-  const info = INDEX_SUMMARIES[symbol];
-  if (!info) return null;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{info.title}</DialogTitle>
-          <DialogDescription>{info.description}</DialogDescription>
-        </DialogHeader>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function Investments() {
   const router = useRouter()
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
@@ -100,6 +69,42 @@ export default function Investments() {
   const [indexLoading, setIndexLoading] = useState(true)
   const [indexError, setIndexError] = useState('')
   const [openIndexModal, setOpenIndexModal] = useState<string | null>(null)
+  const { t } = useTranslation('common');
+
+  // Move INDEX_SUMMARIES inside the component to access t()
+  const INDEX_SUMMARIES: Record<string, { title: string; description: string; link: string }> = {
+    '^GSPC': {
+      title: t('S&P 500 Index'),
+      description: t('The S&P 500 is a stock market index tracking the stock performance of 500 large companies listed on stock exchanges in the United States. It is one of the most commonly followed equity indices and is considered a barometer for the overall U.S. stock market.'),
+      link: 'https://en.wikipedia.org/wiki/S%26P_500_Index',
+    },
+    '^DJI': {
+      title: t('Dow Jones Industrial Average'),
+      description: t('The Dow Jones Industrial Average (DJIA) is a price-weighted index of 30 prominent companies listed on stock exchanges in the United States. It is one of the oldest and most widely recognized stock market indices in the world.'),
+      link: 'https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average',
+    },
+    '^IXIC': {
+      title: t('NASDAQ Composite'),
+      description: t('The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.'),
+      link: 'https://en.wikipedia.org/wiki/NASDAQ_Composite',
+    },
+  };
+
+  // Move IndexDetailModal inside Investments to access INDEX_SUMMARIES and t()
+  function IndexDetailModal({ open, onOpenChange, symbol }: { open: boolean; onOpenChange: (v: boolean) => void; symbol: string }) {
+    const info = INDEX_SUMMARIES[symbol];
+    if (!info) return null;
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{info.title}</DialogTitle>
+            <DialogDescription>{info.description}</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   useEffect(() => {
     fetchWatchlist()
@@ -176,7 +181,7 @@ export default function Investments() {
       await api.delete(`/investments/watchlist/${pendingDeleteId}`)
         Swal.fire({
           icon: 'success',
-          title: 'Stock removed from watchlist!',
+          title: t('Stock removed from watchlist!'),
         })
         fetchWatchlist()
       } catch (error) {
@@ -212,7 +217,7 @@ export default function Investments() {
       await api.post('/investments/watchlist', { symbol, company_name: companyName })
       Swal.fire({
         icon: 'success',
-        title: 'Stock added to watchlist!',
+        title: t('Stock added to watchlist!'),
       })
       setIsDialogOpen(false)
       setSearchAddQuery('')
@@ -221,7 +226,7 @@ export default function Investments() {
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Failed to add stock',
+        title: t('Failed to add stock'),
       })
     }
   }
@@ -237,8 +242,8 @@ export default function Investments() {
   return (
     <>
       <Head>
-        <title>Watchlist - MindGo</title>
-        <meta name="description" content="Track your favorite stocks" />
+        <title>{t('Investment Watchlist')} - MindGo</title>
+        <meta name="description" content={t('Track your favorite stocks')} />
       </Head>
 
       <div className="min-h-screen bg-background">
@@ -253,11 +258,11 @@ export default function Investments() {
                   className="mr-4 flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Investment Watchlist</h1>
-                  <p className="text-muted-foreground">Track your favorite stocks and investments</p>
+                  <h1 className="text-3xl font-bold">{t('Investment Watchlist')}</h1>
+                  <p className="text-muted-foreground">{t('Track your favorite stocks and investments')}</p>
                 </div>
               </div>
               <div className="hidden sm:flex gap-2">
@@ -265,28 +270,28 @@ export default function Investments() {
                   <DialogTrigger asChild>
                     <Button>
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Stock
+                      {t('Add Stock')}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                       <DialogTitle>
-                        Add to Watchlist
+                        {t('Add to Watchlist')}
                       </DialogTitle>
                       <DialogDescription>
-                        Add a new stock to your watchlist
+                        {t('Add a new stock to your watchlist')}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <Label htmlFor="add-search">Search by Symbol or Company Name</Label>
+                      <Label htmlFor="add-search">{t('Search by Symbol or Company Name')}</Label>
                         <Input
                         id="add-search"
-                        placeholder="Type symbol or company name..."
+                        placeholder={t('Type symbol or company name...')}
                         value={searchAddQuery}
                         onChange={e => setSearchAddQuery(e.target.value)}
                         autoFocus
                       />
-                      {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">Searching...</div>}
+                      {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">{t('Searching...')}</div>}
                       {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
                       {searchAddResults.length > 0 && (
                         <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
@@ -311,7 +316,7 @@ export default function Investments() {
                           }}
                           className="flex-1"
                         >
-                          Cancel
+                          {t('Cancel')}
                         </Button>
                       </div>
                     </div>
@@ -326,7 +331,7 @@ export default function Investments() {
         <button
           className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full fab-add-transaction"
           onClick={() => setIsDialogOpen(true)}
-          aria-label="Add Stock"
+          aria-label={t('Add Stock')}
         >
           <Plus className="w-8 h-8" />
         </button>
@@ -339,7 +344,7 @@ export default function Investments() {
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search your watchlist..."
+                placeholder={t('Search your watchlist...')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -351,23 +356,23 @@ export default function Investments() {
             <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-950/20 shadow-sm p-4">
               <div className="flex items-center gap-4 mb-2">
                 <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="text-base font-semibold text-blue-900 dark:text-blue-100">Major Indices <span className="text-xs font-normal text-blue-700 dark:text-blue-300">(Live)</span></h3>
+                <h3 className="text-base font-semibold text-blue-900 dark:text-blue-100">{t('Major Indices')} <span className="text-xs font-normal text-blue-700 dark:text-blue-300">{t('(Live)')}</span></h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-xs text-gray-500 dark:text-gray-400">
-                      <th className="px-1 py-2 text-left font-semibold">Symbol</th>
-                      <th className="px-1 py-2 text-left font-semibold hidden sm:table-cell">Name</th>
-                      <th className="px-1 py-2 text-right font-semibold">Price</th>
-                      <th className="px-1 py-2 text-right font-semibold hidden sm:table-cell">Change</th>
-                      <th className="px-1 py-2 text-right font-semibold sm:pr-6 lg:pr-8">Change %</th>
-                      <th className="px-1 py-2 text-center font-semibold">Actions</th>
+                      <th className="px-1 py-2 text-left font-semibold">{t('Symbol')}</th>
+                      <th className="px-1 py-2 text-left font-semibold hidden sm:table-cell">{t('Name')}</th>
+                      <th className="px-1 py-2 text-right font-semibold">{t('Price')}</th>
+                      <th className="px-1 py-2 text-right font-semibold hidden sm:table-cell">{t('Change')}</th>
+                      <th className="px-1 py-2 text-right font-semibold sm:pr-6 lg:pr-8">{t('Change %')}</th>
+                      <th className="px-1 py-2 text-center font-semibold">{t('Actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {indexLoading ? (
-                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">Loading...</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">Loading...</td></tr>
+                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">{t('Loading...')}</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">{t('Loading...')}</td></tr>
                     ) : indexError ? (
                       <tr><td colSpan={4} className="text-center text-red-600 py-4 sm:hidden">{indexError}</td><td colSpan={6} className="text-center text-red-600 py-4 hidden sm:table-cell">{indexError}</td></tr>
                     ) : indexRows.length > 0 ? (
@@ -418,7 +423,7 @@ export default function Investments() {
                         )
                       })
                     ) : (
-                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">No data</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">No data</td></tr>
+                      <tr><td colSpan={4} className="text-center py-4 sm:hidden">{t('No data')}</td><td colSpan={6} className="text-center py-4 hidden sm:table-cell">{t('No data')}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -432,34 +437,34 @@ export default function Investments() {
             <Card>
               <CardContent className="text-center py-12">
                 <BarChart3 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No stocks in watchlist</h3>
+                <h3 className="text-lg font-medium mb-2">{t('No stocks in watchlist')}</h3>
                 <p className="text-muted-foreground mb-4">
-                  Add your favorite stocks to start tracking their performance
+                  {t('Add your favorite stocks to start tracking their performance')}
                 </p>
                 <Button onClick={() => setIsDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Your First Stock
+                  {t('Add Your First Stock')}
                 </Button>
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Watchlist ({filteredWatchlist.length} stocks)</CardTitle>
+                <CardTitle>{t('Watchlist')} ({filteredWatchlist.length} {t('stocks')})</CardTitle>
                 <CardDescription>
-                  Real-time stock prices and performance
+                  {t('Real-time stock prices and performance')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableFirstRow>
-                      <TableHead>Symbol</TableHead>
-                      <TableHead className="hidden sm:table-cell">Company</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Change</TableHead>
-                      <TableHead className="text-right">Change %</TableHead>
-                      <TableHead className="text-right w-16 sm:w-auto">Actions</TableHead>
+                      <TableHead>{t('Symbol')}</TableHead>
+                      <TableHead className="hidden sm:table-cell">{t('Company')}</TableHead>
+                      <TableHead className="text-right">{t('Price')}</TableHead>
+                      <TableHead className="text-right hidden sm:table-cell">{t('Change')}</TableHead>
+                      <TableHead className="text-right">{t('Change %')}</TableHead>
+                      <TableHead className="text-right w-16 sm:w-auto">{t('Actions')}</TableHead>
                     </TableFirstRow>
                   </TableHeader>
                   <TableBody>
@@ -530,17 +535,17 @@ export default function Investments() {
           <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Remove Stock</DialogTitle>
+                <DialogTitle>{t('Remove Stock')}</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to remove this stock from your watchlist? This action cannot be undone.
+                  {t('Are you sure you want to remove this stock from your watchlist? This action cannot be undone.')}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-                  Cancel
+                  {t('Cancel')}
                 </Button>
                 <Button variant="destructive" onClick={confirmDelete}>
-                  Remove
+                  {t('Remove')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -549,4 +554,13 @@ export default function Investments() {
       </div>
     </>
   )
+} 
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const locale = context.locale || 'en';
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 

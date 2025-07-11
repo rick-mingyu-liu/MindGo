@@ -40,6 +40,8 @@ import {
   DialogClose
 } from '@/components/ui/dialog'
 import Swal from 'sweetalert2'
+import { useTranslation } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface DataRetentionSettings {
   autoDeleteEnabled: boolean
@@ -105,6 +107,7 @@ export default function Settings() {
   })
   const [savingPlanningPrefs, setSavingPlanningPrefs] = useState(false)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
+  const { t, i18n } = useTranslation('common');
 
   useEffect(() => {
     fetchSettings()
@@ -155,8 +158,8 @@ export default function Settings() {
       await api.put('/transactions/retention-settings', settings)
       Swal.fire({
         icon: 'success',
-        title: 'Settings saved successfully',
-        text: 'Your settings have been saved successfully!'
+        title: t('Settings saved successfully'),
+        text: t('Your settings have been saved successfully!')
       })
     } catch (error) {
       console.error('Error saving settings:', error)
@@ -171,21 +174,32 @@ export default function Settings() {
   }
 
   const handleSavePreferences = async () => {
+    const result = await Swal.fire({
+      icon: 'question',
+      title: t('Are you sure?'),
+      text: t('Do you want to save all your preferences?'),
+      showCancelButton: true,
+      confirmButtonText: t('Yes, save them!'),
+      cancelButtonText: t('Cancel'),
+    });
+    if (!result.isConfirmed) return;
     try {
       setSaving(true)
       // In a real app, you'd save to API
       localStorage.setItem('userPreferences', JSON.stringify(preferences))
-      Swal.fire({
+      await Swal.fire({
         icon: 'success',
-        title: 'Preferences saved successfully',
-        text: 'Your preferences have been saved successfully!'
+        title: t('Preferences saved successfully'),
+        text: t('Your preferences have been saved successfully!'),
+        confirmButtonText: t('OK'),
       })
+      router.push('/')
     } catch (error) {
       console.error('Error saving preferences:', error)
       Swal.fire({
         icon: 'error',
-        title: 'Failed to save preferences',
-        text: 'There was an error saving your preferences. Please try again later.'
+        title: t('Failed to save preferences'),
+        text: t('There was an error saving your preferences. Please try again later.')
       })
     } finally {
       setSaving(false)
@@ -272,12 +286,12 @@ export default function Settings() {
                   className="flex items-center"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2 sm:mr-2" />
-                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="hidden sm:inline">{t('Back to Dashboard')}</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Settings</h1>
+                  <h1 className="text-3xl font-bold">{t('Settings')}</h1>
                   <p className="text-muted-foreground">
-                    Manage your app preferences and data retention
+                    {t('Manage your app preferences and data retention')}
                   </p>
                 </div>
               </div>
@@ -288,7 +302,7 @@ export default function Settings() {
                   className="hidden sm:flex"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
-                  Logout
+                  {t('Logout')}
                 </Button>
               </div>
             </div>
@@ -302,15 +316,15 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
-                  Appearance
+                  {t('Appearance')}
                 </CardTitle>
                 <CardDescription>
-                  Customize the look and feel of your app
+                  {t('Customize the look and feel of your app')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <Label className="text-base">Theme</Label>
+                  <Label className="text-base">{t('Theme')}</Label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div 
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
@@ -321,8 +335,8 @@ export default function Settings() {
                       <div className="flex items-center space-x-3">
                         <Sun className="h-5 w-5" />
                         <div>
-                          <p className="font-medium">Light</p>
-                          <p className="text-sm text-muted-foreground">Clean and bright interface</p>
+                          <p className="font-medium">{t('Light')}</p>
+                          <p className="text-sm text-muted-foreground">{t('Clean and bright interface')}</p>
                         </div>
                       </div>
                     </div>
@@ -336,8 +350,8 @@ export default function Settings() {
                       <div className="flex items-center space-x-3">
                         <Moon className="h-5 w-5" />
                         <div>
-                          <p className="font-medium">Dark</p>
-                          <p className="text-sm text-muted-foreground">Easy on the eyes</p>
+                          <p className="font-medium">{t('Dark')}</p>
+                          <p className="text-sm text-muted-foreground">{t('Easy on the eyes')}</p>
                         </div>
                       </div>
                     </div>
@@ -351,15 +365,15 @@ export default function Settings() {
                       <div className="flex items-center space-x-3">
                         <Monitor className="h-5 w-5" />
                         <div>
-                          <p className="font-medium">System</p>
-                          <p className="text-sm text-muted-foreground">Follows your device</p>
+                          <p className="font-medium">{t('System')}</p>
+                          <p className="text-sm text-muted-foreground">{t('Follows your device')}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                   
                   <div className="text-sm text-muted-foreground">
-                    Current theme: <span className="font-medium capitalize">{resolvedTheme}</span>
+                    {t('Current theme')}: <span className="font-medium capitalize">{t(resolvedTheme.charAt(0).toUpperCase() + resolvedTheme.slice(1))}</span>
                   </div>
                 </div>
               </CardContent>
@@ -370,16 +384,16 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
-                  Preferences
+                  {t('Preferences')}
                 </CardTitle>
                 <CardDescription>
-                  Customize your app experience
+                  {t('Customize your app experience')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
+                    <Label htmlFor="currency">{t('Currency')}</Label>
                     <Select
                       value={preferences.currency}
                       onValueChange={(value) => setPreferences({ ...preferences, currency: value })}
@@ -399,20 +413,32 @@ export default function Settings() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="language">Language</Label>
+                    <Label htmlFor="language">{t('Language')}</Label>
                     <Select
                       value={preferences.language}
-                      onValueChange={(value) => setPreferences({ ...preferences, language: value })}
+                      onValueChange={(value) => {
+                        setPreferences({ ...preferences, language: value });
+                        let lang = value;
+                        if (lang === 'system') {
+                          lang = window.navigator.language.startsWith('zh') ? 'zh' : 'en';
+                        }
+                        i18n.changeLanguage(lang);
+                        router.push(router.asPath, router.asPath, { locale: lang });
+                      }}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select language">
-                          {preferences.language || 'System'}
+                        <SelectValue placeholder={t('Language')}>
+                          {preferences.language === 'en'
+                            ? t('English')
+                            : preferences.language === 'zh'
+                            ? t('Mandarin')
+                            : t('System')}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="System">System</SelectItem>
-                        <SelectItem value="English">English</SelectItem>
-                        <SelectItem value="Mandarin">Mandarin</SelectItem>
+                        <SelectItem value="system">{t('System')}</SelectItem>
+                        <SelectItem value="en">{t('English')}</SelectItem>
+                        <SelectItem value="zh">{t('Mandarin')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -425,18 +451,18 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="h-5 w-5" />
-                  Notifications
+                  {t('Notifications')}
                 </CardTitle>
                 <CardDescription>
-                  Manage your notification preferences
+                  {t('Manage your notification preferences')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Email Notifications</Label>
+                    <Label className="text-base">{t('Email Notifications')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive updates via email
+                      {t('Receive updates via email')}
                     </p>
                   </div>
                   <Switch
@@ -450,25 +476,9 @@ export default function Settings() {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Push Notifications</Label>
+                    <Label className="text-base">{t('Weekly Reports')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive browser notifications
-                    </p>
-                  </div>
-                  <Switch
-                    checked={preferences.notifications.push}
-                    onCheckedChange={(checked) => setPreferences({
-                      ...preferences,
-                      notifications: { ...preferences.notifications, push: checked }
-                    })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Weekly Reports</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get weekly financial summary by email every Sunday at 7 p.m.
+                      {t('Get weekly financial summary by email every Sunday at 7 p.m.')}
                     </p>
                   </div>
                   <Switch
@@ -479,9 +489,9 @@ export default function Settings() {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Goal Reminders</Label>
+                    <Label className="text-base">{t('Goal Reminders')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Get notified about goal progress
+                      {t('Get notified about goal progress')}
                     </p>
                   </div>
                   <Switch
@@ -500,18 +510,18 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
-                  Privacy & Data
+                  {t('Privacy & Data')}
                 </CardTitle>
                 <CardDescription>
-                  Control your data and privacy settings
+                  {t('Control your data and privacy settings')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Share Usage Data</Label>
+                    <Label className="text-base">{t('Share Usage Data')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Help improve the app by sharing anonymous usage data
+                      {t('Help improve the app by sharing anonymous usage data')}
                     </p>
                   </div>
                   <Switch
@@ -525,9 +535,9 @@ export default function Settings() {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Analytics</Label>
+                    <Label className="text-base">{t('Analytics')}</Label>
                     <p className="text-sm text-muted-foreground">
-                      Allow analytics to improve your experience
+                      {t('Allow analytics to improve your experience')}
                     </p>
                   </div>
                   <Switch
@@ -544,42 +554,42 @@ export default function Settings() {
             {/* Financial Planning Preferences */}
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle>Financial Planning Preferences</CardTitle>
+                <CardTitle>{t('Financial Planning Preferences')}</CardTitle>
                 <CardDescription>
-                  These preferences will be used to personalize your AI financial planning and investment suggestions.
+                  {t('These preferences will be used to personalize your AI financial planning and investment suggestions.')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
-                  <Label>Risk Tolerance</Label>
+                  <Label>{t('Risk Tolerance')}</Label>
                   <Select value={planningPrefs.riskTolerance} onValueChange={v => setPlanningPrefs(p => ({ ...p, riskTolerance: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="moderate">Moderate</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="low">{t('Low')}</SelectItem>
+                      <SelectItem value="moderate">{t('Moderate')}</SelectItem>
+                      <SelectItem value="high">{t('High')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="mb-4">
-                  <Label>Life Stage</Label>
+                  <Label>{t('Life Stage')}</Label>
                   <Select value={planningPrefs.lifeStage} onValueChange={v => setPlanningPrefs(p => ({ ...p, lifeStage: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="student">Student</SelectItem>
-                      <SelectItem value="worker">Worker</SelectItem>
-                      <SelectItem value="retired">Retired</SelectItem>
+                      <SelectItem value="student">{t('Student')}</SelectItem>
+                      <SelectItem value="worker">{t('Worker')}</SelectItem>
+                      <SelectItem value="retired">{t('Retired')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="mb-4">
-                  <Label>Investment Experience</Label>
+                  <Label>{t('Investment Experience')}</Label>
                   <Select value={planningPrefs.investmentExperience} onValueChange={v => setPlanningPrefs(p => ({ ...p, investmentExperience: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="beginner">Beginner</SelectItem>
-                      <SelectItem value="intermediate">Intermediate</SelectItem>
-                      <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="beginner">{t('Beginner')}</SelectItem>
+                      <SelectItem value="intermediate">{t('Intermediate')}</SelectItem>
+                      <SelectItem value="advanced">{t('Advanced')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -615,10 +625,10 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
-                  Account Management
+                  {t('Account Management')}
                 </CardTitle>
                 <CardDescription>
-                  Manage your account and data
+                  {t('Manage your account and data')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -628,10 +638,10 @@ export default function Settings() {
                       <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                          Dangerous Actions
+                          {t('Dangerous Actions')}
                         </p>
                         <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                          These actions cannot be undone and will permanently delete your data.
+                          {t('These actions cannot be undone and will permanently delete your data.')}
                         </p>
                       </div>
                     </div>
@@ -639,9 +649,9 @@ export default function Settings() {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-base">Clear All Data</Label>
+                      <Label className="text-base">{t('Clear All Data')}</Label>
                       <p className="text-sm text-muted-foreground">
-                        Permanently delete all transactions, goals, and streak etc.
+                        {t('Permanently delete all transactions, goals, and streak etc.')}
                       </p>
                     </div>
                     <Button
@@ -650,15 +660,15 @@ export default function Settings() {
                       disabled={clearing}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Clear All Data
+                      {t('Clear All Data')}
                     </Button>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-base">Sign Out</Label>
+                      <Label className="text-base">{t('Sign Out')}</Label>
                       <p className="text-sm text-muted-foreground">
-                        Sign out of your account
+                        {t('Sign out of your account')}
                       </p>
                     </div>
                     <Button
@@ -666,7 +676,7 @@ export default function Settings() {
                       onClick={() => logout()}
                     >
                       <LogOut className="w-4 h-4 mr-2" />
-                      Logout
+                      {t('Logout')}
                     </Button>
                   </div>
                 </div>
@@ -677,7 +687,16 @@ export default function Settings() {
             <div className="flex justify-end space-x-4">
               <Button
                 variant="outline"
-                onClick={() => {
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    icon: 'question',
+                    title: t('Are you sure?'),
+                    text: t('Do you want to reset your preferences to defaults?'),
+                    showCancelButton: true,
+                    confirmButtonText: t('Yes, reset them!'),
+                    cancelButtonText: t('Cancel'),
+                  });
+                  if (!result.isConfirmed) return;
                   setPreferences({
                     currency: 'CAD',
                     dateFormat: 'MM/DD/YYYY',
@@ -696,16 +715,18 @@ export default function Settings() {
                       compactMode: false,
                       showCharts: true
                     }
-                  })
-                  Swal.fire({
+                  });
+                  await Swal.fire({
                     icon: 'success',
-                    title: 'Preferences reset to defaults',
-                    text: 'Your preferences have been reset to defaults successfully!'
-                  })
+                    title: t('Preferences reset to defaults'),
+                    text: t('Your preferences have been reset to defaults successfully!'),
+                    confirmButtonText: t('OK'),
+                  });
+                  router.push('/');
                 }}
                 className="aurora-border"
               >
-                Reset to Defaults
+                {t('Reset to Defaults')}
               </Button>
               <Button
                 onClick={handleSavePreferences}
@@ -713,7 +734,7 @@ export default function Settings() {
                 className="aurora-glow"
               >
                 <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Saving...' : 'Save All Preferences'}
+                {saving ? 'Saving...' : t('Save All Preferences')}
               </Button>
             </div>
           </div>
@@ -723,21 +744,29 @@ export default function Settings() {
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Clear All Data</DialogTitle>
+            <DialogTitle>{t('Clear All Data')}</DialogTitle>
             <DialogDescription>
-              This will permanently delete <b>ALL</b> your data including transactions, goals, and watchlist. This action cannot be undone. Are you sure?
+              {t('This will permanently delete <b>ALL</b> your data including transactions, goals, and watchlist. This action cannot be undone. Are you sure?')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">{t('Cancel')}</Button>
             </DialogClose>
             <Button variant="destructive" onClick={handleClearData} disabled={clearing}>
-              {clearing ? 'Clearing...' : 'Yes, Delete Everything'}
+              {clearing ? 'Clearing...' : t('Yes, Delete Everything')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   )
+} 
+
+export async function getStaticProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 } 
