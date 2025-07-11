@@ -158,8 +158,8 @@ export default function Settings() {
       await api.put('/transactions/retention-settings', settings)
       Swal.fire({
         icon: 'success',
-        title: 'Settings saved successfully',
-        text: 'Your settings have been saved successfully!'
+        title: t('Settings saved successfully'),
+        text: t('Your settings have been saved successfully!')
       })
     } catch (error) {
       console.error('Error saving settings:', error)
@@ -180,8 +180,8 @@ export default function Settings() {
       localStorage.setItem('userPreferences', JSON.stringify(preferences))
       Swal.fire({
         icon: 'success',
-        title: 'Preferences saved successfully',
-        text: 'Your preferences have been saved successfully!'
+        title: t('Preferences saved successfully'),
+        text: t('Your preferences have been saved successfully!')
       })
     } catch (error) {
       console.error('Error saving preferences:', error)
@@ -698,8 +698,8 @@ export default function Settings() {
                   })
                   Swal.fire({
                     icon: 'success',
-                    title: 'Preferences reset to defaults',
-                    text: 'Your preferences have been reset to defaults successfully!'
+                    title: t('Preferences reset to defaults'),
+                    text: t('Your preferences have been reset to defaults successfully!')
                   })
                 }}
                 className="aurora-border"

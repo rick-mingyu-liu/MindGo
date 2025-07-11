@@ -200,8 +200,8 @@ export default function Dashboard() {
       setHasJustCheckedIn(true);
       Swal.fire({
         icon: 'success',
-        title: 'Checked in!',
-        text: 'You have checked in for today. Keep up the streak! 🔥',
+        title: t('Checked in!'),
+        text: t('You have checked in for today. Keep up the streak! 🔥'),
         confirmButtonColor: '#facc15',
       });
     } catch (err: any) {
@@ -211,15 +211,15 @@ export default function Dashboard() {
       ) {
         Swal.fire({
           icon: 'info',
-          title: 'Already checked in',
-          text: 'You have already checked in today. Come back tomorrow!',
+          title: t('Already checked in'),
+          text: t('You have already checked in today. Come back tomorrow!'),
           confirmButtonColor: '#f87171',
         });
       } else {
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: 'Unable to check in. Please try again later.',
+          title: t('Error'),
+          text: t('Unable to check in. Please try again later.'),
           confirmButtonColor: '#f87171',
         });
       }
@@ -238,15 +238,15 @@ export default function Dashboard() {
       await api.post('/auth/test-email');
       Swal.fire({
         icon: 'success',
-        title: 'Report Sent!',
-        text: 'Your financial report has been emailed to you. Check your inbox!',
+        title: t('Report Sent!'),
+        text: t('Your financial report has been emailed to you. Check your inbox!'),
         confirmButtonColor: '#facc15',
       });
     } catch (error) {
       Swal.fire({
         icon: 'error',
-        title: 'Error',
-        text: 'Failed to send financial report.',
+        title: t('Error'),
+        text: t('Failed to send financial report.'),
         confirmButtonColor: '#f87171',
       });
     }
@@ -1006,8 +1006,8 @@ export default function Dashboard() {
                     {indexRows.map((idx) => (
                       <div key={idx.symbol} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/20 dark:hover:bg-white/5 dark:hover:border-white/20">
                         <div>
-                          <div className="font-medium">{idx.label}</div>
-                          <div className="text-sm text-muted-foreground">{idx.name}</div>
+                          <div className="font-medium">{t(idx.label)}</div>
+                          <div className="text-sm text-muted-foreground">{t(idx.name)}</div>
                         </div>
                         <div className="text-right">
                           <div className="font-medium">
