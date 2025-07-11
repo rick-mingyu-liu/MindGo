@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next';
 import { i18n } from 'next-i18next';
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface Transaction {
   id: number
@@ -352,4 +353,12 @@ export default function Transactions() {
       </div>
     </>
   )
+}
+
+export async function getServerSideProps({ locale }: { locale: string }) {
+  return {
+    props: {
+      ...(await serverSideTranslations(locale, ['common'])),
+    },
+  };
 }
