@@ -25,12 +25,12 @@ const connectionOptions = process.env.DATABASE_URL
 function createPool() {
   const newPool = new Pool(connectionOptions);
   newPool.on('connect', () => {
-    console.log('✅ Connected to PostgreSQL database');
-  });
+  console.log('✅ Connected to PostgreSQL database');
+});
   newPool.on('error', (err) => {
-    console.error('❌ Unexpected error on idle client', err);
-    process.exit(-1);
-  });
+  console.error('❌ Unexpected error on idle client', err);
+  process.exit(-1);
+});
   return newPool;
 }
 

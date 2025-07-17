@@ -17,6 +17,7 @@ const summaryRoutes = require('./routes/summary');
 const goalRoutes = require('./routes/goals');
 const investmentRoutes = require('./routes/investments');
 const aiRoutes = require('./routes/ai');
+const cryptoRoutes = require('./routes/crypto');
 
 const app = express();
 const PORT = config.port;
@@ -45,6 +46,7 @@ app.use('/summary', summaryRoutes);
 app.use('/goals', goalRoutes);
 app.use('/investments', investmentRoutes);
 app.use('/ai', aiRoutes);
+app.use('/crypto', cryptoRoutes);
 
 // Error handling middleware
 app.use(ErrorHandler.globalErrorHandler);

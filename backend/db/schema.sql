@@ -84,6 +84,16 @@ CREATE TABLE IF NOT EXISTS ai_plans (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Crypto Watchlist table
+CREATE TABLE IF NOT EXISTS crypto_watchlist (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    symbol VARCHAR(20) NOT NULL, -- e.g., 'BTCUSDT'
+    coin_name VARCHAR(100),
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, symbol)
+);
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
