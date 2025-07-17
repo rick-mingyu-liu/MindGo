@@ -16,6 +16,7 @@ import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { GetServerSidePropsContext } from 'next';
+import { CryptoWatchlist } from '@/components/CryptoWatchlist';
 
 interface WatchlistItem {
   id: number
@@ -69,6 +70,8 @@ export default function Investments() {
   const [indexLoading, setIndexLoading] = useState(true)
   const [indexError, setIndexError] = useState('')
   const [openIndexModal, setOpenIndexModal] = useState<string | null>(null)
+  const [showAddCoin, setShowAddCoin] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<any>(null);
   const { t } = useTranslation('common');
 
   // Move INDEX_SUMMARIES inside the component to access t()
@@ -266,75 +269,14 @@ export default function Investments() {
                 </div>
               </div>
               <div className="hidden sm:flex gap-2">
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
-                      {t('Add Stock')}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                      <DialogTitle>
-                        {t('Add to Watchlist')}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {t('Add a new stock to your watchlist')}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <Label htmlFor="add-search">{t('Search by Symbol or Company Name')}</Label>
-                        <Input
-                        id="add-search"
-                        placeholder={t('Type symbol or company name...')}
-                        value={searchAddQuery}
-                        onChange={e => setSearchAddQuery(e.target.value)}
-                        autoFocus
-                      />
-                      {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">{t('Searching...')}</div>}
-                      {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
-                      {searchAddResults.length > 0 && (
-                        <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
-                          {searchAddResults.map((result, idx) => (
-                            <div
-                              key={result.symbol + idx}
-                              className="px-3 py-2 hover:bg-muted cursor-pointer"
-                              onClick={() => handleAddStockFromSearch(result.symbol, result.description)}
-                            >
-                              <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
-                            </div>
-                          ))}
-                      </div>
-                      )}
-                      <div className="flex gap-2 mt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setIsDialogOpen(false)
-                            setSearchAddQuery('')
-                            setSearchAddResults([])
-                          }}
-                          className="flex-1"
-                        >
-                          {t('Cancel')}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                {/* <Button onClick={() => setShowAddCoin(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t('Add Coin')}
+                </Button> */}
               </div>
             </div>
           </div>
         </header>
-
-        {/* FAB for mobile */}
-        <button
-          className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full fab-add-transaction"
-          onClick={() => setIsDialogOpen(true)}
-          aria-label={t('Add Stock')}
-        >
-          <Plus className="w-8 h-8" />
-        </button>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
@@ -441,19 +383,174 @@ export default function Investments() {
                 <p className="text-muted-foreground mb-4">
                   {t('Add your favorite stocks to start tracking their performance')}
                 </p>
-                <Button onClick={() => setIsDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  {t('Add Your First Stock')}
-                </Button>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t('Add Your First Stock')}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {t('Add Stock to Watchlist')}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {t('Add a new stock to your watchlist')}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <Label htmlFor="add-search-empty">{t('Search by Symbol or Company Name')}</Label>
+                      <Input
+                        id="add-search-empty"
+                        placeholder={t('Type symbol or company name...')}
+                        value={searchAddQuery}
+                        onChange={e => setSearchAddQuery(e.target.value)}
+                        autoFocus
+                      />
+                      {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">{t('Searching...')}</div>}
+                      {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
+                      {searchAddResults.length > 0 && (
+                        <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
+                          {searchAddResults.map((result, idx) => (
+                            <div
+                              key={result.symbol + idx}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer"
+                              onClick={() => {
+                                setSelectedStock(result);
+                                setSearchAddQuery('');
+                              }}
+                            >
+                              <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          onClick={async () => {
+                            if (selectedStock) {
+                              await handleAddStockFromSearch(selectedStock.symbol, selectedStock.description);
+                              setSelectedStock(null);
+                            }
+                          }}
+                          disabled={!selectedStock || searchAddLoading}
+                          className="flex-1"
+                        >
+                          {t('Add Stock')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsDialogOpen(false)
+                            setSearchAddQuery('')
+                            setSearchAddResults([])
+                            setSelectedStock(null);
+                          }}
+                          className="flex-1"
+                        >
+                          {t('Cancel')}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>{t('Watchlist')} ({filteredWatchlist.length} {t('stocks')})</CardTitle>
-                <CardDescription>
-                  {t('Real-time stock prices and performance')}
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>{t('Stock Watchlist')} ({filteredWatchlist.length} {t('stocks')})</CardTitle>
+                    <CardDescription>
+                      {t('Real-time stock prices and performance')}
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t('Add Stock')}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {t('Add Stock to Watchlist')}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {t('Add a new stock to your watchlist')}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <Label htmlFor="add-search">{t('Search by Symbol or Company Name')}</Label>
+                        <Input
+                          id="add-search"
+                          placeholder={t('Type symbol or company name...')}
+                          value={selectedStock ? `${selectedStock.symbol} - ${selectedStock.description}` : searchAddQuery}
+                          onChange={e => {
+                            setSearchAddQuery(e.target.value);
+                            setSelectedStock(null);
+                          }}
+                          autoFocus
+                          readOnly={!!selectedStock}
+                          className={selectedStock ? 'cursor-pointer' : ''}
+                          onClick={() => {
+                            if (selectedStock) {
+                              setSelectedStock(null);
+                              setSearchAddQuery('');
+                            }
+                          }}
+                        />
+                        {searchAddLoading && <div className="text-xs text-muted-foreground mt-1">{t('Searching...')}</div>}
+                        {searchAddError && <div className="text-xs text-red-600 mt-1">{searchAddError}</div>}
+                        {!selectedStock && searchAddResults.length > 0 && (
+                          <div className="border rounded mt-2 max-h-48 overflow-y-auto bg-background z-10">
+                            {searchAddResults.map((result, idx) => (
+                              <div
+                                key={result.symbol + idx}
+                                className="px-3 py-2 hover:bg-muted cursor-pointer"
+                                onClick={() => {
+                                  setSelectedStock(result);
+                                  setSearchAddQuery('');
+                                }}
+                              >
+                                <span className="font-mono font-semibold">{result.symbol}</span> - {result.description}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex gap-2 mt-4">
+                          <Button
+                            onClick={async () => {
+                              if (selectedStock) {
+                                await handleAddStockFromSearch(selectedStock.symbol, selectedStock.description);
+                                setSelectedStock(null);
+                              }
+                            }}
+                            disabled={!selectedStock || searchAddLoading}
+                            className="flex-1"
+                          >
+                            {t('Add Stock')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsDialogOpen(false)
+                              setSearchAddQuery('')
+                              setSearchAddResults([])
+                              setSelectedStock(null);
+                            }}
+                            className="flex-1"
+                          >
+                            {t('Cancel')}
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -551,6 +648,7 @@ export default function Investments() {
             </DialogContent>
           </Dialog>
         </main>
+        <CryptoWatchlist showAdd={showAddCoin} setShowAdd={setShowAddCoin} />
       </div>
     </>
   )

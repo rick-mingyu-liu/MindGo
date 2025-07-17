@@ -118,6 +118,10 @@ export const investmentAPI = {
   getMarketOverview: () => api.get('/investments/market-overview'),
   getStockAnalysis: (symbol: string) => api.get(`/investments/analysis/${symbol}`),
   getStockHistoricalData: (symbol: string, period: string = '1m') => api.get(`/investments/historical/${symbol}?period=${period}`),
+  // Crypto watchlist endpoints
+  getCryptoWatchlist: () => api.get('/investments/crypto-watchlist'),
+  addToCryptoWatchlist: (symbol: string, coin_name?: string) => api.post('/investments/crypto-watchlist', { symbol, coin_name }),
+  removeFromCryptoWatchlist: (symbol: string) => api.delete(`/investments/crypto-watchlist/${symbol}`),
 }
 
 export const goalAPI = {
@@ -128,6 +132,10 @@ export const goalAPI = {
 export const summaryAPI = {
   checkIn: () => api.post('/summary/checkin'),
   getCheckinStreak: () => api.get('/summary/checkin-streak'),
+};
+
+export const cryptoAPI = {
+  getCryptoDetail: (symbol: string) => api.get(`/crypto/${symbol}`),
 };
 
 export { api } 
