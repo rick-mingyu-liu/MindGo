@@ -6,7 +6,7 @@ const transactionController = {
   // Get all transactions for user
   async getTransactions(req, res) {
     try {
-      const { page = 1, limit = 20, type, category, startDate, endDate, targetCurrency } = req.query;
+      const { page = 1, limit = 50, type, category, startDate, endDate, targetCurrency } = req.query;
       const offset = (page - 1) * limit;
 
       let query = 'SELECT * FROM transactions WHERE user_id = $1';
