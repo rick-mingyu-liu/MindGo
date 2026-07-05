@@ -1,0 +1,22 @@
+# oh-my-claudecode (OMC) state and artifacts
+.omc/
+.omc/state/
+.omc/sessions/
+.omc/logs/
+.omc/plans/
+.omc/research/
+.omc/notepad.md
+.omc/project-memory.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies (also covered by subproject .gitignore files)
+node_modules/

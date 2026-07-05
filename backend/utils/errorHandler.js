@@ -97,9 +97,25 @@ class ErrorHandler {
     return this.serverError(res, err);
   }
 
+  // Global error middleware
+  static globalErrorHandler(err, req, res, next) {
+    logger.error('Unhandled Error', err);
+
+    if (err.name === 'ValidationError') {
+      return ErrorHandler.validationError(res, err.errors);
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return ErrorHandler.unauthorized(res, 'Invalid token');
+    }
+    if (err.name === 'TokenExpiredError') {
+      return ErrorHandler.unauthorized(res, 'Token expired');
+    }
+    return ErrorHandler.serverError(res, err);
+  }
+
   // 404 handler
   static notFoundHandler(req, res) {
-    return this.notFound(res, 'Route not found');
+    return ErrorHandler.notFound(res, 'Route not found');
   }
 }
 
