@@ -10,9 +10,23 @@ Ordered by value-per-effort, not by severity alone.
 
 ## 1. Rate limiting is written but never wired up
 
-**Status:** open
+**Status:** ✅ DONE 2026-08-27
 **Effort:** ~4 lines
 **Risk if ignored:** unlimited password guessing; unmetered spend on OpenAI
+
+Mounted with `app.set('trust proxy', 1)`, `apiLimiter` after `/health`, and
+`aiLimiter` on `/ai`. `authLimiter` is applied **per-route** in
+`routes/auth.js` — a blanket limiter on `/auth` would cap `/notifications` and
+`/profile` at 5 requests per 15 minutes and break the settings page.
+
+Verified: login 400 ×5 then 429; `/health` unthrottled; `/auth/notifications`
+survives 6 rapid saves; all read endpoints still 200.
+
+> **Still to tune:** `apiLimiter` allows 100 requests / 15 min per IP. The
+> dashboard fires ~5 requests per load, so that is roughly 20 page loads per
+> quarter hour before a real user gets 429s — plausibly tight for active use,
+> and users behind one NAT share the bucket. Consider raising it, or keying
+> authenticated requests on `req.user.userId` instead of IP.
 
 `backend/middleware/rateLimiter.js` defines `apiLimiter`, `authLimiter`
 (5 attempts / 15 min) and `aiLimiter`. Nothing in the backend imports them —

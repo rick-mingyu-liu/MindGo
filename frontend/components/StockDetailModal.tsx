@@ -620,7 +620,9 @@ function FinancialsTable({ financials }: { financials: any }) {
   const columns = [
     { key: 'period', label: t('Year') },
     { key: 'revenue', label: t('Revenue') },
-    { key: 'netIncome', label: t('Net Income') },
+    // stock.* rather than the bare key: this is a company's net profit, which is
+    // a different word from the dashboard's personal "Net Income" in Chinese.
+    { key: 'netIncome', label: t('stock.Net Income') },
     { key: 'eps', label: t('EPS') },
     { key: 'assets', label: t('Assets') },
     { key: 'liabilities', label: t('Liabilities') },
@@ -715,27 +717,27 @@ const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
         />
         <Line 
           type="monotone" 
-          dataKey="high" 
-          stroke="#22c55e" 
+          dataKey="high"
+          stroke="#22c55e"
           strokeWidth={2}
           dot={false}
-          name={t('High')}
+          name={t('stock.High')}
         />
         <Line 
           type="monotone" 
-          dataKey="low" 
-          stroke="#ef4444" 
+          dataKey="low"
+          stroke="#ef4444"
           strokeWidth={2}
           dot={false}
-          name={t('Low')}
+          name={t('stock.Low')}
         />
         <Line 
           type="monotone" 
-          dataKey="close" 
-          stroke="#f59e0b" 
+          dataKey="close"
+          stroke="#f59e0b"
           strokeWidth={2}
           dot={false}
-          name={t('Close')}
+          name={t('stock.Close')}
         />
       </LineChart>
     </ResponsiveContainer>
