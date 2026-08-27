@@ -6,6 +6,22 @@ time of writing; file:line references are from that commit.
 
 Ordered by value-per-effort, not by severity alone.
 
+## Status
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Rate limiters written but never mounted | ✅ done — PR #12 |
+| 2 | `config/index.js` is decorative; password length mismatch | open |
+| 3 | No fail-fast on missing secrets | open |
+| 4 | Six wrong Chinese translations (duplicate keys) | ✅ done — PR #12 |
+| 5 | No tests; `npm test` passes by doing nothing | open |
+| 6 | `npm run lint` cannot run in the backend | open |
+| 7 | Orphan `Savings` category | open |
+| 8 | Scheduler depends upward on controllers | open |
+| 9 | 59 Chinese strings missing entirely | open |
+| 10 | Environment variables are undocumented | open |
+| 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
+
 ---
 
 ## 1. Rate limiting is written but never wired up
@@ -238,12 +254,76 @@ otherwise it just blocks every build.
 
 ---
 
+## 10. Environment variables are undocumented
+
+**Status:** open
+**Effort:** ~20 lines
+**Found:** during the Azure → AWS migration
+
+Neither project has a `.env.example`, `.env.sample`, or any other list of the
+variables it needs. `backend/.env` currently holds 15 keys — `DATABASE_URL`,
+`JWT_SECRET`, `OPENAI_API_KEY`, `FINNHUB_API_KEY`, `FINNHUB_TOKEN`,
+`FINNHUB_WEBHOOK_SECRET`, `ALPHA_VANTAGE_API_KEY`, `EMAIL_USER`, `EMAIL_PASS`,
+`MAILBOXLAYER_API_KEY`, `FRONTEND_URL`, and others — and the only way to
+discover any of them is to grep for `process.env`.
+
+Two concrete costs already observed:
+
+1. **Local and Render can drift silently.** During the region migration there
+   was no way to confirm the deployed `DATABASE_URL` matched the local one
+   without reading it out of the Render dashboard by hand. When the database
+   password was later rotated, nothing flagged that one of the two copies was
+   now stale.
+2. A fresh clone cannot be run without reverse-engineering the required keys.
+
+Add a committed `.env.example` for each project listing every variable with a
+placeholder value and a one-line comment, and note which are optional. Pairs
+naturally with item 3 — the startup assertion should check exactly the set the
+example documents.
+
+---
+
+## 11. `package-lock.json` had drifted from `package.json`
+
+**Status:** ✅ fixed in passing (PR #12)
+**Found:** while wiring up item 1
+
+`backend/package.json` declared `express-rate-limit@^7.1.5`, but the lockfile
+had no entry for it and it was absent from `node_modules`. `npm install`
+tolerates this; **`npm ci` does not** — it fails outright when the two files
+disagree.
+
+The lock now has it (7.5.1). Worth confirming the deploy uses `npm ci` rather
+than `npm install`, so this class of drift fails the build instead of
+resolving to whatever the registry serves that day.
+
+---
+
+## Operational follow-ups
+
+Not code — carried over from the 2026-08-27 database work.
+
+- [ ] **Confirm Render holds the rotated database password.** It was rotated
+      after the migration; if Render still has the pre-rotation credential,
+      production is down.
+- [ ] **Delete the old Azure Neon project** once the AWS one has run clean for
+      a few days. That also permanently invalidates the old credential. Azure
+      regions stop receiving Neon features after 2026-10-05.
+- [ ] **Backups** from the migration live in `~/mindgo-db-backups-2026-08-27/`
+      (full `pg_dump` plus six CSVs). They contain real emails and bcrypt
+      hashes — keep them out of the repo.
+
+---
+
 ## Suggested order
 
-1. Wire up the rate limiters + `trust proxy` — best security gain per line
-2. Fix the password-length mismatch; resolve the `config` question
-3. Startup assertions for `JWT_SECRET` / `DATABASE_URL`
-4. ~~Fix the 6 zh translations and namespace the colliding keys~~ — done
-5. One integration test file over the auth → transaction → summary path,
-   with `check:locales` wired into the same CI workflow
+1. ~~Wire up the rate limiters + `trust proxy`~~ — done (PR #12)
+2. ~~Fix the 6 zh translations and namespace the colliding keys~~ — done (PR #12)
+3. **Next:** password-length mismatch, and resolve the `config` question (item 2)
+4. Startup assertions for `JWT_SECRET` / `DATABASE_URL` (item 3), together with
+   a `.env.example` documenting the same set (item 10)
+5. One integration test file over the auth → transaction → summary path, with
+   `check:locales` wired into the same CI workflow (items 5, 6)
 6. Fill in the 59 missing Chinese strings (item 9)
+
+Items 7 and 8 are cleanup rather than risk; do them when touching that code.
