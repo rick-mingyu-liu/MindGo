@@ -94,7 +94,8 @@ interface WatchlistItem {
 // colour whether you're looking at the Overall, Spending or Income view.
 const CATEGORY_COLORS: Record<string, string> = {
   // Expenses
-  'Food & Dining': '#f59e0b',
+  'Groceries': '#f59e0b',
+  'Dining Out': '#e11d48',
   'Transportation': '#06b6d4',
   'Housing': '#3b82f6',
   'Utilities': '#ef4444',
@@ -109,6 +110,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Freelance': '#a855f7',
   'Investment Returns': '#84cc16',
   'Business': '#0ea5e9',
+  'Tax Refund': '#15803d',
   'Other Income': '#10b981',
 }
 

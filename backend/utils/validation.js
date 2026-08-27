@@ -46,24 +46,28 @@ class ValidationHelper {
 
   // Category validation
   static isValidCategory(category) {
+    // Must stay in step with the frontend's canonical list in
+    // frontend/pages/transactions/new.tsx.
     const validCategories = [
-      'Food & Dining',
+      // Income
+      'Salary',
+      'Freelance',
+      'Investment Returns',
+      'Business',
+      'Tax Refund',
+      'Other Income',
+      // Expense
+      'Groceries',
+      'Dining Out',
       'Transportation',
-      'Shopping',
-      'Entertainment',
-      'Healthcare',
       'Housing',
       'Utilities',
-      'Insurance',
+      'Entertainment',
+      'Shopping',
+      'Healthcare',
       'Education',
       'Travel',
-      'Business',
-      'Personal Care',
-      'Gifts',
-      'Taxes',
-      'Investment',
-      'Income',
-      'Other'
+      'Other Expenses'
     ];
     return validCategories.includes(category);
   }

@@ -24,16 +24,20 @@ interface TransactionForm {
   currency: string // Add currency field
 }
 
+// The canonical category list. Anything that needs categories — the edit page,
+// the dashboard's colour map, the backend validator — derives from this.
 export const categories = {
   income: [
     'Salary',
     'Freelance',
     'Investment Returns',
     'Business',
+    'Tax Refund',
     'Other Income'
   ],
   expense: [
-    'Food & Dining',
+    'Groceries',
+    'Dining Out',
     'Transportation',
     'Housing',
     'Utilities',
