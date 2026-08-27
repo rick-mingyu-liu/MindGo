@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:locales": "node scripts/check-locales.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
