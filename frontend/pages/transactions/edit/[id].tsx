@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { api } from '@/utils/api'
+import { categories } from '../new'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,20 +23,10 @@ interface Transaction {
   currency: string // Add currency field
 }
 
-const CATEGORIES = [
-  'Salary',
-  'Freelance',
-  'Investment',
-  'Food & Dining',
-  'Transportation',
-  'Housing',
-  'Utilities',
-  'Entertainment',
-  'Healthcare',
-  'Shopping',
-  'Education',
-  'Other'
-]
+// Derived from the canonical list rather than duplicated: the local copy had
+// drifted, offering 'Investment' and 'Other' (which aren't real categories) while
+// missing Business, Travel and Other Income.
+const CATEGORIES = [...categories.income, ...categories.expense]
 
 export default function EditTransaction() {
   const router = useRouter()

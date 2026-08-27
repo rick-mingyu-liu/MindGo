@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    net_worth DECIMAL(12,2) DEFAULT 0.00,
-    language VARCHAR(10) NOT NULL DEFAULT 'en'
+    language VARCHAR(10) NOT NULL DEFAULT 'en',
+    email_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    weekly_reports_enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- Transactions table
@@ -54,27 +55,6 @@ CREATE TABLE IF NOT EXISTS watchlist (
     UNIQUE(user_id, symbol)
 );
 
--- Check-ins table for daily check-ins
-CREATE TABLE IF NOT EXISTS checkins (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, date)
-);
-
--- Streak totals table for tracking user's streak statistics
-CREATE TABLE IF NOT EXISTS streak_totals (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    current_streak INTEGER DEFAULT 0,
-    longest_streak INTEGER DEFAULT 0,
-    total_checkins INTEGER DEFAULT 0,
-    last_checkin_date DATE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id)
-);
-
 -- AI plans table
 CREATE TABLE IF NOT EXISTS ai_plans (
     id SERIAL PRIMARY KEY,
@@ -85,15 +65,13 @@ CREATE TABLE IF NOT EXISTS ai_plans (
 );
 
 -- Indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+-- Every read of transactions filters on user_id and the main listing then sorts
+-- by date DESC, created_at DESC, so one composite index serves filter and sort.
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_user_id ON checkins(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(date);
-CREATE INDEX IF NOT EXISTS idx_streak_totals_user_id ON streak_totals(user_id);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -104,12 +82,15 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Triggers to automatically update updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+-- Triggers to automatically update updated_at.
+-- OR REPLACE keeps this file re-runnable: plain CREATE TRIGGER has no
+-- IF NOT EXISTS form, so db:setup used to fail on a second run even though
+-- every other statement here is idempotent.
+CREATE OR REPLACE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
+CREATE OR REPLACE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON savings_goals
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+CREATE OR REPLACE TRIGGER update_goals_updated_at BEFORE UPDATE ON savings_goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

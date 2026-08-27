@@ -11,8 +11,5 @@ router.use(auth);
 router.get('/monthly', summaryController.getMonthlySummary);
 router.get('/rolling', summaryController.getRollingSummary);
 router.get('/trends', summaryController.getSpendingTrends);
-router.post('/checkin', summaryController.checkIn);
-router.get('/checkin-streak', summaryController.getCheckinStreak);
-router.delete('/clear-all', summaryController.clearAllStreakData);
 
 module.exports = router; 

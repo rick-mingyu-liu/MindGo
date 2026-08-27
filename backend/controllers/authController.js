@@ -429,7 +429,7 @@ async function createSampleDataForNewUser(userId) {
       {
         amount: 400.00,
         description: 'Sample Grocery Shopping',
-        category: 'Food & Dining',
+        category: 'Groceries',
         type: 'expense',
         date: new Date(currentYear, currentMonth, 5).toISOString().split('T')[0]
       },
