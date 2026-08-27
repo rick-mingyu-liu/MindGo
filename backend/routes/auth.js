@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const auth = require('../middleware/auth');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -60,13 +61,21 @@ const resendVerificationValidation = [
 ];
 
 // Routes
-router.post('/register', registerValidation, authController.register);
-router.post('/login', loginValidation, authController.login);
+//
+// authLimiter (5 per 15 min) is applied per-route rather than to the whole
+// router. The endpoints below that guess credentials or send mail are the ones
+// worth throttling that hard; /profile and /notifications are ordinary
+// authenticated traffic, and a user editing their settings can legitimately
+// save more than five times in a quarter hour. Those fall under the general
+// apiLimiter in app.js instead.
+router.post('/register', authLimiter, registerValidation, authController.register);
+router.post('/login', authLimiter, loginValidation, authController.login);
 router.get('/verify-email/:token', authController.verifyEmail);
-router.post('/resend-verification', resendVerificationValidation, authController.resendVerification);
+router.post('/resend-verification', authLimiter, resendVerificationValidation, authController.resendVerification);
 router.get('/profile', auth, authController.getProfile);
 router.put('/profile', auth, updateProfileValidation, authController.updateProfile);
-router.post('/test-email', auth, authController.sendTestEmail);
+// Sends an email, so it is throttled like the credential routes.
+router.post('/test-email', authLimiter, auth, authController.sendTestEmail);
 router.put('/notifications', auth, authController.updateNotificationSettings);
 
 module.exports = router; 

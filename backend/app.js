@@ -9,6 +9,7 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const ErrorHandler = require('./utils/errorHandler');
 const schedulerService = require('./services/schedulerService');
+const { apiLimiter, aiLimiter } = require('./middleware/rateLimiter');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -20,6 +21,13 @@ const aiRoutes = require('./routes/ai');
 
 const app = express();
 const PORT = config.port;
+
+// Render terminates TLS at a proxy, so req.ip is that proxy's address unless
+// Express is told to read X-Forwarded-For. Without this the rate limiters below
+// see every visitor as one client and throttle the whole user base together.
+// The value is the number of trusted hops — not `true`, which would let a
+// client spoof its own address via the header.
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
@@ -38,13 +46,19 @@ app.get('/health', (req, res) => {
   });
 });
 
+// General limiter, mounted after /health so platform health checks are never
+// throttled. Credential endpoints add a stricter limiter of their own in
+// routes/auth.js.
+app.use(apiLimiter);
+
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/transactions', transactionRoutes);
 app.use('/summary', summaryRoutes);
 app.use('/goals', goalRoutes);
 app.use('/investments', investmentRoutes);
-app.use('/ai', aiRoutes);
+// Every /ai call costs real OpenAI credit, so it gets its own hourly budget.
+app.use('/ai', aiLimiter, aiRoutes);
 
 // Error handling middleware
 app.use(ErrorHandler.globalErrorHandler);
