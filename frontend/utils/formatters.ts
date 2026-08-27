@@ -15,6 +15,22 @@ export const formatCurrency = (amount: number, currency: string = 'USD'): string
   return formatted;
 }
 
+// Short form for axis ticks, where "$3,000.00" is noise and overflows the gutter.
+export const formatCompactCurrency = (amount: number, currency: string = 'USD'): string => {
+  const dollarCurrencies = ['USD', 'CAD'];
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(amount);
+  if (dollarCurrencies.includes(currency)) {
+    return formatted.replace(/[A-Z]*\$/g, '$');
+  }
+  return formatted;
+}
+
 export const formatPercentage = (value: number, decimals: number = 2): string => {
   return `${value.toFixed(decimals)}%`
 }
