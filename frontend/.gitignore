@@ -21,3 +21,5 @@ yarn-error.log*
 .vscode/
 .idea/
 *.swp 
+# TypeScript incremental build cache
+*.tsbuildinfo
