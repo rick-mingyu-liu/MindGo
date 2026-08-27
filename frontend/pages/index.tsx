@@ -205,10 +205,6 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const { resolvedTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [streak, setStreak] = useState(0)
-  const [hasCheckedInToday, setHasCheckedInToday] = useState(false)
-  const [hasJustCheckedIn, setHasJustCheckedIn] = useState(false)
-  const [checkingIn, setCheckingIn] = useState(false)
   const [indexRows, setIndexRows] = useState<any[]>([]);
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState('');
@@ -231,24 +227,17 @@ export default function Dashboard() {
       setLoading(true)
       const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
       const currency = prefs.currency || 'CAD';
-      const [summaryRes, goalsRes, watchlistRes, transactionsRes, streakRes] = await Promise.all([
+      const [summaryRes, goalsRes, watchlistRes, transactionsRes] = await Promise.all([
         api.get(`/summary/rolling?months=4&targetCurrency=${currency}`),
         api.get('/goals'),
         api.get('/investments/watchlist'),
-        api.get(`/transactions?limit=10&targetCurrency=${currency}`),
-        api.get('/summary/checkin-streak')
+        api.get(`/transactions?limit=10&targetCurrency=${currency}`)
       ])
 
       setSummary(summaryRes.data)
       setGoals(goalsRes.data.goals)
       setWatchlist(watchlistRes.data.watchlist)
       setTransactions(transactionsRes.data.transactions)
-      setStreak(streakRes.data.streak || 0)
-
-      // Check if user has checked in today
-      const today = new Date().toISOString().split('T')[0]
-      const hasCheckedIn = streakRes.data.lastCheckinDate === today
-      setHasCheckedInToday(hasCheckedIn)
 
       // Check if this is a new user (has very little data or sample data)
       const hasVeryLittleData = summaryRes.data.transactions?.length <= 6 && 
@@ -264,46 +253,6 @@ export default function Dashboard() {
       setLoading(false)
     }
   }, [])
-
-  const handleCheckIn = async () => {
-    setCheckingIn(true);
-    try {
-      await api.post('/summary/checkin');
-      // Fetch the latest streak/check-in status
-      const streakRes = await api.get('/summary/checkin-streak');
-      setStreak(streakRes.data.streak || 0);
-      // If you use lastCheckinDate, update hasCheckedInToday accordingly
-      // setHasCheckedInToday(isToday(new Date(streakRes.data.lastCheckinDate)));
-      setHasCheckedInToday(true);
-      setHasJustCheckedIn(true);
-      Swal.fire({
-        icon: 'success',
-        title: t('Checked in!'),
-        text: t('You have checked in for today. Keep up the streak! 🔥'),
-        confirmButtonColor: '#facc15',
-      });
-    } catch (err: any) {
-      if (
-        err?.response?.status === 400 &&
-        err?.response?.data?.error?.toLowerCase().includes('already checked in')
-      ) {
-        Swal.fire({
-          icon: 'info',
-          title: t('Already checked in'),
-          text: t('You have already checked in today. Come back tomorrow!'),
-          confirmButtonColor: '#f87171',
-        });
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: t('Error'),
-          text: t('Unable to check in. Please try again later.'),
-          confirmButtonColor: '#f87171',
-        });
-      }
-    }
-    setCheckingIn(false);
-  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -689,41 +638,7 @@ export default function Dashboard() {
 
           {/* Summary Cards */}
           <div className="overflow-x-auto scrollbar-hide -mx-2 pb-2 sm:mx-0 sm:pb-0">
-            <div className="flex gap-4 min-w-[750px] sm:grid sm:grid-cols-5 lg:grid-cols-5 sm:gap-6 mb-8">
-                            {/* Streak Card */}
-              <Card
-                className="transition-colors duration-200 flex flex-col items-center justify-center text-center hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-              >
-                <button
-                  type="button"
-                  className="focus:outline-none focus:ring-2 rounded-lg flex flex-col items-center justify-center text-center w-full h-full cursor-pointer bg-transparent border-0 p-0 focus:ring-yellow-400"
-                  onClick={handleCheckIn}
-                  disabled={checkingIn}
-                  aria-label={!hasCheckedInToday ? "Check in for today" : "View streak details"}
-                  tabIndex={0}
-                >
-                  <CardHeader className="flex flex-col items-center justify-center space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      {!hasCheckedInToday ? t('Check In') : t('Streak')}
-                      {hasCheckedInToday && (
-                        <Sparkles className="h-4 w-4 text-yellow-500 animate-pulse" />
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center justify-center">
-                    <div className={`text-2xl font-bold ${!hasCheckedInToday ? 'text-orange-600' : 'text-yellow-600'}`}>
-                      {checkingIn ? (
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-500"></div>
-                      ) : (
-                        streak
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {!hasCheckedInToday ? t('Click to check in') : t('Days in a row')}
-                    </p>
-                  </CardContent>
-                </button>
-              </Card>
+            <div className="flex gap-4 min-w-[600px] sm:grid sm:grid-cols-4 lg:grid-cols-4 sm:gap-6 mb-8">
               {/* Total Income Card */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

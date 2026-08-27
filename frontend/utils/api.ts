@@ -125,9 +125,4 @@ export const goalAPI = {
     api.post('/goals/from-ai-plan', data),
 };
 
-export const summaryAPI = {
-  checkIn: () => api.post('/summary/checkin'),
-  getCheckinStreak: () => api.get('/summary/checkin-streak'),
-};
-
-export { api } 
+export { api }

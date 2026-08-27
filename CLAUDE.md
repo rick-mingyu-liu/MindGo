@@ -50,7 +50,7 @@ Request flow: **route → (auth middleware) → validation → controller → se
 - **Scheduler** ([backend/services/schedulerService.js](backend/services/schedulerService.js)): weekly report emails via `node-cron`, plus `setInterval` cleanup jobs for expired AI plans and unverified accounts. Cleanup controller methods (`autoDeleteOldAIPlans`, `deleteUnverifiedAccounts`) are invoked both by HTTP routes and the scheduler.
 
 ### Database
-Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wholesale by `db:setup`. Tables: `users`, `transactions`, `savings_goals`, `watchlist`, `checkins`, `streak_totals`, `ai_plans`. `updated_at` is auto-maintained by triggers. Note the schema file can lag runtime code (e.g. scheduler queries `email_notifications_enabled`/`weekly_reports_enabled` columns not present in `schema.sql`) — check the live DB when adding user-preference columns.
+Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wholesale by `db:setup`. Tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`. `updated_at` is auto-maintained by triggers. Note the schema file can lag runtime code (e.g. scheduler queries `email_notifications_enabled`/`weekly_reports_enabled` columns not present in `schema.sql`) — check the live DB when adding user-preference columns.
 
 ## Frontend architecture
 

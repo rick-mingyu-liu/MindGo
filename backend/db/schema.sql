@@ -54,27 +54,6 @@ CREATE TABLE IF NOT EXISTS watchlist (
     UNIQUE(user_id, symbol)
 );
 
--- Check-ins table for daily check-ins
-CREATE TABLE IF NOT EXISTS checkins (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, date)
-);
-
--- Streak totals table for tracking user's streak statistics
-CREATE TABLE IF NOT EXISTS streak_totals (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    current_streak INTEGER DEFAULT 0,
-    longest_streak INTEGER DEFAULT 0,
-    total_checkins INTEGER DEFAULT 0,
-    last_checkin_date DATE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id)
-);
-
 -- AI plans table
 CREATE TABLE IF NOT EXISTS ai_plans (
     id SERIAL PRIMARY KEY,
@@ -91,9 +70,6 @@ CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_user_id ON checkins(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(date);
-CREATE INDEX IF NOT EXISTS idx_streak_totals_user_id ON streak_totals(user_id);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

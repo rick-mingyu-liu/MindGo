@@ -44,7 +44,6 @@ To democratize financial intelligence by providing everyone with AI-powered tool
 - **Financial Health Score**: Overall assessment of your financial situation
 
 ### 🔔 **Smart Notifications**
-- **Daily Check-ins**: Build financial discipline with streak tracking
 - **Weekly Reports**: Automated email summaries of your financial activity
 - **Goal Reminders**: Stay on track with timely notifications
 - **Market Updates**: Get notified about significant market movements
@@ -377,7 +376,7 @@ The backend provides comprehensive API endpoints:
 - **`transactions`** - Financial transactions (income/expenses) with categories
 - **`savings_goals`** - User-defined financial goals and progress tracking
 - **`watchlist`** - Stock symbols and companies for investment tracking
-- **`check_ins`** - Daily financial check-ins for habit building
+- **`ai_plans`** - Generated AI financial plans
 
 ### **Key Features**
 - **Multi-currency Support** - All monetary values support multiple currencies
@@ -419,8 +418,6 @@ The backend provides comprehensive API endpoints:
 
 ### **Summary Routes** (`/summary`)
 - `GET /summary/rolling` - Get rolling financial summary
-- `GET /summary/checkin-streak` - Get check-in streak
-- `POST /summary/checkin` - Record daily check-in
 - `POST /summary/send-report` - Send weekly report
 
 ## 🌐 Deployment

@@ -5,7 +5,6 @@ console.log('🧹 Starting backend cleanup...');
 
 // Files to remove (if they exist)
 const filesToRemove = [
-  'migrate-streak-tables.js',
   'run-migration.js',
   'seed-stock-data.js'
 ];

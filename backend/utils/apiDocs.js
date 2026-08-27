@@ -125,8 +125,6 @@ apiDocs.addEndpoint('PUT', '/transactions/retention-settings', 'Update data rete
 apiDocs.addEndpoint('GET', '/summary/monthly', 'Get monthly summary', 'summaryController.getMonthlySummary', true);
 apiDocs.addEndpoint('GET', '/summary/rolling', 'Get rolling summary', 'summaryController.getRollingSummary', true);
 apiDocs.addEndpoint('GET', '/summary/trends', 'Get spending trends', 'summaryController.getSpendingTrends', true);
-apiDocs.addEndpoint('POST', '/summary/checkin', 'Daily check-in', 'summaryController.checkIn', true);
-apiDocs.addEndpoint('GET', '/summary/checkin-streak', 'Get check-in streak', 'summaryController.getCheckInStreak', true);
 
 // Goals
 apiDocs.addEndpoint('GET', '/goals', 'Get user goals', 'goalController.getGoals', true);
