@@ -50,7 +50,9 @@ Request flow: **route → (auth middleware) → validation → controller → se
 - **Scheduler** ([backend/services/schedulerService.js](backend/services/schedulerService.js)): weekly report emails via `node-cron`, plus `setInterval` cleanup jobs for expired AI plans and unverified accounts. Cleanup controller methods (`autoDeleteOldAIPlans`, `deleteUnverifiedAccounts`) are invoked both by HTTP routes and the scheduler.
 
 ### Database
-Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wholesale by `db:setup`. Tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`. `updated_at` is auto-maintained by triggers. Note the schema file can lag runtime code (e.g. scheduler queries `email_notifications_enabled`/`weekly_reports_enabled` columns not present in `schema.sql`) — check the live DB when adding user-preference columns.
+Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wholesale by `db:setup`, which is idempotent and safe to re-run. Tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`. `updated_at` is auto-maintained by triggers. `schema.sql` is the desired end state; incremental changes against an existing database go in [backend/db/migrations/](backend/db/migrations/) as numbered files, applied by hand with `psql -v ON_ERROR_STOP=1 -f`. Keep the two in step — a migration without the matching `schema.sql` edit means fresh setups and existing databases diverge.
+
+**Connections**: `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host), which hands out sessions with an empty `search_path`. Every query in this codebase names tables unqualified, so [backend/db/connection.js](backend/db/connection.js) issues `SET search_path` on each new pool connection. Without it every query fails with `relation "transactions" does not exist`. Don't move this into the pool's `options` — Neon's pooler rejects `search_path` as a startup parameter.
 
 ## Frontend architecture
 

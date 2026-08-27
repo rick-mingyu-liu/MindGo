@@ -1,5 +1,9 @@
 const nodemailer = require('nodemailer');
 const db = require('../db/connection');
+const { getExchangeRate } = require('./exchangeRateService');
+
+// The dashboard defaults to CAD, so the report reads in the same currency.
+const REPORT_CURRENCY = 'CAD';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail', // Change if using another provider
@@ -160,11 +164,27 @@ exports.generateWeeklyReport = async (userId) => {
     const goalsRes = await db.query('SELECT name, current_amount, target_amount, target_date FROM savings_goals WHERE user_id = $1', [userId]);
     const goals = goalsRes.rows;
 
-    // Fetch user's current balance (net worth)
-    let currentBalance = null;
-    const netWorthRes = await db.query('SELECT net_worth FROM users WHERE id = $1', [userId]);
-    if (netWorthRes.rows.length > 0) {
-      currentBalance = parseFloat(netWorthRes.rows[0].net_worth);
+    // Current balance, derived from the transaction history. This used to read a
+    // users.net_worth column that nothing ever wrote, so every report claimed a
+    // balance of $0.00; the transactions are the real source of truth.
+    //
+    // Summed per currency and converted to CAD, the same target the dashboard
+    // defaults to — a straight SUM would add CNY to CAD as if they were the
+    // same unit.
+    const balanceRes = await db.query(
+      `SELECT currency,
+              COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0)
+            - COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS balance
+         FROM transactions WHERE user_id = $1 GROUP BY currency`,
+      [userId]
+    );
+    let currentBalance = 0;
+    for (const row of balanceRes.rows) {
+      const amount = parseFloat(row.balance);
+      const currency = row.currency || REPORT_CURRENCY;
+      currentBalance += currency === REPORT_CURRENCY
+        ? amount
+        : amount * await getExchangeRate(currency, REPORT_CURRENCY);
     }
 
     // Fetch 4-month net income summary (dashboard style)
@@ -198,9 +218,7 @@ exports.generateWeeklyReport = async (userId) => {
     content += pad('Total Income:', 18) + money(totalIncome) + '\n';
     content += pad('Total Expenses:', 18) + money(totalExpenses) + '\n';
     content += pad('Net Income:', 18) + money(netIncome) + '\n';
-    if (currentBalance !== null) {
-      content += pad('Current Balance:', 18) + money(currentBalance) + '\n';
-    }
+    content += pad('Current Balance:', 18) + money(currentBalance) + '\n';
     content += '\n';
     // Goals Status
     if (goals.length > 0) {

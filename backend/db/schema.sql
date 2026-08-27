@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    net_worth DECIMAL(12,2) DEFAULT 0.00,
-    language VARCHAR(10) NOT NULL DEFAULT 'en'
+    language VARCHAR(10) NOT NULL DEFAULT 'en',
+    email_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    weekly_reports_enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- Transactions table
@@ -64,9 +65,10 @@ CREATE TABLE IF NOT EXISTS ai_plans (
 );
 
 -- Indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+-- Every read of transactions filters on user_id and the main listing then sorts
+-- by date DESC, created_at DESC, so one composite index serves filter and sort.
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
@@ -80,12 +82,15 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Triggers to automatically update updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+-- Triggers to automatically update updated_at.
+-- OR REPLACE keeps this file re-runnable: plain CREATE TRIGGER has no
+-- IF NOT EXISTS form, so db:setup used to fail on a second run even though
+-- every other statement here is idempotent.
+CREATE OR REPLACE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
+CREATE OR REPLACE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_goals_updated_at BEFORE UPDATE ON savings_goals
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+CREATE OR REPLACE TRIGGER update_goals_updated_at BEFORE UPDATE ON savings_goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

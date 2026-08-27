@@ -182,12 +182,9 @@ MindGo/
 │   │   └── schedulerService.js     # Automated tasks and cron jobs
 │   ├── utils/                       # Helper functions
 │   │   ├── apiDocs.js              # API documentation generator
-│   │   ├── database.js             # Database utilities
 │   │   ├── errorHandler.js         # Error handling utilities
-│   │   ├── logger.js               # Logging utilities
-│   │   └── validation.js           # Input validation helpers
+│   │   └── logger.js               # Logging utilities
 │   └── scripts/                     # Utility scripts
-│       ├── cleanup.js              # Database cleanup utilities
 │       └── generateDocs.js         # API documentation generation
 ├── frontend/                        # Next.js React application
 │   ├── package.json                # Frontend dependencies
