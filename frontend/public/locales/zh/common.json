@@ -362,7 +362,6 @@
   "IXIC": "纳斯达克",
   "NASDAQ Composite": "纳斯达克综合指数",
   "The NASDAQ Composite is a stock market index that includes almost all stocks listed on the Nasdaq stock exchange. It is heavily weighted toward information technology companies and is seen as an indicator of the performance of technology and growth companies.": "纳斯达克综合指数涵盖了纳斯达克交易所几乎所有上市股票，信息技术公司权重较高，被视为科技和成长型企业表现的风向标。",
-  "Track your favorite stocks": "跟踪您喜欢的股票",
   "Add a new stock to your watchlist": "将新股票添加到您的观察列表",
   "Add your favorite stocks to start tracking their performance": "添加您喜欢的股票以开始追踪其表现",
   "Add Your First Stock": "添加您的第一只股票",
@@ -390,10 +389,8 @@
   "Search by Symbol or Company Name": "搜获代号或者公司英文名",
   "Add Stock": "加入股票",
   "Actions": "更多",
-  "Change %": "变动 %",
   "Change": "变动",
   "Price": "价格",
-  "Name": "指数",
   "Symbol": "代号",
   "Company": "公司",
   "Type symbol or company name...": "输入代号或公司名称",
@@ -450,16 +447,12 @@
   "No upcoming earnings events.": "暂无即将到来的财报事件。",
   "Year": "年份",
   "Revenue": "营收",
-  "Net Income": "净利润",
   "EPS": "每股收益",
   "Assets": "资产",
   "Liabilities": "负债",
   "Filing": "文件",
   "View Filing": "查看文件",
   "Open": "开盘",
-  "High": "最高",
-  "Low": "最低",
-  "Close": "收盘",
   "ALPHABET INC-CL C": "谷歌母公司A类C股",
   "Apple Inc": "苹果公司",
   "SPOTIFY TECHNOLOGY SA": "Spotify科技公司",
@@ -495,5 +488,11 @@
   "APIs (free)": "免费API",
   "Frontend": "前段",
   "Backend": "后端",
-  "Close": "关闭"
+  "Close": "关闭",
+  "stock": {
+    "High": "最高",
+    "Low": "最低",
+    "Close": "收盘",
+    "Net Income": "净利润"
+  }
 }
