@@ -21,14 +21,15 @@ import {
   Mail,
   CheckCircle2
 } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api, logout, investmentAPI } from '@/utils/api'
-import { formatCurrency } from '@/utils/formatters'
+import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -89,7 +90,83 @@ interface WatchlistItem {
   changePercent: number
 }
 
-const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4']
+// Colour follows the category, not its rank in the pie, so a slice keeps the same
+// colour whether you're looking at the Overall, Spending or Income view.
+const CATEGORY_COLORS: Record<string, string> = {
+  // Expenses
+  'Food & Dining': '#f59e0b',
+  'Transportation': '#06b6d4',
+  'Housing': '#3b82f6',
+  'Utilities': '#ef4444',
+  'Entertainment': '#8b5cf6',
+  'Shopping': '#ec4899',
+  'Healthcare': '#f97316',
+  'Education': '#14b8a6',
+  'Travel': '#6366f1',
+  'Other Expenses': '#a16207',
+  // Income
+  'Salary': '#22c55e',
+  'Freelance': '#a855f7',
+  'Investment Returns': '#84cc16',
+  'Business': '#0ea5e9',
+  'Other Income': '#10b981',
+}
+
+const FALLBACK_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4']
+
+// Unknown categories still need a stable colour, so derive it from the name.
+const getCategoryColor = (name: string) => {
+  if (CATEGORY_COLORS[name]) return CATEGORY_COLORS[name]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
+}
+
+type CategoryView = 'all' | 'expense' | 'income'
+
+// The trend lines, their colours and their marker shapes in one place, so the
+// chart and its legend can never drift apart.
+const TREND_SERIES = [
+  { key: 'income', label: 'Income', shape: 'circle', light: '#22c55e', dark: '#4ade80' },
+  { key: 'expenses', label: 'Expenses', shape: 'square', light: '#ef4444', dark: '#f87171' },
+  { key: 'net', label: 'Net', shape: 'triangle', light: '#3b82f6', dark: '#60a5fa' },
+] as const
+
+type TrendSeries = typeof TREND_SERIES[number]
+
+// The shapes are a second, non-colour cue: green and red sit at OKLab ΔE 7.4 under
+// deuteranopia, which is too close to carry identity on their own.
+const renderMarker = (shape: TrendSeries['shape'], cx: number, cy: number, size: number, fill: string, ring: string) => {
+  // The ring is drawn in the card's own colour, so crossing lines and stacked
+  // points stay legible instead of merging into one blob.
+  const paint = { fill, stroke: ring, strokeWidth: 2, style: { cursor: 'pointer' } }
+  if (shape === 'square') {
+    return <rect x={cx - size} y={cy - size} width={size * 2} height={size * 2} rx={1} {...paint} />
+  }
+  if (shape === 'triangle') {
+    const w = size * 1.15
+    return <path d={`M ${cx} ${cy - w} L ${cx + w} ${cy + size * 0.9} L ${cx - w} ${cy + size * 0.9} Z`} {...paint} />
+  }
+  return <circle cx={cx} cy={cy} r={size} {...paint} />
+}
+
+const categoryChartCopy: Record<CategoryView, { title: string; description: string; empty: string }> = {
+  all: {
+    title: 'Category Breakdown',
+    description: 'All income and expenses by category',
+    empty: 'No transactions in this period yet',
+  },
+  expense: {
+    title: 'Spending by Category',
+    description: 'Breakdown of your expenses by category',
+    empty: 'No expenses in this period yet',
+  },
+  income: {
+    title: 'Income by Category',
+    description: 'Breakdown of your income by category',
+    empty: 'No income in this period yet',
+  },
+}
 
 const INDEX_CARDS = [
   {
@@ -135,6 +212,7 @@ export default function Dashboard() {
   const [indexRows, setIndexRows] = useState<any[]>([]);
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState('');
+  const [categoryView, setCategoryView] = useState<CategoryView>('all');
   const { t, i18n } = useTranslation('common');
 
   // Get user's default currency from localStorage (preferences)
@@ -322,7 +400,7 @@ export default function Dashboard() {
     }
   }, [router, fetchDashboardData])
 
-  const getCategoryChartData = () => {
+  const getCategoryChartData = (view: CategoryView = 'all') => {
     if (!summary?.categories) return [];
     return Object.entries(summary.categories)
       .map(([name, data]) => {
@@ -336,8 +414,11 @@ export default function Dashboard() {
           type,
         };
       })
+      .filter(entry => view === 'all' || entry.type === view)
       .sort((a, b) => b.value - a.value);
   }
+
+  const categoryChartData = getCategoryChartData(categoryView)
 
   const getMonthlyChartData = () => {
     if (!summary?.monthlyBreakdown) return []
@@ -357,67 +438,43 @@ export default function Dashboard() {
     })
   }
 
+  const monthlyChartData = getMonthlyChartData()
+  const monthCount = Math.max(monthlyChartData.length, 1)
+  const monthlyAverages = {
+    income: monthlyChartData.reduce((sum, item) => sum + item.income, 0) / monthCount,
+    expenses: monthlyChartData.reduce((sum, item) => sum + item.expenses, 0) / monthCount,
+    net: monthlyChartData.reduce((sum, item) => sum + item.net, 0) / monthCount,
+  }
+
+  const displayCurrency = summary?.targetCurrency || defaultCurrency
+  const seriesColor = (series: TrendSeries) => (resolvedTheme === 'dark' ? series.dark : series.light)
+
   // Custom tooltip for the line chart
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-background border border-border p-4 rounded-lg shadow-lg">
           <p className="font-semibold text-foreground mb-2">{t(label)}</p>
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center space-x-2 mb-1">
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-sm font-medium text-muted-foreground">
-                {t(entry.name)}:
-              </span>
-              <span className="text-sm font-bold" style={{ color: entry.color }}>
-                {formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
-              </span>
-            </div>
-          ))}
+          {payload.map((entry: any, index: number) => {
+            const series = TREND_SERIES.find((s) => s.label === entry.name)
+            return (
+              <div key={index} className="flex items-center space-x-2 mb-1">
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  {renderMarker(series?.shape ?? 'circle', 6, 6, 4, entry.color, 'transparent')}
+                </svg>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {t(entry.name)}:
+                </span>
+                <span className="text-sm font-bold" style={{ color: entry.color }}>
+                  {formatCurrency(entry.value, displayCurrency)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )
     }
     return null
-  }
-
-  // Custom axis tick for better formatting
-  const CustomAxisTick = ({ x, y, payload }: any) => {
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text 
-          x={0} 
-          y={0} 
-          dy={16} 
-          textAnchor="middle" 
-          fill="hsl(var(--muted-foreground))"
-          fontSize={12}
-          fontWeight={500}
-        >
-          {payload.value}
-        </text>
-      </g>
-    )
-  }
-
-  // Custom Y-axis tick for currency formatting
-  const CustomYTick = ({ x, y, payload }: any) => {
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text 
-          x={10} 
-          y={0} 
-          dy={4} 
-          textAnchor="end" 
-          fill={resolvedTheme === 'dark' ? '#e5e7eb' : '#374151'}
-          fontSize={11}
-        >
-          {formatCurrency(payload.value, summary?.targetCurrency || defaultCurrency)}
-        </text>
-      </g>
-    )
   }
 
   // Custom label renderer for pie chart
@@ -748,45 +805,31 @@ export default function Dashboard() {
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">{t('Avg Income')}</p>
                       <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.income, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
+                        {formatCurrency(monthlyAverages.income, displayCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">{t('Avg Expenses')}</p>
                       <p className="text-lg font-bold text-red-600">
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.expenses, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
+                        {formatCurrency(monthlyAverages.expenses, displayCurrency)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-muted-foreground">{t('Avg Net')}</p>
-                      <p className={`text-lg font-bold ${getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                        {formatCurrency(getMonthlyChartData().reduce((sum, item) => sum + item.net, 0) / Math.max(getMonthlyChartData().length, 1), summary?.targetCurrency || defaultCurrency)}
+                      <p className={`text-lg font-bold ${monthlyAverages.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                        {formatCurrency(monthlyAverages.net, displayCurrency)}
                       </p>
                     </div>
                   </div>
 
                   <div className="h-80 relative z-10">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={getMonthlyChartData()} margin={{ top: 0, right: 32, left: 0, bottom: 0 }} style={{ cursor: 'pointer' }}>
-                        <defs>
-                          <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid 
-                          strokeDasharray="3 3" 
-                          stroke={resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)'}
+                      <LineChart data={monthlyChartData} margin={{ top: 16, right: 24, left: 8, bottom: 4 }} style={{ cursor: 'pointer' }}>
+                        {/* Horizontal hairlines only — the month labels already mark the columns */}
+                        <CartesianGrid
+                          vertical={false}
+                          stroke={resolvedTheme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.07)'}
                           strokeWidth={1}
-                          opacity={1}
                         />
                         <XAxis
                           dataKey="month"
@@ -798,62 +841,65 @@ export default function Dashboard() {
                             fontSize: 13,
                             fontWeight: 500
                           }}
-                          axisLine={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
+                          axisLine={false}
                           tickLine={false}
+                          tickMargin={12}
+                          /* Keeps the first and last markers clear of the plot edges */
+                          padding={{ left: 24, right: 24 }}
                         />
                         <YAxis
-                          tick={CustomYTick}
-                          axisLine={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)', strokeWidth: 1 }}
+                          tickFormatter={(value) => formatCompactCurrency(value, displayCurrency)}
+                          tick={{
+                            fill: resolvedTheme === 'dark' ? '#9ca3af' : '#6b7280',
+                            fontSize: 11
+                          }}
+                          axisLine={false}
                           tickLine={false}
-                          tickMargin={10}
+                          tickMargin={8}
+                          width={56}
+                        />
+                        {/* Break-even, so a negative Net reads at a glance */}
+                        <ReferenceLine
+                          y={0}
+                          stroke={resolvedTheme === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.22)'}
+                          strokeWidth={1}
                         />
                         <Tooltip content={<CustomTooltip />} cursor={{ stroke: resolvedTheme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)', strokeWidth: 2 }} />
-                        <Line 
-                          type="monotone" 
-                          dataKey="income" 
-                          stroke={resolvedTheme === 'dark' ? '#4ade80' : '#22c55e'}
-                          strokeWidth={3} 
-                          name="Income"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#4ade80' : '#22c55e', strokeWidth: 2, style: { cursor: 'pointer' } }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="expenses" 
-                          stroke={resolvedTheme === 'dark' ? '#f87171' : '#ef4444'}
-                          strokeWidth={3} 
-                          name="Expenses"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#f87171' : '#ef4444', strokeWidth: 2, style: { cursor: 'pointer' } }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="net" 
-                          stroke={resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6'}
-                          strokeWidth={3} 
-                          name="Net"
-                          dot={{ fill: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, r: 4, style: { cursor: 'pointer' } }}
-                          activeDot={{ r: 6, stroke: resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6', strokeWidth: 2, style: { cursor: 'pointer' } }}
-                        />
+                        {TREND_SERIES.map((series) => (
+                          <Line
+                            key={series.key}
+                            type="monotone"
+                            dataKey={series.key}
+                            stroke={seriesColor(series)}
+                            strokeWidth={2.5}
+                            name={series.label}
+                            dot={(props: any) => (
+                              <g key={`${series.key}-dot-${props.index}`}>
+                                {renderMarker(series.shape, props.cx, props.cy, 4, seriesColor(series), 'hsl(var(--card))')}
+                              </g>
+                            )}
+                            activeDot={(props: any) => (
+                              <g key={`${series.key}-active-${props.index}`}>
+                                {renderMarker(series.shape, props.cx, props.cy, 6, seriesColor(series), 'hsl(var(--card))')}
+                              </g>
+                            )}
+                          />
+                        ))}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
                   
-                  {/* Chart Legend */}
+                  {/* Chart Legend — same colours and marker shapes as the lines */}
                   <div className="mt-4 flex justify-center">
-                    <div className="flex items-center space-x-6">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-sm font-medium text-foreground">{t('Income')}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-sm font-medium text-foreground">{t('Expenses')}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span className="text-sm font-medium text-foreground">{t('Net')}</span>
-                      </div>
+                    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                      {TREND_SERIES.map((series) => (
+                        <div key={series.key} className="flex items-center space-x-2">
+                          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                            {renderMarker(series.shape, 6, 6, 4, seriesColor(series), 'transparent')}
+                          </svg>
+                          <span className="text-sm font-medium text-foreground">{t(series.label)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
@@ -862,52 +908,71 @@ export default function Dashboard() {
               {/* Category Breakdown */}
               <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
                 <CardHeader>
-                  <CardTitle>{t('Spending by Category')}</CardTitle>
-                  <CardDescription>
-                    {t('Breakdown of your expenses by category')}
-                  </CardDescription>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>{t(categoryChartCopy[categoryView].title)}</CardTitle>
+                      <CardDescription>
+                        {t(categoryChartCopy[categoryView].description)}
+                      </CardDescription>
+                    </div>
+                    <Tabs value={categoryView} onValueChange={(value) => setCategoryView(value as CategoryView)}>
+                      <TabsList>
+                        <TabsTrigger value="all">{t('Overall')}</TabsTrigger>
+                        <TabsTrigger value="expense">{t('Spending')}</TabsTrigger>
+                        <TabsTrigger value="income">{t('Income')}</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart style={{ cursor: 'pointer' }}>
-                        <Pie
-                          data={getCategoryChartData()}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={renderCustomLabel}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {getCategoryChartData().map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} style={{ cursor: 'pointer' }} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value, name) => [`${formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)}`, t(typeof name === 'string' ? name : '')]} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  
-                  {/* Legend */}
-                  {getCategoryChartData().length > 0 && (
-                    <div className="mt-4">
-                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-                        {getCategoryChartData().map((entry, index) => (
-                          <div key={entry.name} className="flex items-center space-x-2 whitespace-normal">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
-                              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                            />
-                            <span className="text-foreground whitespace-normal">{t(entry.name)}</span>
-                            <span className="text-muted-foreground ml-1">
-                              {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
-                            </span>
-                          </div>
-                        ))}
+                  {categoryChartData.length > 0 ? (
+                    <>
+                      <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart style={{ cursor: 'pointer' }}>
+                            <Pie
+                              data={categoryChartData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={renderCustomLabel}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {categoryChartData.map((entry) => (
+                                <Cell key={`cell-${entry.name}`} fill={getCategoryColor(entry.name)} style={{ cursor: 'pointer' }} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value, name) => [`${formatCurrency(value as number, summary?.targetCurrency || defaultCurrency)}`, t(typeof name === 'string' ? name : '')]} />
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
+
+                      {/* Legend */}
+                      <div className="mt-4">
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                          {categoryChartData.map((entry) => (
+                            <div key={entry.name} className="flex items-center space-x-2 whitespace-normal">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: getCategoryColor(entry.name) }}
+                              />
+                              <span className="text-foreground whitespace-normal">{t(entry.name)}</span>
+                              <span className="text-muted-foreground ml-1">
+                                {entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.value, summary?.targetCurrency || defaultCurrency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="h-80 flex items-center justify-center text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {t(categoryChartCopy[categoryView].empty)}
+                      </p>
                     </div>
                   )}
                 </CardContent>
