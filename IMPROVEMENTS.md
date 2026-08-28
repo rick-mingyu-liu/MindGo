@@ -787,10 +787,25 @@ full MailboxLayer response dump.
 
 **One of those mutations initially passed.** The harness rendered log arguments
 with `String()`, so `console.log('...', { email })` became `[object Object]` and
-an address logged inside an object was invisible to every assertion. The
-harness now uses `util.inspect`. Worth recording because the test looked
-thorough and proved nothing about that case — a guard against a leak has to see
-the same bytes an operator would.
+an address logged inside an object was invisible to every assertion — the shape
+half the call sites used. The harness now uses `util.inspect`. Worth recording
+because the test looked thorough and proved nothing about that case: a guard
+against a leak has to see the same bytes an operator would.
+
+**And CI caught a second problem with it — item 13, demonstrating itself.** The
+suite was green locally and red in CI, because `validateEmailMailboxLayer()`
+throws before it reaches any of the code under test when `MAILBOXLAYER_API_KEY`
+is unset. It passed locally only because a developer `.env` happened to have a
+key; CI sets none, so `register` returned 500 and never generated a token. The
+test now sets the key on `config` itself and the HTTP call stays mocked, so it
+no longer depends on the environment — verified by running it with the key
+blanked.
+
+That failure is worth keeping in mind for **decision C**: the missing key does
+not merely break registration in production, it silently changed what a test of
+unrelated code was exercising. `test/registerLogging.test.js` ends with a
+characterisation test pinning the 500, labelled as a bug rather than desired
+behaviour, which should be rewritten when decision C lands.
 
 ---
 

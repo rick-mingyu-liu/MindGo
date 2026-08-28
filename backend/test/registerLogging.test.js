@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const util = require('node:util');
 const axios = require('axios');
 const db = require('../db/connection');
+const config = require('../config');
 
 /**
  * A regression guard for item 16: registration must not write the
@@ -49,10 +50,20 @@ describe('POST /auth/register logging', () => {
   const EMAIL = 'john.doe@example.com';
   let printed;
   let insertedToken;
+  let savedKey;
 
   beforeEach(() => {
     printed = [];
     insertedToken = null;
+
+    // validateEmailMailboxLayer() throws before it ever calls axios when this
+    // key is absent, so without it `register` 500s and never reaches the code
+    // under test. CI sets no key and caught this: the suite passed locally
+    // purely because a developer .env happened to have one. See item 13 /
+    // decision C -- that 500 is the open bug, and the characterisation test at
+    // the bottom of this file pins it.
+    savedKey = config.apiKeys.mailboxLayer;
+    config.apiKeys.mailboxLayer = 'test-key-not-used-the-http-call-is-mocked';
 
     mock.method(console, 'log', (...args) => printed.push(args));
     mock.method(console, 'error', (...args) => printed.push(args));
@@ -79,6 +90,7 @@ describe('POST /auth/register logging', () => {
   });
 
   afterEach(() => {
+    config.apiKeys.mailboxLayer = savedKey;
     mock.restoreAll();
     delete require.cache[emailServicePath];
     delete require.cache[authControllerPath];
@@ -129,5 +141,22 @@ describe('POST /auth/register logging', () => {
     const { output } = await register();
     assert.match(output, /j\*\*\*@example\.com/);
     assert.match(output, /user 7/);
+  });
+
+  test('CHARACTERISATION: without a MailboxLayer key, register 500s', async () => {
+    // This asserts a **bug**, not desired behaviour. validateEmailMailboxLayer
+    // throws at authController.js:32, outside the try that opens at line 35, so
+    // it escapes to register's catch and becomes a 500 — while .env.example and
+    // config/validate.js both call the key optional.
+    //
+    // It is pinned here because it is what made this suite environment-dependent
+    // and red in CI. When decision C lands (item 13), this test should be
+    // changed to assert whatever the new behaviour is.
+    config.apiKeys.mailboxLayer = undefined;
+
+    const { res } = await register();
+
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.body, { error: 'Server error' });
   });
 });
