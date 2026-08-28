@@ -23,7 +23,7 @@ Ordered by value-per-effort, not by severity alone.
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
 | 13 | Three dead top-level symbols, and a 500 on register | open — needs a product call |
-| 14 | `/auth/verify-email` leaks another user's email | open — **security** |
+| 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 
 ---
 
@@ -420,7 +420,7 @@ it genuinely optional; that is the case for option "wire it up".
 
 ## 14. `/auth/verify-email` returns another user's email address
 
-**Status:** open — **security**
+**Status:** ✅ FIXED 2026-08-28 — **security**
 **Found:** while reading item 13's surroundings
 
 `controllers/authController.js`, in `verifyEmail`. When the supplied token
@@ -444,10 +444,24 @@ because no account had verified within the window, which is also why this has
 never been noticed.
 
 The intent was a friendly "you're already verified" message for someone who
-clicks their link twice. That needs to be keyed on *their* token — for example
-by keeping consumed tokens with a `used_at` timestamp — not by guessing at
-whoever registered most recently. Until then the fallback should be deleted and
-the handler should return the 400 it already has.
+clicks their link twice. Verification clears the token, so the second click is
+genuinely indistinguishable from a forged one — and the query guessed.
+
+**Fixed by deleting the fallback.** An unknown token now returns the 400 the
+handler already had. Verified: forged tokens of both shapes return 400 with no
+`@` anywhere in the response, and a real end-to-end verification still succeeds
+and returns only that user's own row.
+
+The same handler was also logging the raw verification token, which is a
+credential — possession of it verifies the account — into every log sink the
+platform ships to. That line no longer includes it.
+
+**Follow-up, if the friendly message is wanted back:** it has to be keyed on
+*which* token was consumed. Either stop nulling the token on verification and
+branch on `email_verified`, or add a `email_verification_used_at` column. The
+second is cleaner but needs a migration plus the matching `schema.sql` edit.
+The frontend still has its `alreadyVerified` branch, which currently does the
+same thing as the success branch, so restoring it is backend-only.
 
 ---
 
@@ -473,13 +487,13 @@ Not code — carried over from the 2026-08-27 database work.
 2. ~~The 6 zh translations, and namespacing the colliding keys~~ — done (PR #12)
 3. ~~`config` as the single source of env and policy~~ — done (round 2, items 2/3/10)
 4. ~~Make lint runnable~~ — done (round 2, item 6), which produced items 12–14
-5. **Next: delete the `verify-email` fallback query (item 14).** It is the only
-   open item that hands a stranger someone else's email address, and the fix is
-   a deletion.
-6. Decide the three dead symbols, and whether `MAILBOXLAYER_API_KEY` should stop
-   500ing registration (item 13)
-7. One integration test over auth → transaction → summary, with `check:locales`
-   and both `lint` scripts wired into the same CI workflow (item 5)
-8. Fill in the 59 missing Chinese strings (item 9)
+5. ~~Delete the `verify-email` fallback query~~ — done (round 2, item 14)
+6. **Next:** one integration test over auth → transaction → summary, with
+   `check:locales` and both `lint` scripts in the same CI workflow (item 5)
+7. Fill in the 59 missing Chinese strings (item 9)
+
+**Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
+13 (three dead symbols, and whether a missing `MAILBOXLAYER_API_KEY` should
+stop 500ing registration). Item 9 needs someone who reads Chinese.
 
 Items 7 and 8 are cleanup rather than risk; do them when touching that code.

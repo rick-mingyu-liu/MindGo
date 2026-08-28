@@ -200,26 +200,21 @@ const authController = {
   async verifyEmail(req, res) {
     try {
       const { token } = req.params;
-      console.log(`[VerifyEmail] Received verification request for token:`, token);
+      console.log('[VerifyEmail] Received verification request'); // token is a credential — not logged
       // Find user with this verification token
       const user = await db.query(
         'SELECT id, email, first_name, email_verification_expires, created_at FROM users WHERE email_verification_token = $1',
         [token]
       );
       if (user.rows.length === 0) {
-        console.log(`[VerifyEmail] No user found for token:`, token);
-        // Try to find a recently verified user (last 30 min)
-        const recentVerified = await db.query(
-          `SELECT id, email, first_name FROM users WHERE email_verified = TRUE AND email_verification_token IS NULL AND created_at > NOW() - INTERVAL '30 minutes' ORDER BY created_at DESC LIMIT 1`
-        );
-        if (recentVerified.rows.length > 0) {
-          console.log(`[VerifyEmail] User already verified:`, recentVerified.rows[0].email);
-          return res.status(200).json({
-            message: 'Your email is already verified. You can now log in to your account.',
-            alreadyVerified: true,
-            user: recentVerified.rows[0]
-          });
-        }
+        console.log('[VerifyEmail] No user found for the supplied token');
+        // There used to be a fallback here that answered "already verified" by
+        // looking up whichever account had verified most recently. Verification
+        // clears the token, so a second click on a real link is indistinguishable
+        // from a forged one — and that query guessed. On an unauthenticated
+        // route it returned a stranger's id, email and first name, which the
+        // frontend then displayed. Telling the two apart requires knowing which
+        // token was consumed; until the schema records that, this is a 400.
         return res.status(400).json({ error: 'Invalid verification token' });
       }
       const now = new Date();
