@@ -17,7 +17,7 @@ Ordered by value-per-effort, not by severity alone.
 | 5 | No tests; `npm test` passes by doing nothing | ✅ done — round 2 |
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
 | 7 | Orphan `Savings` category | open — needs a product call |
-| 8 | Scheduler depends upward on controllers | open |
+| 8 | Scheduler depends upward on controllers | ✅ done — round 5 |
 | 9 | 59 Chinese strings missing entirely | ✅ done — round 4 |
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
@@ -313,20 +313,73 @@ Either promote `Savings` to a real category or migrate the four rows to
 
 ## 8. The scheduler depends upward on controllers
 
-**Status:** open
-**Effort:** medium
+**Status:** ✅ DONE 2026-08-28
 
-`services/schedulerService.js` imports `authController` and `aiController` to
-reuse `autoDeleteOldAIPlans` and `deleteUnverifiedAccounts` — a service
-depending on the layer above it. Those functions are also HTTP handlers written
-against `(req, res)`, so the scheduler works around their signature.
+`autoDeleteOldAIPlans` and `deleteUnverifiedAccounts` moved out of
+`aiController` / `authController` into a new
+[services/cleanupService.js](backend/services/cleanupService.js). The scheduler
+now depends downward, and the controllers no longer carry methods that were
+never HTTP handlers.
 
-Push the logic down into a cleanup service that both the controller and the
-scheduler call. Already noted in `backend/ARCHITECTURE.md`.
+**The premise of this item was wrong, in a way worth recording.** Both this file
+and `CLAUDE.md` said the two functions were "invoked both by HTTP routes and the
+scheduler", so the plan was to split shared logic out from under two callers.
+Grepping found **no route mounts for either one** — they take no `(req, res)`,
+never send a response, and the scheduler was the only caller. A move, not a
+split. Both documents are corrected.
 
-Lower priority, same family: SQL lives directly in controllers (~11 `db.query`
-calls in `transactionController.js` alone). Fine at current size; it becomes the
-reason a schema change takes a day once the table count grows.
+### The three real bugs found on the way
+
+None of these was the layering problem; all three were in the timer plumbing.
+
+1. **`stop()` never stopped the cleanup jobs.** It tried `job.stop()` then
+   `job.destroy()` and gave up. `setInterval` returns a `Timeout`, which has
+   neither — so it fell through both branches and logged
+   `Stopped scheduled job: aiCleanup` for a job that kept firing. Latent rather
+   than harmful today, because both callers in `app.js` follow it with
+   `process.exit(0)`; it bites the first time anything stops the scheduler
+   without exiting.
+
+2. **The error handling could not catch anything.** The shape was
+   `setInterval(() => { try { asyncThing(); logger.debug('completed') } catch {} })`.
+   `asyncThing()` returns a promise, so the `try` block exits before the work
+   finishes: the `catch` was unreachable, and "completed" was logged the instant
+   the task *started*. A cleanup failing every single run looked healthy.
+
+3. **`getStatus()` reported every job as active forever**, stopped ones
+   included — it read `job.running` and `job.nextDate()`, neither of which
+   exists on either job type under node-cron 4. Never called; fixed rather than
+   deleted.
+
+Also removed: the unverified-account DELETE used
+`RETURNING id, email, created_at` and logged **every deleted account's email
+address**, putting user emails into the server log on a ten-minute timer. Same
+family as item 14. The row count is all the caller needed.
+
+### Design note
+
+`cleanupService` **throws** rather than logging and returning. What a failed
+cleanup means belongs to the caller — the scheduler logs and stays alive; a
+future admin endpoint would return a 500. Swallowing it in the service takes
+that choice from both, and swallowing is what let the old code report success
+for work that had failed.
+
+Covered by `test/cleanupService.test.js` and `test/schedulerService.test.js`
+(20 tests, no database). Mutation-tested: reverting `stop()`, dropping the
+`await`, removing `unref()`, restoring `RETURNING`, and re-swallowing the error
+each fail the suite.
+
+**Open question for you:** `logger.info` is gated on
+`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'`. The
+cleanup now logs its row counts through the logger, matching the rest of
+`schedulerService` — which means **in production those lines are silent**. The
+old `console.log` always printed. Errors still always print. If you want an
+audit trail of what the retention jobs delete in production, that is a logger
+change rather than a scheduler one.
+
+**Not done, same family:** SQL still lives directly in controllers (~11
+`db.query` calls in `transactionController.js` alone). Fine at current size; it
+becomes the reason a schema change takes a day once the table count grows.
 
 ---
 
@@ -587,8 +640,12 @@ Not code — carried over from the 2026-08-27 database work.
 6. ~~Tests and CI~~ — done (round 2, item 5)
 7. ~~A guard for untranslated keys~~ — done (round 3, item 9)
 8. ~~Translate the 59 missing Chinese strings~~ — done (round 4, item 9)
-9. **Next:** push the scheduler's cleanup logic down out of the controllers
-   (item 8) — the last piece of work here that needs no decision
+9. ~~Push the scheduler's cleanup logic down out of the controllers~~ — done
+   (round 5, item 8), which turned up three timer bugs and a second place user
+   email addresses were being written to the log
+
+**Nothing is left that does not need a decision.** Items 7 and 13 are both
+yours to call, as is the production-logging question raised under item 8.
 
 **Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
 13 (three dead symbols, and whether a missing `MAILBOXLAYER_API_KEY` should
