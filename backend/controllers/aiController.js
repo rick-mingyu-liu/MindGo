@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const aiPlanner = require('../services/aiPlanner');
+const config = require('../config');
 
 const aiController = {
   // Generate AI financial plan
@@ -416,11 +417,12 @@ const aiController = {
     }
   },
 
-  // Auto-delete AI plans older than 30 minutes
+  // Auto-delete AI plans older than dataRetention.aiPlanMinutes
   async autoDeleteOldAIPlans() {
     try {
       const result = await db.query(
-        `DELETE FROM ai_plans WHERE created_at < NOW() - INTERVAL '30 minutes'`
+        'DELETE FROM ai_plans WHERE created_at < NOW() - make_interval(mins => $1)',
+        [config.dataRetention.aiPlanMinutes]
       );
       console.log(`Auto-deleted ${result.rowCount} old AI plans.`);
     } catch (error) {

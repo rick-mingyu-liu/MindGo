@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
+const config = require('../config');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
 const axios = require('axios');
 
@@ -22,7 +23,7 @@ const DISPOSABLE_EMAIL_DOMAINS = [
 
 // MailboxLayer API validation
 async function validateEmailMailboxLayer(email) {
-  const apiKey = process.env.MAILBOXLAYER_API_KEY;
+  const apiKey = config.apiKeys.mailboxLayer;
   if (!apiKey) {
     throw new Error('MailboxLayer API key not set');
   }
@@ -99,7 +100,7 @@ const authController = {
 
       // Generate email verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
       console.log(`[Register] Generated verification token for ${email}:`, verificationToken);
 
       // Create user with email verification fields
@@ -173,8 +174,8 @@ const authController = {
       // Generate JWT token
       const token = jwt.sign(
         { userId: user.rows[0].id, email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
       );
 
       const { password_hash, email_verified, ...userWithoutPassword } = user.rows[0];
@@ -271,17 +272,17 @@ const authController = {
         return res.status(400).json({ error: 'Email is already verified' });
       }
 
-      // Check if previous token is still valid (within 1 hour)
+      // Check if previous token is still valid (within the resend cooldown)
       if (user.rows[0].email_verification_expires && 
           new Date() < new Date(user.rows[0].email_verification_expires) &&
-          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - 60 * 60 * 1000)) {
+          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - config.emailVerification.resendCooldown)) {
         return res.status(400).json({ error: 'Please wait before requesting another verification email' });
       }
 
       // Generate new verification token
       const crypto = require('crypto');
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
 
       // Update user with new token
       await db.query(
@@ -376,12 +377,13 @@ const authController = {
     }
   },
 
-  // Scheduled job: Delete unverified accounts older than 30 minutes
+  // Scheduled job: delete unverified accounts older than dataRetention.unverifiedAccountMinutes
   async deleteUnverifiedAccounts() {
     try {
       console.log(`[Cleanup] Running unverified user cleanup job at`, new Date());
       const result = await db.query(
-        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email, created_at` 
+        'DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - make_interval(mins => $1) RETURNING id, email, created_at',
+        [config.dataRetention.unverifiedAccountMinutes]
       );
       if (result.rows.length > 0) {
         console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => ({email: u.email, created_at: u.created_at})));

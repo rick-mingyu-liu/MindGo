@@ -1,9 +1,10 @@
 const OpenAI = require('openai');
+const config = require('../config');
 
 class AIPlanner {
   constructor() {
     this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: config.apiKeys.openai,
     });
   }
 
@@ -16,7 +17,7 @@ class AIPlanner {
    */
   async generatePlan(userPrompt, financialData = null, language = 'en') {
     try {
-      if (!process.env.OPENAI_API_KEY) {
+      if (!config.apiKeys.openai) {
         throw new Error('OpenAI API key not configured');
       }
 

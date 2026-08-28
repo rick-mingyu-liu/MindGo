@@ -1,5 +1,5 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const config = require('../config');
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 let pool = null;
@@ -7,31 +7,31 @@ let lastRequestTime = Date.now();
 let inactivityTimer = null;
 
 // Pin the schema explicitly. Every query in this codebase names tables
-// unqualified, which only resolves if search_path includes public — and Neon's
-// pooled endpoint (-pooler host) hands out sessions with an EMPTY search_path,
-// where those queries fail with 'relation "transactions" does not exist'. The
-// direct endpoint defaults to "$user", public and works, so the failure looks
-// intermittent depending on which host the connection string points at. Setting
-// it here makes the app behave the same on both.
-const SEARCH_PATH = process.env.DB_SCHEMA || 'public';
+// unqualified, which only resolves if search_path includes public. Neon's
+// *Azure* pooler handed out sessions with an EMPTY search_path, where those
+// queries all failed with 'relation "transactions" does not exist'; the AWS
+// pooler this project now runs on hands out a normal "$user", public. So this
+// is defensive rather than load-bearing today — it costs one statement per
+// connection and makes the app behave identically on any endpoint.
+const SEARCH_PATH = config.database.schema;
 
 const baseOptions = {
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: config.nodeEnv === 'production' ? { rejectUnauthorized: false } : false,
   idleTimeoutMillis: 30000, // 30 seconds
 };
 
-const connectionOptions = process.env.DATABASE_URL
+const connectionOptions = config.database.url
   ? {
       ...baseOptions,
-      connectionString: process.env.DATABASE_URL,
+      connectionString: config.database.url,
     }
   : {
       ...baseOptions,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD || '',
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      database: process.env.DB_DATABASE,
+      user: config.database.user,
+      password: config.database.password,
+      host: config.database.host,
+      port: config.database.port,
+      database: config.database.database,
     };
 
 function createPool() {

@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const db = require('../db/connection');
 const { getExchangeRate } = require('./exchangeRateService');
+const config = require('../config');
 
 // The dashboard defaults to CAD, so the report reads in the same currency.
 const REPORT_CURRENCY = 'CAD';
@@ -8,14 +9,14 @@ const REPORT_CURRENCY = 'CAD';
 const transporter = nodemailer.createTransport({
   service: 'gmail', // Change if using another provider
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: config.email.user,
+    pass: config.email.pass,
   },
 });
 
 exports.sendWeeklyReport = async (to, content, htmlContent) => {
   await transporter.sendMail({
-    from: `"MindGo" <${process.env.EMAIL_USER}>`,
+    from: `"MindGo" <${config.email.user}>`,
     to,
     subject: 'Your Weekly Financial Report',
     text: content,
@@ -24,7 +25,7 @@ exports.sendWeeklyReport = async (to, content, htmlContent) => {
 };
 
 exports.sendEmailVerification = async (to, firstName, verificationToken) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = config.frontendUrl;
   const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
   console.log(`[EmailService] Using verification URL: ${verificationUrl}`);
   
@@ -83,7 +84,7 @@ The MindGo Team
   `;
 
   await transporter.sendMail({
-    from: `"MindGo" <${process.env.EMAIL_USER}>`,
+    from: `"MindGo" <${config.email.user}>`,
     to,
     subject: 'Verify your MindGo account',
     text: textContent,

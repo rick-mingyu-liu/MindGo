@@ -1,8 +1,9 @@
 const axios = require('axios');
+const config = require('../config');
 
 class FreeStockDataService {
   constructor() {
-    this.alphaVantageApiKey = process.env.ALPHA_VANTAGE_API_KEY || 'demo';
+    this.alphaVantageApiKey = config.apiKeys.alphaVantage;
     this.cache = new Map();
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
   }

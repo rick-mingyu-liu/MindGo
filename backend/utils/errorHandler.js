@@ -1,4 +1,5 @@
 const logger = require('./logger');
+const config = require('../config');
 
 class ErrorHandler {
   // Standard error responses
@@ -50,7 +51,7 @@ class ErrorHandler {
     logger.error(`Server Error: ${message}`, error);
     return res.status(500).json({
       error: message,
-      ...(process.env.NODE_ENV === 'development' && { details: error.message })
+      ...(config.nodeEnv === 'development' && { details: error.message })
     });
   }
 
