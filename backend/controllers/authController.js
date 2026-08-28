@@ -374,24 +374,6 @@ const authController = {
       console.error('Update notification settings error:', error);
       res.status(500).json({ error: 'Failed to update notification settings' });
     }
-  },
-
-  // Scheduled job: delete unverified accounts older than dataRetention.unverifiedAccountMinutes
-  async deleteUnverifiedAccounts() {
-    try {
-      console.log(`[Cleanup] Running unverified user cleanup job at`, new Date());
-      const result = await db.query(
-        'DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - make_interval(mins => $1) RETURNING id, email, created_at',
-        [config.dataRetention.unverifiedAccountMinutes]
-      );
-      if (result.rows.length > 0) {
-        console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => ({email: u.email, created_at: u.created_at})));
-      } else {
-        console.log(`[Cleanup] No unverified accounts deleted.`);
-      }
-    } catch (error) {
-      console.error('[Cleanup] Error deleting unverified accounts:', error);
-    }
   }
 };
 
