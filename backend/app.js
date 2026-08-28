@@ -6,6 +6,12 @@ require('dotenv').config();
 
 // Import utilities and services
 const config = require('./config');
+const validateConfig = require('./config/validate');
+
+// Before anything else is loaded: a missing JWT_SECRET or database URL makes
+// every request fail later, in ways that read as bugs rather than as setup.
+validateConfig();
+
 const logger = require('./utils/logger');
 const ErrorHandler = require('./utils/errorHandler');
 const schedulerService = require('./services/schedulerService');
