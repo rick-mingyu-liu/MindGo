@@ -14,7 +14,7 @@ Ordered by value-per-effort, not by severity alone.
 | 2 | `config/index.js` is decorative; password length mismatch | ✅ done — round 2 |
 | 3 | No fail-fast on missing secrets | ✅ done — round 2 |
 | 4 | Six wrong Chinese translations (duplicate keys) | ✅ done — PR #12 |
-| 5 | No tests; `npm test` passes by doing nothing | open |
+| 5 | No tests; `npm test` passes by doing nothing | ✅ done — round 2 |
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
 | 7 | Orphan `Savings` category | open — needs a product call |
 | 8 | Scheduler depends upward on controllers | open |
@@ -177,8 +177,8 @@ and 7 Chinese duplicates removed; verified 0 regressions across 472 `t()` keys,
 `tsc` clean, `next build` passing.
 
 `npm run check:locales` (`frontend/scripts/check-locales.js`) now fails the build
-on any duplicate key and is verified against an injected duplicate. **Wire it
-into CI** when item 5 is done.
+on any duplicate key and is verified against an injected duplicate. ✅ Wired
+into CI as of item 5.
 
 `frontend/public/locales/zh/common.json` has 7 duplicated keys, 6 of them with
 **different values**. `JSON.parse` keeps the last occurrence silently.
@@ -207,8 +207,50 @@ stops it recurring.
 
 ## 5. No tests, and `npm test` passes by doing nothing
 
-**Status:** open
+**Status:** ✅ DONE 2026-08-28
 **Effort:** medium
+
+31 tests, run by `node --test`. No framework installed — none was needed.
+
+| File | Needs | Covers |
+|---|---|---|
+| `exchangeRateService.test.js` | nothing | the rate, the cache, per-direction keys, and the failure modes that produce a *plausible* wrong number |
+| `configValidate.test.js` | nothing | the startup check, in a child process because it exits |
+| `api.test.js` | `TEST_DATABASE_URL` | login, validation, ownership scoping, summary arithmetic, delete |
+
+The integration suite **will not borrow `DATABASE_URL` from `.env`** — it
+creates and deletes users, so pointing it anywhere has to be deliberate. It
+skips with a message when the variable is absent, so `npm test` stays useful on
+a machine with no Postgres.
+
+**The tests were verified to fail.** Three mutations, each caught by exactly the
+intended test and nothing else: net income subtraction → addition, ownership
+scoping dropped from the transaction query, and the exchange-rate cache key
+made order-independent. A suite that has never failed is not evidence of
+anything.
+
+Two blockers had to go first, both real bugs in their own right:
+
+- `app.js` bound a port on `require`, so importing it to test the routes
+  started a server. Now guarded by `require.main === module`.
+- `db/connection.js`'s five-minute inactivity timer kept the event loop alive,
+  so **any** script requiring it hung for five minutes after finishing its
+  work. Now `unref`'d.
+
+CI is `.github/workflows/ci.yml`: backend lint + tests against a Postgres 17
+service container, frontend `check:locales` + lint + build. It uses `npm ci`,
+so the drift in item 11 would now fail the build.
+
+> **Found while writing these:** the rate limiter values were still hardcoded in
+> `middleware/rateLimiter.js`, which item 2 missed. They are in `config` now and
+> readable from the environment, which closes the tuning note under item 1.
+> Also worth knowing: `authLimiter`'s 5 per 15 minutes covers `/register`,
+> `/login`, `/resend-verification` and `/test-email` **combined** per IP — a
+> user who mistypes a password three times and then tries to register is locked
+> out.
+
+<details>
+<summary>Original finding</summary>
 
 `backend/package.json` → `"test": "echo \"No tests specified\" && exit 0"`. It
 exits 0, so any CI would report green while testing nothing. No test files exist
@@ -225,6 +267,7 @@ conversion and the `updated_at` triggers.
 Currency conversion deserves unit tests specifically: pure arithmetic on money,
 a network dependency behind a 1-hour cache, and a wrong rate produces
 plausible-looking numbers — the worst kind of failure.
+</details>
 
 ---
 
@@ -247,6 +290,8 @@ The first backend run found 19 problems, including three real defects — see
 item 12 and the `globalErrorHandler` duplicate. The rest were dead bindings,
 now removed. Three dead top-level symbols are marked rather than deleted; see
 item 13.
+
+Both lint scripts run in CI as of item 5, so nothing runs unattended any more.
 
 ---
 
@@ -488,12 +533,13 @@ Not code — carried over from the 2026-08-27 database work.
 3. ~~`config` as the single source of env and policy~~ — done (round 2, items 2/3/10)
 4. ~~Make lint runnable~~ — done (round 2, item 6), which produced items 12–14
 5. ~~Delete the `verify-email` fallback query~~ — done (round 2, item 14)
-6. **Next:** one integration test over auth → transaction → summary, with
-   `check:locales` and both `lint` scripts in the same CI workflow (item 5)
-7. Fill in the 59 missing Chinese strings (item 9)
+6. ~~Tests and CI~~ — done (round 2, item 5)
+7. **Next:** fill in the 59 missing Chinese strings (item 9), and push the
+   scheduler's cleanup logic down out of the controllers (item 8)
 
 **Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
 13 (three dead symbols, and whether a missing `MAILBOXLAYER_API_KEY` should
-stop 500ing registration). Item 9 needs someone who reads Chinese.
+stop 500ing registration). Item 9 needs someone who reads Chinese to check the
+translations, though the mechanical part can be prepared first.
 
 Items 7 and 8 are cleanup rather than risk; do them when touching that code.
