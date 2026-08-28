@@ -58,7 +58,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint plus tests f
 
 ## Backend architecture
 
-Request flow: **route → (auth middleware) → validation → controller → service/db**.
+Request flow: **route → (auth middleware) → validation → controller → service/db**. [backend/ARCHITECTURE.md](backend/ARCHITECTURE.md) has the diagram, the patterns in use, and where the layering still leaks.
 
 - [backend/app.js](backend/app.js) wires helmet, morgan, cors, JSON parsing, mounts routers under `/auth`, `/transactions`, `/summary`, `/goals`, `/investments`, `/ai`, then global error + 404 handlers. On startup it also calls `schedulerService.init()`.
 - **All config is centralized** in [backend/config/index.js](backend/config/index.js) — ports, JWT settings, cron schedules, data-retention windows, validation limits, and API keys. Read env vars from here, not `process.env` directly, when adding features.
