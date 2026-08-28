@@ -3,9 +3,24 @@ const config = require('../config');
 
 class AIPlanner {
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: config.apiKeys.openai,
-    });
+    this.openai = null;
+  }
+
+  /**
+   * The OpenAI client, built on first use.
+   *
+   * It cannot be built in the constructor: this module is exported as an
+   * instance, so the constructor runs at require time, and the SDK throws when
+   * OPENAI_API_KEY is absent. That turned a missing optional key into a crash
+   * before app.js could even listen — the whole API, not just /ai — and it made
+   * the "OpenAI API key not configured" guard in generatePlan unreachable.
+   * Building it lazily lets that guard do its job.
+   */
+  get client() {
+    if (!this.openai) {
+      this.openai = new OpenAI({ apiKey: config.apiKeys.openai });
+    }
+    return this.openai;
   }
 
   /**
@@ -65,7 +80,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       }
 
 
-      const completion = await this.openai.chat.completions.create({
+      const completion = await this.client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
