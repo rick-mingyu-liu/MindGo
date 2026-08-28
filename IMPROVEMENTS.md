@@ -6,10 +6,9 @@ time of writing; file:line references are from that commit.
 
 Ordered by value-per-effort, not by severity alone.
 
-Four items remain open. One of them (16) is a security bug that needs no input;
-the other three are blocked on decisions, collected under
-[Decisions needed](#decisions-needed) so they can be answered without reading
-the whole backlog.
+Three items remain open, and **all three are blocked on a decision** rather than
+on work. They are collected under [Decisions needed](#decisions-needed) so they
+can be answered without reading the whole backlog.
 
 ## Status
 
@@ -30,7 +29,7 @@ the whole backlog.
 | 13 | Three dead top-level symbols, and a 500 on register | open — **decisions B and C** |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
-| 16 | Registration writes verification tokens to the log | **open — no decision needed** |
+| 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
 | 17 | Retention deletions are silent in production | open — **decision D** |
 
 ---
@@ -741,37 +740,57 @@ CI sets neither key, so this cannot regress.
 
 ## 16. Registration writes verification tokens to the log
 
-**Status:** open — **no decision needed**, and it is the highest-priority open
-item
-**Found:** while verifying item 13 for the decisions above
+**Status:** ✅ DONE 2026-08-28 — **security**
 
-`controllers/authController.js` logs the raw email-verification token twice on
-the registration happy path:
+`controllers/authController.js` logged the raw email-verification token twice on
+the registration happy path (lines 108 and 125). Both were live. **Anyone who
+could read the logs could verify an account they did not own**, for as long as
+the token stayed valid — 30 minutes. On Render that is anyone with dashboard
+access, plus whatever log aggregator is attached.
 
-```js
-console.log(`[Register] Generated verification token for ${email}:`, verificationToken);   // line 108
-console.log(`[Register] Sending verification email to ${email} with token:`, verificationToken);  // line 125
-```
+Both are gone. The line whose only content was the token was deleted; the other
+now names the user id.
 
-Both are live — neither sits behind a condition or in dead code. **Anyone who
-can read the logs can verify an account they do not own**, for as long as the
-token is valid (`config.emailVerification.tokenExpiry`, 30 minutes). On Render
-that is anyone with dashboard access, plus whatever log aggregator is attached.
+### The address logging, fixed in the same pass
 
-The third place user data has been found leaking here, and the second into the
-logs specifically — after the `verify-email` endpoint returning a stranger's
-address in its **response** (item 14), and the unverified-account cleanup's
-`RETURNING ... email` writing deleted users' addresses to the **log** every ten
-minutes (item 8).
+Nine call sites in that file wrote a user's address to stdout, including one
+that logged MailboxLayer's **entire API response** for every registration
+attempt. The rule now followed, and written down in `CLAUDE.md`:
 
-While fixing it, note that **eight** `console.log` call sites in this file write
-a user's email address to stdout — lines 38, 94, 96, 108, 115, 125, 232 and 240.
-Line 38 logs the entire MailboxLayer API response for every registration
-attempt. The two token lines are the security bug; the other six are a privacy
-question worth answering in the same pass.
+> log a user id where one exists, and a masked address only where one does not
 
-This needs no decision. It has not been fixed only because it was found after
-the last round closed.
+`utils/privacy.js` provides `maskEmail()` — `j***@example.com`. It keeps the
+domain, which is the part carrying diagnostic value (MX failures,
+provider-specific bounces) and is not identifying for the mail hosts nearly
+everyone uses. It uses a fixed number of stars rather than one per character,
+because the local part's length is a free distinguisher to remove. It never
+throws: it is called from inside logging statements, and a logging helper that
+can throw turns a diagnostic line into an outage.
+
+Also narrowed the two `console.error('Failed to send verification email',
+emailError)` calls to the error's code or message. A nodemailer *connection*
+failure carries no address — verified — but an SMTP-level rejection attaches
+`envelope` and `rejected`, which do. That path is not reproducible without a
+real SMTP server, so this is precautionary rather than a demonstrated leak.
+
+### Verification
+
+`test/privacy.test.js` (17 cases) and `test/registerLogging.test.js` (5 cases),
+neither needing a database or network. The second runs the real `register`
+handler with stubbed collaborators and asserts on everything it printed: no
+token, no 64-hex string of any kind, no raw address, and — because silence is
+not the goal — that the masked address and the user id *are* there.
+
+Mutation-tested, four mutations, each caught: restoring the token log, logging
+the raw address inside an object, making `maskEmail` a no-op, and restoring the
+full MailboxLayer response dump.
+
+**One of those mutations initially passed.** The harness rendered log arguments
+with `String()`, so `console.log('...', { email })` became `[object Object]` and
+an address logged inside an object was invisible to every assertion. The
+harness now uses `util.inspect`. Worth recording because the test looked
+thorough and proved nothing about that case — a guard against a leak has to see
+the same bytes an operator would.
 
 ---
 
@@ -830,10 +849,9 @@ Not code — carried over from the 2026-08-27 database work.
    (round 5, item 8), which turned up three timer bugs and a second place user
    email addresses were being written to the log
 
-10. **Next, and needing nothing from anyone:** stop logging verification tokens
-    (item 16). It is the only open item that is a security bug rather than a
-    judgement call.
-11. Then whichever of decisions **A**–**D** you have answered. C is worth
+10. ~~Stop logging verification tokens~~ — done (round 8, item 16), which also
+    fixed nine address-logging sites and produced `utils/privacy.js`
+11. **Next:** whichever of decisions **A**–**D** you have answered. C is worth
     answering early: registration is 500ing for anyone who deploys without a
     MailboxLayer key, and both `.env.example` and the startup check currently
     tell them the key is optional.
@@ -849,5 +867,4 @@ Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `..
 A native reader should still skim them; the check can prove a key *resolves*,
 never that the wording is good.
 
-Item 7 is cleanup rather than risk; do it when touching that code. Item 16 is
-not — it should not wait for a round.
+Item 7 is cleanup rather than risk; do it when touching that code.
