@@ -18,7 +18,7 @@ Ordered by value-per-effort, not by severity alone.
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
 | 7 | Orphan `Savings` category | open — needs a product call |
 | 8 | Scheduler depends upward on controllers | open |
-| 9 | 62 Chinese strings missing entirely | partly done — guard added, translations open |
+| 9 | 59 Chinese strings missing entirely | ✅ done — round 4 |
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
@@ -332,48 +332,44 @@ reason a schema change takes a day once the table count grows.
 
 ## 9. Chinese strings are missing entirely and render as English
 
-**Status:** partly done — the guard is in, the translations are not
-**Effort:** small mechanically; needs someone who reads Chinese
+**Status:** ✅ DONE 2026-08-28
 
-`npm run check:locales` now reports unresolved keys as **warnings** (duplicates
-stay fatal), so new untranslated strings are caught when they are added instead
-of being found by a user. Current state, out of 475 keys used:
+All 475 keys now resolve in both locales. 59 Chinese translations and 25 English
+entries were written; `npm run check:locales` reports `✔ every key resolves` for
+both, and CI runs it.
 
-| Locale | Missing |
-|---|---|
-| `zh` | **62** — a Chinese user reads raw English mid-sentence |
-| `en` | **28** — invisible, because the key *is* the English string |
+Two subtleties about *counting* the gap, both of which produced a wrong number
+before producing a right one:
 
-Writing that check turned up a subtlety worth recording. Resolution has to
-mirror i18next, which walks the key as a dotted path **and then falls back to
-the literal flat key** — that fallback is `ignoreJSONStructure`, on by default.
-A naive path lookup reports every key merely *containing* a dot as missing:
-`"Saving..."`, and every sentence ending in one. The first version of the check
-did exactly that and claimed 125 missing; the real number is 62.
+1. **i18next resolution is not a dotted-path lookup.** It walks the key as a
+   path **and then falls back to the literal flat key** — that fallback is
+   `ignoreJSONStructure`, on by default. A naive path lookup reports every key
+   merely *containing* a dot as missing: `"Saving..."`, and every sentence
+   ending in one. The first version of the check did that and claimed 125.
 
-**What is left** is the translation itself, which wants someone who reads
-Chinese. The worst offender remains `components/StockWatchlist.tsx`, which is
-close to entirely untranslated.
+2. **The key in the source is not the key at runtime.** `T_CALL` captures raw
+   source text, so `t('We\'ve sent…')` yielded a key with the backslash still
+   in it, matching nothing in `common.json` and reporting three perfectly good
+   translations as missing. Fixed with `unescapeLiteral()`. This is what put the
+   count at 62/28 when the original hand audit had said 59/25 — the hand audit
+   was right.
 
-<details>
-<summary>Original finding</summary>
+The check is mutation-tested: deleting a translated key, fabricating a
+*genuinely* missing escaped-quote key, and introducing a conflicting duplicate
+are each caught. That third one still exits non-zero; unresolved keys remain
+warnings.
 
-Auditing all 472 `t()` keys against both locale files:
+**Adjacent, deliberately not done** — page `<title>` tags are outside the `t()`
+system entirely, so a Chinese user gets an English browser tab. Two of them also
+read `Personal Finance App` rather than `MindGo`
+([pages/transactions/new.tsx](frontend/pages/transactions/new.tsx),
+[pages/transactions/edit/[id].tsx](frontend/pages/transactions/edit/[id].tsx)).
+Worth a follow-up; it is a different change from this one.
 
-- **zh: 59 keys have no entry** — i18next falls back to the key itself, so a
-  Chinese user sees raw English mid-sentence. Worst offender is
-  `components/StockWatchlist.tsx`, which appears to be entirely untranslated.
-- **en: 25 keys have no entry** — invisible, because the key *is* the English
-  string. Harmless today, but it means `en/common.json` is not a reliable
-  inventory of translatable strings.
-
-Extend `scripts/check-locales.js` to also report unresolved keys, so new
-untranslated strings are caught when added rather than discovered by a user.
-Keep it a warning rather than an error until the existing 59 are cleared,
-otherwise it just blocks every build.
-</details>
-
----
+A `Data Retention Settings` / `Save to Blockchain` card in
+[pages/settings.tsx](frontend/pages/settings.tsx) is hardcoded English, but it
+sits inside a `{/* … */}` JSX comment and never renders. Dead UI, not an i18n
+gap — see item 13.
 
 ## 10. Environment variables are undocumented
 
@@ -590,12 +586,18 @@ Not code — carried over from the 2026-08-27 database work.
 5. ~~Delete the `verify-email` fallback query~~ — done (round 2, item 14)
 6. ~~Tests and CI~~ — done (round 2, item 5)
 7. ~~A guard for untranslated keys~~ — done (round 3, item 9)
-8. **Next:** translate the 62 missing Chinese strings (item 9), and push the
-   scheduler's cleanup logic down out of the controllers (item 8)
+8. ~~Translate the 59 missing Chinese strings~~ — done (round 4, item 9)
+9. **Next:** push the scheduler's cleanup logic down out of the controllers
+   (item 8) — the last piece of work here that needs no decision
 
 **Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
 13 (three dead symbols, and whether a missing `MAILBOXLAYER_API_KEY` should
-stop 500ing registration). Item 9 needs someone who reads Chinese to check the
-translations, though the mechanical part can be prepared first.
+stop 500ing registration).
+
+**Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
+to match the conventions already in `zh/common.json` — full-width `（）` around
+Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `...`.
+A native reader should still skim them; the check can prove a key *resolves*,
+never that the wording is good.
 
 Items 7 and 8 are cleanup rather than risk; do them when touching that code.
