@@ -8,9 +8,14 @@ const ALPHA_VANTAGE_API_KEY = config.apiKeys.alphaVantage;
 
 class FinnhubService {
   constructor() {
-    if (!FINNHUB_API_KEY) {
-      throw new Error('Finnhub API key is not set in environment variables');
-    }
+    // Deliberately empty. This used to throw when FINNHUB_API_KEY was absent,
+    // but the module is exported as an instance, so the constructor runs at
+    // require time — which took down the entire API at boot, not just the
+    // stock endpoints, because investmentController requires it. It also
+    // defeated the layered design: callers already fall back to
+    // freeStockDataService (Yahoo, then Alpha Vantage), so a missing key
+    // should degrade to the free path rather than be fatal.
+    // config/validate.js reports the missing key at startup.
   }
 
   // Get real-time quote for a stock
