@@ -18,12 +18,13 @@ Ordered by value-per-effort, not by severity alone.
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
 | 7 | Orphan `Savings` category | open — needs a product call |
 | 8 | Scheduler depends upward on controllers | open |
-| 9 | 59 Chinese strings missing entirely | open |
+| 9 | 62 Chinese strings missing entirely | partly done — guard added, translations open |
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
 | 13 | Three dead top-level symbols, and a 500 on register | open — needs a product call |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
+| 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 
 ---
 
@@ -329,10 +330,33 @@ reason a schema change takes a day once the table count grows.
 
 ---
 
-## 9. 59 Chinese strings are missing entirely and render as English
+## 9. Chinese strings are missing entirely and render as English
 
-**Status:** open (found while fixing item 4)
+**Status:** partly done — the guard is in, the translations are not
 **Effort:** small mechanically; needs someone who reads Chinese
+
+`npm run check:locales` now reports unresolved keys as **warnings** (duplicates
+stay fatal), so new untranslated strings are caught when they are added instead
+of being found by a user. Current state, out of 475 keys used:
+
+| Locale | Missing |
+|---|---|
+| `zh` | **62** — a Chinese user reads raw English mid-sentence |
+| `en` | **28** — invisible, because the key *is* the English string |
+
+Writing that check turned up a subtlety worth recording. Resolution has to
+mirror i18next, which walks the key as a dotted path **and then falls back to
+the literal flat key** — that fallback is `ignoreJSONStructure`, on by default.
+A naive path lookup reports every key merely *containing* a dot as missing:
+`"Saving..."`, and every sentence ending in one. The first version of the check
+did exactly that and claimed 125 missing; the real number is 62.
+
+**What is left** is the translation itself, which wants someone who reads
+Chinese. The worst offender remains `components/StockWatchlist.tsx`, which is
+close to entirely untranslated.
+
+<details>
+<summary>Original finding</summary>
 
 Auditing all 472 `t()` keys against both locale files:
 
@@ -347,6 +371,7 @@ Extend `scripts/check-locales.js` to also report unresolved keys, so new
 untranslated strings are caught when added rather than discovered by a user.
 Keep it a warning rather than an error until the existing 59 are cleared,
 otherwise it just blocks every build.
+</details>
 
 ---
 
@@ -510,6 +535,36 @@ same thing as the success branch, so restoring it is backend-only.
 
 ---
 
+## 15. Two services crashed the whole app at boot without an optional key
+
+**Status:** ✅ FIXED 2026-08-28
+**Found:** by CI, on its first ever run
+
+`services/aiPlanner.js` and `services/finnhubService.js` are both exported as
+instances (`module.exports = new X()`), so their constructors run at *require*
+time. `aiPlanner` built the OpenAI client there, and the SDK throws without
+`OPENAI_API_KEY`; `finnhubService` threw explicitly without `FINNHUB_API_KEY`.
+
+`investmentController` and `aiController` require them, so a missing key took
+down the **entire API at boot** — every route, not just `/ai` and the stock
+endpoints. Neither key is documented as required, and item 3's startup check
+described both as degrading gracefully. They did not.
+
+This is the clearest possible argument for item 5. It could not show locally,
+because `.env` has both keys; it showed in CI within a minute of the workflow
+existing, on a runner that has neither.
+
+The OpenAI client is now built on first use, which also makes `generatePlan`'s
+own `"OpenAI API key not configured"` guard reachable — it had been dead code,
+since the process died before any request could arrive. `finnhubService` no
+longer throws: its methods pass the key per request and callers already fall
+back to `freeStockDataService`, so a missing key degrades to the free Yahoo
+path as the layered design intended.
+
+CI sets neither key, so this cannot regress.
+
+---
+
 ## Operational follow-ups
 
 Not code — carried over from the 2026-08-27 database work.
@@ -534,7 +589,8 @@ Not code — carried over from the 2026-08-27 database work.
 4. ~~Make lint runnable~~ — done (round 2, item 6), which produced items 12–14
 5. ~~Delete the `verify-email` fallback query~~ — done (round 2, item 14)
 6. ~~Tests and CI~~ — done (round 2, item 5)
-7. **Next:** fill in the 59 missing Chinese strings (item 9), and push the
+7. ~~A guard for untranslated keys~~ — done (round 3, item 9)
+8. **Next:** translate the 62 missing Chinese strings (item 9), and push the
    scheduler's cleanup logic down out of the controllers (item 8)
 
 **Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
