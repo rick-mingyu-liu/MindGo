@@ -80,6 +80,19 @@ const SRC_DIRS = ['pages', 'components', 'contexts', 'lib', 'utils'];
 const ROOT = path.join(__dirname, '..');
 const T_CALL = /\bt\(\s*(['"])((?:(?!\1)[^\\]|\\.)*)\1/g;
 
+/**
+ * Undoes JavaScript string escapes, so the key we look up is the string the app
+ * actually asks for at runtime.
+ *
+ * T_CALL captures raw source. `t('We\\'ve sent…')` therefore yields a key with
+ * the backslash still in it, which matches nothing in common.json — reporting a
+ * perfectly good translation as missing. Three strings in this codebase hit it.
+ */
+function unescapeLiteral(raw) {
+  const SIMPLE = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v' };
+  return raw.replace(/\\(.)/g, (_, ch) => SIMPLE[ch] ?? ch);
+}
+
 function collectKeys(dir, found = new Set()) {
   if (!fs.existsSync(dir)) return found;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -88,7 +101,7 @@ function collectKeys(dir, found = new Set()) {
       if (!['node_modules', '.next', '.git'].includes(entry.name)) collectKeys(full, found);
     } else if (/\.(tsx?|jsx?)$/.test(entry.name)) {
       const src = fs.readFileSync(full, 'utf8');
-      for (const m of src.matchAll(T_CALL)) found.add(m[2]);
+      for (const m of src.matchAll(T_CALL)) found.add(unescapeLiteral(m[2]));
     }
   }
   return found;
