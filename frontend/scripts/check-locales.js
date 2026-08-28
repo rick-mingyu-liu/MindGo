@@ -10,6 +10,11 @@
  * That means this check cannot use JSON.parse to find duplicates — by the time
  * the file is parsed the evidence is gone. It scans raw lines instead.
  *
+ * It also reports keys the app asks for that no locale file answers. Those are
+ * warnings, not errors: there is a standing backlog of them (IMPROVEMENTS.md
+ * item 9), and failing on those would block every build rather than stopping
+ * new ones from being added. Duplicates stay fatal.
+ *
  * Run: npm run check:locales
  */
 const fs = require('fs');
@@ -65,8 +70,68 @@ for (const locale of fs.readdirSync(LOCALES_DIR)) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Unresolved keys: something the app calls t() with that no locale answers.
+// i18next falls back to the key itself, so in `en` this is invisible — the key
+// *is* the English string — while a Chinese user sees raw English mid-sentence.
+// ---------------------------------------------------------------------------
+
+const SRC_DIRS = ['pages', 'components', 'contexts', 'lib', 'utils'];
+const ROOT = path.join(__dirname, '..');
+const T_CALL = /\bt\(\s*(['"])((?:(?!\1)[^\\]|\\.)*)\1/g;
+
+function collectKeys(dir, found = new Set()) {
+  if (!fs.existsSync(dir)) return found;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!['node_modules', '.next', '.git'].includes(entry.name)) collectKeys(full, found);
+    } else if (/\.(tsx?|jsx?)$/.test(entry.name)) {
+      const src = fs.readFileSync(full, 'utf8');
+      for (const m of src.matchAll(T_CALL)) found.add(m[2]);
+    }
+  }
+  return found;
+}
+
+/**
+ * Mirrors how i18next actually resolves a key, which is not just a dotted path.
+ *
+ * It walks the key as a path first ('stock.Close' -> { stock: { Close } }), and
+ * if that finds nothing it falls back to the literal flat key. That fallback is
+ * `ignoreJSONStructure`, which defaults to true. Without it every key that
+ * merely *contains* a dot — 'Saving...', or any sentence ending in one — looks
+ * missing when it is sitting right there in the file.
+ */
+function resolveKey(tree, key) {
+  const nested = key
+    .split('.')
+    .reduce((node, part) => (node && typeof node === 'object' ? node[part] : undefined), tree);
+  if (nested !== undefined) return nested;
+  return tree[key];
+}
+
+const used = new Set();
+for (const dir of SRC_DIRS) collectKeys(path.join(ROOT, dir), used);
+
+console.log(`\n${used.size} keys used across ${SRC_DIRS.join(', ')}.`);
+
+for (const locale of fs.readdirSync(LOCALES_DIR)) {
+  const file = path.join(LOCALES_DIR, locale, 'common.json');
+  if (!fs.existsSync(file)) continue;
+  const tree = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const missing = [...used].filter((key) => resolveKey(tree, key) === undefined);
+  if (missing.length === 0) {
+    console.log(`✔ ${locale}: every key resolves`);
+  } else {
+    console.warn(`⚠ ${locale}: ${missing.length} keys have no entry and will render as the key itself`);
+    for (const key of missing.slice(0, 5)) console.warn(`      ${JSON.stringify(key)}`);
+    if (missing.length > 5) console.warn(`      ... and ${missing.length - 5} more`);
+  }
+}
+
 if (failed) {
   console.error('\nDuplicate keys found. Remove them, or namespace the distinct meanings.');
   process.exit(1);
 }
-console.log('\nLocales OK.');
+console.log('\nNo duplicate keys.');
