@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const config = require('../config');
+const { maskEmail } = require('../utils/privacy');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
 const axios = require('axios');
 
@@ -35,7 +36,15 @@ async function validateEmailMailboxLayer(email) {
   try {
     const response = await axios.get(url);
     const data = response.data;
-    console.log('[MailboxLayer] Response for', email, ':', data); // Detailed logging
+    // The full response carries the address back plus everything MailboxLayer
+    // inferred about it. Log the verdict, which is what a failed registration
+    // actually needs explaining.
+    console.log('[MailboxLayer] Checked', maskEmail(email), {
+      format_valid: data.format_valid,
+      disposable: data.disposable,
+      mx_found: data.mx_found,
+      smtp_check: data.smtp_check,
+    });
 
     if (!data.format_valid) {
       return { valid: false, reason: 'Invalid email format' };
@@ -91,9 +100,9 @@ const authController = {
       if (existingUser.rows.length > 0) {
         const isVerified = existingUser.rows[0].email_verified;
         if (isVerified) {
-          console.log(`[Register] Attempt to register already verified email: ${email}`);
+          console.log(`[Register] Attempt to register an already verified address: ${maskEmail(email)}`);
         } else {
-          console.log(`[Register] Attempt to register unverified email: ${email} (user did not verify)`);
+          console.log(`[Register] Attempt to re-register an unverified address: ${maskEmail(email)}`);
         }
         return res.status(400).json({ error: 'User already exists' });
       }
@@ -105,7 +114,6 @@ const authController = {
       // Generate email verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
-      console.log(`[Register] Generated verification token for ${email}:`, verificationToken);
 
       // Create user with email verification fields
       const newUser = await db.query(
@@ -115,17 +123,23 @@ const authController = {
       const userId = newUser.rows[0].id;
       console.log(`[Register] User created:`, {
         id: userId,
-        email,
+        email: maskEmail(email),
         created_at: newUser.rows[0].created_at,
         verification_expires: newUser.rows[0].email_verification_expires
       });
 
       // Send verification email
       try {
-        console.log(`[Register] Sending verification email to ${email} with token:`, verificationToken);
+        // The token is a credential: it verifies the account on its own.
+        console.log(`[Register] Sending verification email to user ${userId}`);
         await sendEmailVerification(email, first_name, verificationToken);
       } catch (emailError) {
-        console.error('Failed to send verification email:', emailError);
+        // Message and code rather than the whole error. A connection failure
+        // carries no address (checked), but nodemailer attaches `envelope` and
+        // `rejected` when the SMTP server rejects a recipient, and those hold
+        // the address. Precautionary — that path is not reproducible without a
+        // real SMTP server — and it reads better in a log either way.
+        console.error(`Failed to send verification email for user ${userId}:`, emailError.code || emailError.message);
         // Don't fail registration if email fails, but log it
       }
 
@@ -222,14 +236,13 @@ const authController = {
       const created = new Date(user.rows[0].created_at);
       console.log(`[VerifyEmail] User found:`, {
         id: user.rows[0].id,
-        email: user.rows[0].email,
         created_at: created,
         verification_expires: expires,
         now: now
       });
       // Check if token has expired
       if (now > expires) {
-        console.log(`[VerifyEmail] Token expired for user:`, user.rows[0].email);
+        console.log(`[VerifyEmail] Token expired for user ${user.rows[0].id}`);
         return res.status(400).json({ error: 'Verification token has expired' });
       }
       // Mark email as verified and clear token
@@ -237,7 +250,7 @@ const authController = {
         'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
         [user.rows[0].id]
       );
-      console.log(`[VerifyEmail] Email verified for user:`, user.rows[0].email);
+      console.log(`[VerifyEmail] Email verified for user ${user.rows[0].id}`);
       res.json({
         message: 'Email verified successfully! You can now log in to your account.',
         user: {
@@ -294,7 +307,7 @@ const authController = {
         await sendEmailVerification(email, user.rows[0].first_name, verificationToken);
         res.json({ message: 'Verification email sent successfully' });
       } catch (emailError) {
-        console.error('Failed to send verification email:', emailError);
+        console.error(`Failed to send verification email for user ${user.rows[0].id}:`, emailError.code || emailError.message);
         res.status(500).json({ error: 'Failed to send verification email' });
       }
 
