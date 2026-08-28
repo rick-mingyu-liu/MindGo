@@ -78,28 +78,7 @@ class ErrorHandler {
   }
 
   // Global error middleware
-  static globalErrorHandler(err, req, res, next) {
-    logger.error('Unhandled Error', err);
-    
-    // Handle specific error types
-    if (err.name === 'ValidationError') {
-      return this.validationError(res, err.errors);
-    }
-    
-    if (err.name === 'JsonWebTokenError') {
-      return this.unauthorized(res, 'Invalid token');
-    }
-    
-    if (err.name === 'TokenExpiredError') {
-      return this.unauthorized(res, 'Token expired');
-    }
-    
-    // Default server error
-    return this.serverError(res, err);
-  }
-
-  // Global error middleware
-  static globalErrorHandler(err, req, res, next) {
+  static globalErrorHandler(err, req, res, _next) {
     logger.error('Unhandled Error', err);
 
     if (err.name === 'ValidationError') {

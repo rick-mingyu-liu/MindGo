@@ -72,6 +72,9 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
             role: "system",
             content: systemPrompt
           },
+          // The user's actual figures. Kept as a separate turn so userPrompt
+          // stays exactly what they typed.
+          ...(context ? [{ role: "system", content: context }] : []),
           {
             role: "user",
             content: userPrompt
@@ -109,10 +112,10 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       const savings = income - expenses;
       const timeline = financialData.formData.timeline || '';
       const currency = financialData.formData.currency || 'USD';
-      context += `**Current Financial Situation:**\n`;
-      context += `• Monthly Income: $${income}\n`;
-      context += `• Monthly Expenses: $${expenses}\n`;
-      context += `• Monthly Savings: $${savings}\n`;
+      context += `**Current Financial Situation:** (amounts in ${currency})\n`;
+      context += `• Monthly Income: ${income}\n`;
+      context += `• Monthly Expenses: ${expenses}\n`;
+      context += `• Monthly Savings: ${savings}\n`;
       context += `• Timeline: ${timeline}\n`;
       if (financialData.formData.additionalContext) {
         context += `• Additional Context: ${financialData.formData.additionalContext}\n`;
