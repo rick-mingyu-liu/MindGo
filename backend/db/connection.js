@@ -65,6 +65,10 @@ function getPool() {
       console.log('🛑 DB pool closed due to inactivity');
     }
   }, INACTIVITY_LIMIT);
+  // Housekeeping only: it must not be the reason the process stays alive. A
+  // script or test that finishes its queries should exit immediately, not hang
+  // for the remaining five minutes.
+  inactivityTimer.unref();
   return pool;
 }
 

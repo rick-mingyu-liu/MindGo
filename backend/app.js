@@ -72,15 +72,19 @@ app.use(ErrorHandler.globalErrorHandler);
 // 404 handler
 app.use('*', ErrorHandler.notFoundHandler);
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT}`);
-  logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
-  logger.info(`🌍 Environment: ${config.nodeEnv}`);
-  
-  // Initialize scheduled tasks
-  schedulerService.init();
-});
+// Start the server only when this file is the entry point. Requiring it —
+// which is how the tests get at the routes — must not bind a port or start the
+// scheduler's cron jobs.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`🚀 Server running on port ${PORT}`);
+    logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
+    logger.info(`🌍 Environment: ${config.nodeEnv}`);
+
+    // Initialize scheduled tasks
+    schedulerService.init();
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

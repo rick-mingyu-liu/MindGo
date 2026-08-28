@@ -1,5 +1,11 @@
 require('dotenv').config();
 
+/** Reads a positive integer from the environment, falling back when unset or unparseable. */
+function intFromEnv(name, fallback) {
+  const parsed = Number.parseInt(process.env[name], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
  * Every environment variable this backend reads is declared in this file, and
  * only in this file.
@@ -61,6 +67,21 @@ const config = {
     // couple of hardcoded symbols. Fine as a fallback, useless as a config.
     alphaVantage: process.env.ALPHA_VANTAGE_API_KEY || 'demo',
     mailboxLayer: process.env.MAILBOXLAYER_API_KEY,
+  },
+
+  // Rate limiting. Defaults are unchanged from when these were hardcoded in
+  // middleware/rateLimiter.js; they are here so they can be tuned per
+  // environment. `apiMax` in particular is worth watching: the dashboard fires
+  // roughly five requests per load, so 100 per 15 minutes is about twenty page
+  // loads, and everyone behind one NAT shares the bucket.
+  rateLimit: {
+    windowMs: 15 * 60 * 1000,
+    apiMax: intFromEnv('RATE_LIMIT_API_MAX', 100),
+    // Covers /register, /login, /resend-verification and /test-email together,
+    // per IP — so five is five across all of them, not five each.
+    authMax: intFromEnv('RATE_LIMIT_AUTH_MAX', 5),
+    aiWindowMs: 60 * 60 * 1000,
+    aiMax: intFromEnv('RATE_LIMIT_AI_MAX', 20),
   },
 
   // Cron jobs
