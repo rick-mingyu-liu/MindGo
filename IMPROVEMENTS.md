@@ -6,6 +6,11 @@ time of writing; file:line references are from that commit.
 
 Ordered by value-per-effort, not by severity alone.
 
+Four items remain open. One of them (16) is a security bug that needs no input;
+the other three are blocked on decisions, collected under
+[Decisions needed](#decisions-needed) so they can be answered without reading
+the whole backlog.
+
 ## Status
 
 | # | Item | Status |
@@ -16,15 +21,103 @@ Ordered by value-per-effort, not by severity alone.
 | 4 | Six wrong Chinese translations (duplicate keys) | ✅ done — PR #12 |
 | 5 | No tests; `npm test` passes by doing nothing | ✅ done — round 2 |
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
-| 7 | Orphan `Savings` category | open — needs a product call |
+| 7 | Orphan `Savings` category | open — **decision A** |
 | 8 | Scheduler depends upward on controllers | ✅ done — round 5 |
 | 9 | 59 Chinese strings missing entirely | ✅ done — round 4 |
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
-| 13 | Three dead top-level symbols, and a 500 on register | open — needs a product call |
+| 13 | Three dead top-level symbols, and a 500 on register | open — **decisions B and C** |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
+| 16 | Registration writes verification tokens to the log | **open — no decision needed** |
+| 17 | Retention deletions are silent in production | open — **decision D** |
+
+---
+
+## Decisions needed
+
+Four open questions. Each one is blocked on a judgement call, not on work — the
+investigation behind each is done and recorded in the item it points to. A
+recommendation is given for each; none is so clear-cut that it should be taken
+without a look.
+
+### A. The `Savings` category — item 7
+
+**What was found.** All four rows come **verbatim from `db/seed.sql` lines
+51–54**: same amount (`500.00`), same description (`Emergency Fund
+Contribution`), dates on the 25th of Mar–Jun 2025, all owned by user 1 — the
+demo account. **No real user ever chose `Savings`**, because the UI has never
+offered it. This is the seed file disagreeing with the category list, not user
+data needing rescue.
+
+| Option | Consequence |
+|---|---|
+| **Promote `Savings` to a real category** | Add it to `categories.expense` in `frontend/pages/transactions/new.tsx` and to `CATEGORY_COLORS` in `frontend/pages/index.tsx`. The seed stays as-is and the four rows become legitimate. Note the app already has a whole `savings_goals` table and feature, so the concept is not foreign to it. |
+| **Migrate the rows to `Other Expenses`** | One `UPDATE` plus an edit to `db/seed.sql`, so fresh setups stop reintroducing it. Loses the distinction between "money spent" and "money set aside" in the demo data. |
+
+**Recommendation: promote it.** "Emergency Fund Contribution" is a real thing a
+finance app should be able to categorise, the feature it pairs with already
+exists, and the migration option requires editing the seed file anyway — so
+neither option is cheaper. Whichever you pick, `db/seed.sql` and the category
+list must end up agreeing; that they disagree today is the actual defect.
+
+### B. The three dead symbols — item 13
+
+Each was left in place with an `eslint-disable`, because "delete it" and "wire
+it up" are both defensible:
+
+| Symbol | Where | The question |
+|---|---|---|
+| `DISPOSABLE_EMAIL_DOMAINS` | `controllers/authController.js` | See decision C — it is the natural fallback. |
+| `createSampleDataForNewUser` | `controllers/authController.js` | New accounts currently get no starter data. Removed feature, or lost wiring? Only you know which was intended. |
+| `createAsciiPieChart` | `services/emailService.js` | The weekly report is assembled without it. |
+
+**Recommendation: delete `createAsciiPieChart`, decide `createSampleDataForNewUser`
+on product grounds, and keep `DISPOSABLE_EMAIL_DOMAINS` pending decision C.** An
+ASCII pie chart in an HTML email is not something the report is missing. The
+starter-data one is genuinely a product question — an empty dashboard on first
+login is a worse first impression, but fake transactions in a real finance app
+are worse still.
+
+### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13
+
+**Verified, not inferred.** `validateEmailMailboxLayer()` throws at
+`authController.js:32` when the key is missing, and that `throw` sits **outside**
+the function's own `try` (which opens at line 35). It escapes to `register`'s
+catch at line 138, which returns `res.status(500)`. So **`/auth/register` returns
+500 for every caller** when the key is unset — while `.env.example` and the
+startup check both describe the key as optional.
+
+| Option | Consequence |
+|---|---|
+| **Fall back to `DISPOSABLE_EMAIL_DOMAINS`** | Registration works without the key, with weaker disposable-address filtering. Gives the dead list a job and makes "optional" true. |
+| **Skip validation entirely when the key is absent** | Simplest. Registration works; no disposable filtering at all. |
+| **Make the key genuinely required** | Fail at boot in `config/validate.js` rather than at the first registration. Honest, but the app cannot run without a paid third-party key. |
+
+**Recommendation: fall back to the domain list.** It resolves B and C together,
+makes the documented "optional" accurate, and keeps some filtering rather than
+none. Whichever you choose, the current state — documented optional, actually
+required, and failing as an opaque 500 — should not be one of them.
+
+### D. Should retention deletions be visible in production? — item 17
+
+`logger.info` is gated on `config.logging.enableConsoleLogs`, which is
+`NODE_ENV === 'development'`. Routing the cleanup row counts through it (round 5)
+matches the rest of `schedulerService`, but means **those counts are silent in
+production**, where the old `console.log` always printed. Errors still always
+print, in every environment.
+
+| Option | Consequence |
+|---|---|
+| **Leave it** | Consistent with the rest of the scheduler. No record of what the retention jobs deleted in production. |
+| **Add a level that always prints** | e.g. `logger.audit`, for events that delete user data. Small change, confined to `utils/logger.js` and its callers. |
+| **Give `utils/logger.js` a real level hierarchy** | Today `logging.level` gates only `debug()`; `info`/`warn` ignore it and key off `enabled`, and `error` always prints. A proper hierarchy is the general fix, and the bigger job. |
+
+**Recommendation: add an always-printing level for deletions.** These jobs
+delete user accounts unattended; "how many did it remove last week" is a
+question worth being able to answer. The general logging rework is a bigger job
+and does not need to block this.
 
 ---
 
@@ -298,16 +391,30 @@ Both lint scripts run in CI as of item 5, so nothing runs unattended any more.
 
 ## 7. Orphan `Savings` category
 
-**Status:** open
-**Effort:** trivial
+**Status:** open — **decision A**
+**Effort:** trivial once decided
 
-Four expense rows are categorized `Savings`, which appears in no category list
-in the code — not `frontend/pages/transactions/new.tsx`, not the dashboard's
-`CATEGORY_COLORS`. They render with fallback styling and the value cannot be
-re-selected if the transaction is edited.
+Four expense rows are categorised `Savings`, which appears in no category list
+in the code — not `categories.expense` in
+[frontend/pages/transactions/new.tsx](frontend/pages/transactions/new.tsx), not
+`CATEGORY_COLORS` in [frontend/pages/index.tsx](frontend/pages/index.tsx). They
+render with fallback styling, and the value cannot be re-selected if the
+transaction is edited.
 
-Either promote `Savings` to a real category or migrate the four rows to
-`Other Expenses`. Same class of schema/code drift the August cleanup removed.
+**Where they came from — checked against the live database.** All four are
+verbatim `db/seed.sql` lines 51–54: `500.00`, `Emergency Fund Contribution`,
+the 25th of March, April, May and June 2025, all owned by user 1, the demo
+account. Nothing here is user-entered, and nothing else in the table uses the
+category:
+
+```
+Savings         | expense | 4 rows | all 2025-06-29, user 1 (demo)
+Other Expenses  | expense | 5 rows
+```
+
+So this is not orphaned user data — it is **`db/seed.sql` disagreeing with the
+category list**, which is why fixing only the rows would not fix the problem.
+See decision A above.
 
 ---
 
@@ -515,25 +622,43 @@ sign — an account in CAD was described to the model as USD.
 
 ## 13. Three dead top-level symbols, and a 500 on register
 
-**Status:** open — each needs a product decision
+**Status:** open — **decisions B and C**
 **Found:** by the linter
 
-Marked with `eslint-disable` and a comment rather than deleted, because
-"remove it" and "wire it up" are both defensible and the choice is not mine:
+Marked with `eslint-disable` and a comment rather than deleted, because "remove
+it" and "wire it up" are both defensible and the choice is not mine:
 
-1. **`DISPOSABLE_EMAIL_DOMAINS`** (`controllers/authController.js`) — a list of
+1. **`DISPOSABLE_EMAIL_DOMAINS`** ([controllers/authController.js](backend/controllers/authController.js)) —
    ~30 throwaway-mail domains, superseded by the MailboxLayer API call.
 2. **`createSampleDataForNewUser`** (same file) — never called, so new accounts
    get no starter data. Removed feature, or lost wiring?
-3. **`createAsciiPieChart`** (`services/emailService.js`) — the weekly report is
-   assembled without it.
+3. **`createAsciiPieChart`** ([services/emailService.js](backend/services/emailService.js)) —
+   the weekly report is assembled without it.
 
-The first is entangled with a live bug. `validateEmailMailboxLayer()` throws
-when `MAILBOXLAYER_API_KEY` is absent, and that `throw` sits **outside** the
-function's own `try`, so it escapes to the route handler: **`/auth/register`
-returns 500 for every caller** when the key is unset. The key is documented as
-optional and is not. Wiring the dead domain list in as the fallback would make
-it genuinely optional; that is the case for option "wire it up".
+All three are still present and still unreferenced.
+
+### The live bug entangled with the first one
+
+`validateEmailMailboxLayer()` throws at **line 32** when
+`MAILBOXLAYER_API_KEY` is absent:
+
+```js
+const apiKey = config.apiKeys.mailboxLayer;
+if (!apiKey) {
+  throw new Error('MailboxLayer API key not set');   // line 32
+}
+const url = `...`;
+try {                                                 // line 35 — the try opens HERE
+```
+
+The `throw` is **outside** the function's own `try`. It escapes to `register`'s
+catch at **line 138**, which returns `res.status(500).json({ error: 'Server
+error' })`. So **`/auth/register` returns 500 for every caller** when the key is
+unset — while `.env.example` and `config/validate.js` both describe the key as
+optional.
+
+Wiring the dead domain list in as the fallback would make it genuinely optional.
+That is the case for "wire it up"; see decision C.
 
 ---
 
@@ -614,6 +739,67 @@ CI sets neither key, so this cannot regress.
 
 ---
 
+## 16. Registration writes verification tokens to the log
+
+**Status:** open — **no decision needed**, and it is the highest-priority open
+item
+**Found:** while verifying item 13 for the decisions above
+
+`controllers/authController.js` logs the raw email-verification token twice on
+the registration happy path:
+
+```js
+console.log(`[Register] Generated verification token for ${email}:`, verificationToken);   // line 108
+console.log(`[Register] Sending verification email to ${email} with token:`, verificationToken);  // line 125
+```
+
+Both are live — neither sits behind a condition or in dead code. **Anyone who
+can read the logs can verify an account they do not own**, for as long as the
+token is valid (`config.emailVerification.tokenExpiry`, 30 minutes). On Render
+that is anyone with dashboard access, plus whatever log aggregator is attached.
+
+The third place user data has been found leaking here, and the second into the
+logs specifically — after the `verify-email` endpoint returning a stranger's
+address in its **response** (item 14), and the unverified-account cleanup's
+`RETURNING ... email` writing deleted users' addresses to the **log** every ten
+minutes (item 8).
+
+While fixing it, note that **eight** `console.log` call sites in this file write
+a user's email address to stdout — lines 38, 94, 96, 108, 115, 125, 232 and 240.
+Line 38 logs the entire MailboxLayer API response for every registration
+attempt. The two token lines are the security bug; the other six are a privacy
+question worth answering in the same pass.
+
+This needs no decision. It has not been fixed only because it was found after
+the last round closed.
+
+---
+
+## 17. Retention deletions are silent in production
+
+**Status:** open — **decision D**
+**Effort:** small
+
+Round 5 routed the cleanup jobs' row counts through `logger.info`, matching the
+rest of `schedulerService`. `logger.info` is gated on
+`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'` — so
+in production those counts print nowhere. The `console.log` they replaced always
+printed.
+
+Errors still always print, in every environment, so a *failing* cleanup is still
+visible. What is lost is the record of a *successful* one: how many accounts and
+AI plans the retention jobs deleted.
+
+Related, and the reason this is worth deciding rather than patching: there is no
+real level hierarchy in `utils/logger.js`. `config.logging.level` is consulted in
+exactly one place — `debug()` at line 37, which needs `enabled` **and**
+`level === 'debug'`. `info()` and `warn()` are gated on `enabled` alone and
+ignore the level entirely; `error()` ignores both and always prints. So
+`LOG_LEVEL` can only ever turn `debug` on, and only in development. See
+decision D.
+
+---
+
 ## Operational follow-ups
 
 Not code — carried over from the 2026-08-27 database work.
@@ -644,12 +830,18 @@ Not code — carried over from the 2026-08-27 database work.
    (round 5, item 8), which turned up three timer bugs and a second place user
    email addresses were being written to the log
 
-**Nothing is left that does not need a decision.** Items 7 and 13 are both
-yours to call, as is the production-logging question raised under item 8.
+10. **Next, and needing nothing from anyone:** stop logging verification tokens
+    (item 16). It is the only open item that is a security bug rather than a
+    judgement call.
+11. Then whichever of decisions **A**–**D** you have answered. C is worth
+    answering early: registration is 500ing for anyone who deploys without a
+    MailboxLayer key, and both `.env.example` and the startup check currently
+    tell them the key is optional.
 
-**Waiting on a decision, not on work:** items 7 (orphan `Savings` category) and
-13 (three dead symbols, and whether a missing `MAILBOXLAYER_API_KEY` should
-stop 500ing registration).
+**Waiting on you, not on work:** decisions **A** (the `Savings` category, item
+7), **B** and **C** (the dead symbols and the register 500, item 13), and **D**
+(production visibility for the retention jobs, item 17). Each is written up
+under [Decisions needed](#decisions-needed) with options and a recommendation.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
@@ -657,4 +849,5 @@ Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `..
 A native reader should still skim them; the check can prove a key *resolves*,
 never that the wording is good.
 
-Items 7 and 8 are cleanup rather than risk; do them when touching that code.
+Item 7 is cleanup rather than risk; do it when touching that code. Item 16 is
+not — it should not wait for a round.
