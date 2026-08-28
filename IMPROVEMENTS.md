@@ -11,16 +11,19 @@ Ordered by value-per-effort, not by severity alone.
 | # | Item | Status |
 |---|---|---|
 | 1 | Rate limiters written but never mounted | ✅ done — PR #12 |
-| 2 | `config/index.js` is decorative; password length mismatch | open |
-| 3 | No fail-fast on missing secrets | open |
+| 2 | `config/index.js` is decorative; password length mismatch | ✅ done — round 2 |
+| 3 | No fail-fast on missing secrets | ✅ done — round 2 |
 | 4 | Six wrong Chinese translations (duplicate keys) | ✅ done — PR #12 |
 | 5 | No tests; `npm test` passes by doing nothing | open |
-| 6 | `npm run lint` cannot run in the backend | open |
-| 7 | Orphan `Savings` category | open |
+| 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
+| 7 | Orphan `Savings` category | open — needs a product call |
 | 8 | Scheduler depends upward on controllers | open |
 | 9 | 59 Chinese strings missing entirely | open |
-| 10 | Environment variables are undocumented | open |
+| 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
+| 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
+| 13 | Three dead top-level symbols, and a 500 on register | open — needs a product call |
+| 14 | `/auth/verify-email` leaks another user's email | open — **security** |
 
 ---
 
@@ -71,9 +74,35 @@ limiter throttles the whole user base as a single client — worse than no limit
 
 ## 2. `config/index.js` is decorative — the code reads `process.env` directly
 
-**Status:** open
+**Status:** ✅ DONE 2026-08-28
 **Effort:** small
-**Risk if ignored:** config drifts from behaviour; already has
+**Risk if ignored:** config drifts from behaviour; already had
+
+Resolved by making `config/` the only place that reads `process.env`, and
+resolving each drift toward the stricter value:
+
+| Drift | Resolution |
+|---|---|
+| config 8 vs `routes/auth.js` min 6 | **8.** Gates registration only — login compares the hash and there is no password-change endpoint, so existing shorter passwords still work |
+| config 255 vs code 254 | **254**, per RFC 5321. The column is `VARCHAR(255)`, so 254 is the tighter limit |
+| `jwt.secret` / `expiresIn` declared but unread | Both now read from config |
+| `nameMaxLength: 100` enforced nowhere | Enforced on register **and** profile update, turning a Postgres 500 into a 400 |
+
+Also folded in the literals config was supposed to own — verification token
+lifetime (previously duplicated), resend cooldown, and both cleanup retention
+windows. The cleanup `DELETE`s used `INTERVAL '30 minutes'` inline and now take
+the value as a parameter via `make_interval(mins => $1)`, verified equivalent
+against the live database.
+
+Four variables were read from `process.env` but missing from config entirely:
+`FINNHUB_TOKEN`, `ALPHA_VANTAGE_API_KEY`, `FRONTEND_URL`, `DB_SCHEMA`.
+
+> The stale comment in `db/connection.js` claiming Neon hands out an empty
+> `search_path` was corrected — that was specific to the **Azure** pooler, and
+> the project now runs on AWS, where the pooler returns a normal `"$user", public`.
+
+<details>
+<summary>Original finding</summary>
 
 CLAUDE.md says config is centralized and features should read from it. In
 practice only `services/schedulerService.js` imports it. 13 other sites across
@@ -93,13 +122,27 @@ API accepts 6.
 Pick one direction — route the code through `config`, or delete the unused keys.
 The current half state is the worst outcome: it reads as authoritative while
 being fiction.
+</details>
 
 ---
 
 ## 3. No fail-fast on missing secrets at startup
 
-**Status:** open
+**Status:** ✅ DONE 2026-08-28
 **Effort:** ~12 lines
+
+`config/validate.js` runs before the route modules load and exits 1 naming what
+is missing. Database configuration is satisfied by either `DATABASE_URL` or a
+complete set of `DB_USER` / `DB_HOST` / `DB_DATABASE`, and the message names
+which of the three are absent.
+
+Everything else is a warning rather than an exit, so local development still
+runs without a full key set: a `JWT_SECRET` under 32 characters, and each
+optional variable paired with the feature that stops working. A degraded deploy
+now announces itself in the boot log.
+
+Verified across five environment states — nothing set, each required value
+missing alone, partial `DB_*`, and a short secret.
 
 With `JWT_SECRET` unset the app boots normally, then every login 500s and every
 authenticated request 401s. The failure is diagnosed from symptoms rather than
@@ -185,17 +228,25 @@ plausible-looking numbers — the worst kind of failure.
 
 ---
 
-## 6. `npm run lint` cannot run in the backend
+## 6. `npm run lint` cannot run in *either* project
 
-**Status:** open
-**Effort:** trivial
+**Status:** ✅ DONE 2026-08-28
+**Effort:** trivial to fix; the findings were not
 
-`backend/package.json` declares `"lint": "eslint ."`, but eslint is not in
-`dependencies` or `devDependencies` and no config file exists. The command fails
-with `command not found`.
+Backend: eslint 9 plus a flat config. Deliberately not a style linter —
+formatting arguments are not worth a build failure on an existing codebase — so
+the rules are the ones that catch defects.
 
-Install and configure it, or delete the script. The frontend has `next lint`,
-but nothing runs it automatically.
+**The frontend was worse than recorded here.** `next lint` with no config file
+does not fail; it *prompts interactively* for setup, so in CI it hangs rather
+than errors. Added `.eslintrc.json` extending `next/core-web-vitals`, which the
+already-installed `eslint-config-next` provides. It now completes: six
+`react-hooks/exhaustive-deps` and `no-img-element` warnings, no errors.
+
+The first backend run found 19 problems, including three real defects — see
+item 12 and the `globalErrorHandler` duplicate. The rest were dead bindings,
+now removed. Three dead top-level symbols are marked rather than deleted; see
+item 13.
 
 ---
 
@@ -256,9 +307,27 @@ otherwise it just blocks every build.
 
 ## 10. Environment variables are undocumented
 
-**Status:** open
+**Status:** ✅ DONE 2026-08-28
 **Effort:** ~20 lines
 **Found:** during the Azure → AWS migration
+
+Both projects now have a committed `.env.example` with placeholder values, each
+variable annotated with what stops working without it. The backend list is
+derived from `config/index.js` (item 2), so the two can be kept in step by
+inspection.
+
+> Both `.gitignore` files matched `.env.*` and would have silently swallowed
+> these templates. Each gained a `!.env.example` negation — verified that `.env`
+> itself is still ignored, and that no real value from either `.env` appears in
+> the committed examples.
+
+Variables that are set somewhere but read nowhere are recorded rather than
+dropped, so their absence is not mistaken for an oversight:
+`FINNHUB_WEBHOOK_SECRET` (backend); `NEXT_PUBLIC_APP_NAME`,
+`NEXT_PUBLIC_APP_VERSION`, `EXCHANGE_RATE_API_KEY` and `CUSTOM_KEY` (frontend).
+
+<details>
+<summary>Original finding</summary>
 
 Neither project has a `.env.example`, `.env.sample`, or any other list of the
 variables it needs. `backend/.env` currently holds 15 keys — `DATABASE_URL`,
@@ -280,6 +349,7 @@ Add a committed `.env.example` for each project listing every variable with a
 placeholder value and a one-line comment, and note which are optional. Pairs
 naturally with item 3 — the startup assertion should check exactly the set the
 example documents.
+</details>
 
 ---
 
@@ -296,6 +366,88 @@ disagree.
 The lock now has it (7.5.1). Worth confirming the deploy uses `npm ci` rather
 than `npm install`, so this class of drift fails the build instead of
 resolving to whatever the registry serves that day.
+
+---
+
+## 12. AI plans were generated without the user's finances
+
+**Status:** ✅ fixed 2026-08-28
+**Found:** by the linter, as an unused variable
+
+`services/aiPlanner.js` called `buildFinancialContext()` and assembled a
+detailed summary — income, expenses, savings, timeline, goals, six months of
+spending by category, closing with *"Please provide personalized advice based
+on this information"* — and then never put it in the request. Only the system
+prompt and the raw user question reached the model.
+
+Every AI plan the product has ever produced was advice for a stranger. It would
+not look broken: the model still answers fluently, just generically.
+
+The context is now sent as its own system turn ahead of the question, so
+`userPrompt` stays exactly what the user typed. Same function also read a
+currency from the form and ignored it, printing every amount with a dollar
+sign — an account in CAD was described to the model as USD.
+
+> This is the argument for item 6 in one finding. A one-line lint rule found in
+> five minutes something that had been silently wrong for the life of the
+> feature, because the symptom was *plausible output*.
+
+---
+
+## 13. Three dead top-level symbols, and a 500 on register
+
+**Status:** open — each needs a product decision
+**Found:** by the linter
+
+Marked with `eslint-disable` and a comment rather than deleted, because
+"remove it" and "wire it up" are both defensible and the choice is not mine:
+
+1. **`DISPOSABLE_EMAIL_DOMAINS`** (`controllers/authController.js`) — a list of
+   ~30 throwaway-mail domains, superseded by the MailboxLayer API call.
+2. **`createSampleDataForNewUser`** (same file) — never called, so new accounts
+   get no starter data. Removed feature, or lost wiring?
+3. **`createAsciiPieChart`** (`services/emailService.js`) — the weekly report is
+   assembled without it.
+
+The first is entangled with a live bug. `validateEmailMailboxLayer()` throws
+when `MAILBOXLAYER_API_KEY` is absent, and that `throw` sits **outside** the
+function's own `try`, so it escapes to the route handler: **`/auth/register`
+returns 500 for every caller** when the key is unset. The key is documented as
+optional and is not. Wiring the dead domain list in as the fallback would make
+it genuinely optional; that is the case for option "wire it up".
+
+---
+
+## 14. `/auth/verify-email` returns another user's email address
+
+**Status:** open — **security**
+**Found:** while reading item 13's surroundings
+
+`controllers/authController.js`, in `verifyEmail`. When the supplied token
+matches no user, the handler does not stop. It runs a second query for *any*
+account verified in the last 30 minutes and returns that row:
+
+```sql
+SELECT id, email, first_name FROM users
+WHERE email_verified = TRUE AND email_verification_token IS NULL
+  AND created_at > NOW() - INTERVAL '30 minutes'
+ORDER BY created_at DESC LIMIT 1
+```
+
+The route is unauthenticated (`routes/auth.js`, no `auth` middleware). So
+`GET /auth/verify-email/anything` returns the id, email address and first name
+of an unrelated user — whoever most recently signed up — to any caller.
+
+Verified: the route takes no credentials, and the query returns a real row with
+those three columns. The live branch was not reachable at the time of writing
+because no account had verified within the window, which is also why this has
+never been noticed.
+
+The intent was a friendly "you're already verified" message for someone who
+clicks their link twice. That needs to be keyed on *their* token — for example
+by keeping consumed tokens with a `used_at` timestamp — not by guessing at
+whoever registered most recently. Until then the fallback should be deleted and
+the handler should return the 400 it already has.
 
 ---
 
@@ -317,13 +469,17 @@ Not code — carried over from the 2026-08-27 database work.
 
 ## Suggested order
 
-1. ~~Wire up the rate limiters + `trust proxy`~~ — done (PR #12)
-2. ~~Fix the 6 zh translations and namespace the colliding keys~~ — done (PR #12)
-3. **Next:** password-length mismatch, and resolve the `config` question (item 2)
-4. Startup assertions for `JWT_SECRET` / `DATABASE_URL` (item 3), together with
-   a `.env.example` documenting the same set (item 10)
-5. One integration test file over the auth → transaction → summary path, with
-   `check:locales` wired into the same CI workflow (items 5, 6)
-6. Fill in the 59 missing Chinese strings (item 9)
+1. ~~Rate limiters + `trust proxy`~~ — done (PR #12)
+2. ~~The 6 zh translations, and namespacing the colliding keys~~ — done (PR #12)
+3. ~~`config` as the single source of env and policy~~ — done (round 2, items 2/3/10)
+4. ~~Make lint runnable~~ — done (round 2, item 6), which produced items 12–14
+5. **Next: delete the `verify-email` fallback query (item 14).** It is the only
+   open item that hands a stranger someone else's email address, and the fix is
+   a deletion.
+6. Decide the three dead symbols, and whether `MAILBOXLAYER_API_KEY` should stop
+   500ing registration (item 13)
+7. One integration test over auth → transaction → summary, with `check:locales`
+   and both `lint` scripts wired into the same CI workflow (item 5)
+8. Fill in the 59 missing Chinese strings (item 9)
 
 Items 7 and 8 are cleanup rather than risk; do them when touching that code.
