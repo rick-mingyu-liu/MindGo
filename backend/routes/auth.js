@@ -2,6 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const auth = require('../middleware/auth');
+const config = require('../config');
 const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -14,14 +15,8 @@ const validateEmail = (email) => {
     return false;
   }
   
-  // Check for common invalid patterns
-  const invalidPatterns = [
-    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, // Valid format
-    /^[^@]+@[^@]+\.[^@]+$/, // Has @ and domain
-  ];
-  
   // Additional checks
-  if (email.length > 254) return false; // RFC 5321 limit
+  if (email.length > config.validation.emailMaxLength) return false; // RFC 5321 limit
   if (email.split('@')[0].length > 64) return false; // Local part limit
   if (email.includes('..')) return false; // No consecutive dots
   if (email.startsWith('.') || email.endsWith('.')) return false; // No leading/trailing dots
@@ -41,9 +36,17 @@ const registerValidation = [
       return true;
     })
     .normalizeEmail(),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('first_name').notEmpty().withMessage('First name is required'),
-  body('last_name').notEmpty().withMessage('Last name is required')
+  body('password')
+    .isLength({ min: config.validation.passwordMinLength })
+    .withMessage(`Password must be at least ${config.validation.passwordMinLength} characters long`),
+  body('first_name')
+    .notEmpty().withMessage('First name is required')
+    .isLength({ max: config.validation.nameMaxLength })
+    .withMessage(`First name must be at most ${config.validation.nameMaxLength} characters`),
+  body('last_name')
+    .notEmpty().withMessage('Last name is required')
+    .isLength({ max: config.validation.nameMaxLength })
+    .withMessage(`Last name must be at most ${config.validation.nameMaxLength} characters`)
 ];
 
 const loginValidation = [
@@ -52,8 +55,14 @@ const loginValidation = [
 ];
 
 const updateProfileValidation = [
-  body('first_name').notEmpty().withMessage('First name is required'),
-  body('last_name').notEmpty().withMessage('Last name is required')
+  body('first_name')
+    .notEmpty().withMessage('First name is required')
+    .isLength({ max: config.validation.nameMaxLength })
+    .withMessage(`First name must be at most ${config.validation.nameMaxLength} characters`),
+  body('last_name')
+    .notEmpty().withMessage('Last name is required')
+    .isLength({ max: config.validation.nameMaxLength })
+    .withMessage(`Last name must be at most ${config.validation.nameMaxLength} characters`)
 ];
 
 const resendVerificationValidation = [

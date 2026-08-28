@@ -6,6 +6,12 @@ require('dotenv').config();
 
 // Import utilities and services
 const config = require('./config');
+const validateConfig = require('./config/validate');
+
+// Before anything else is loaded: a missing JWT_SECRET or database URL makes
+// every request fail later, in ways that read as bugs rather than as setup.
+validateConfig();
+
 const logger = require('./utils/logger');
 const ErrorHandler = require('./utils/errorHandler');
 const schedulerService = require('./services/schedulerService');
@@ -66,15 +72,19 @@ app.use(ErrorHandler.globalErrorHandler);
 // 404 handler
 app.use('*', ErrorHandler.notFoundHandler);
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT}`);
-  logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
-  logger.info(`🌍 Environment: ${config.nodeEnv}`);
-  
-  // Initialize scheduled tasks
-  schedulerService.init();
-});
+// Start the server only when this file is the entry point. Requiring it —
+// which is how the tests get at the routes — must not bind a port or start the
+// scheduler's cron jobs.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`🚀 Server running on port ${PORT}`);
+    logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
+    logger.info(`🌍 Environment: ${config.nodeEnv}`);
+
+    // Initialize scheduled tasks
+    schedulerService.init();
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

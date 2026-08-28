@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const db = require('../db/connection');
 const { getExchangeRate } = require('./exchangeRateService');
+const config = require('../config');
 
 // The dashboard defaults to CAD, so the report reads in the same currency.
 const REPORT_CURRENCY = 'CAD';
@@ -8,14 +9,14 @@ const REPORT_CURRENCY = 'CAD';
 const transporter = nodemailer.createTransport({
   service: 'gmail', // Change if using another provider
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: config.email.user,
+    pass: config.email.pass,
   },
 });
 
 exports.sendWeeklyReport = async (to, content, htmlContent) => {
   await transporter.sendMail({
-    from: `"MindGo" <${process.env.EMAIL_USER}>`,
+    from: `"MindGo" <${config.email.user}>`,
     to,
     subject: 'Your Weekly Financial Report',
     text: content,
@@ -24,7 +25,7 @@ exports.sendWeeklyReport = async (to, content, htmlContent) => {
 };
 
 exports.sendEmailVerification = async (to, firstName, verificationToken) => {
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const frontendUrl = config.frontendUrl;
   const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
   console.log(`[EmailService] Using verification URL: ${verificationUrl}`);
   
@@ -83,7 +84,7 @@ The MindGo Team
   `;
 
   await transporter.sendMail({
-    from: `"MindGo" <${process.env.EMAIL_USER}>`,
+    from: `"MindGo" <${config.email.user}>`,
     to,
     subject: 'Verify your MindGo account',
     text: textContent,
@@ -92,6 +93,9 @@ The MindGo Team
 };
 
 // Helper function to create ASCII pie chart
+// Never called; the weekly report is assembled without it.
+// See IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 function createAsciiPieChart(data, title, maxWidth = 40) {
   if (Object.keys(data).length === 0) return '';
   
@@ -101,7 +105,7 @@ function createAsciiPieChart(data, title, maxWidth = 40) {
   const total = Object.values(data).reduce((sum, val) => sum + val, 0);
   const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
   
-  sortedData.forEach(([category, amount], index) => {
+  sortedData.forEach(([category, amount]) => {
     const percentage = ((amount / total) * 100).toFixed(1);
     const barLength = Math.round((amount / total) * (maxWidth - 20));
     const bar = '█'.repeat(barLength);

@@ -1,9 +1,10 @@
 const axios = require('axios');
+const config = require('../config');
 
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
+const FINNHUB_API_KEY = config.apiKeys.finnhub;
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
-const FINNHUB_TOKEN = process.env.FINNHUB_TOKEN;
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'demo'; // Use demo key as fallback
+const FINNHUB_TOKEN = config.apiKeys.finnhubToken;
+const ALPHA_VANTAGE_API_KEY = config.apiKeys.alphaVantage;
 
 class FinnhubService {
   constructor() {

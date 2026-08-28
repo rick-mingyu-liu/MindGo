@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same PR cancels the run still in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    # A throwaway Postgres for the integration tests. They will not run against
+    # the .env database — they need TEST_DATABASE_URL, which only points here.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: mindgo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/mindgo_test
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/mindgo_test
+      JWT_SECRET: ci-only-secret-not-used-anywhere-real-0123456789
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # ci, not install: it fails when package.json and the lockfile disagree,
+      # which is how express-rate-limit came to be declared but never installed.
+      - run: npm ci
+
+      - run: npm run lint
+
+      - name: Create the schema
+        run: npm run db:setup
+
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # Guards the duplicate-key bug that shipped six wrong Chinese
+      # translations. Cheap, and it runs before the slower steps.
+      - run: npm run check:locales
+
+      - run: npm run lint
+
+      - run: npm run build

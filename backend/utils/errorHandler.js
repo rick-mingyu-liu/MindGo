@@ -1,4 +1,5 @@
 const logger = require('./logger');
+const config = require('../config');
 
 class ErrorHandler {
   // Standard error responses
@@ -50,7 +51,7 @@ class ErrorHandler {
     logger.error(`Server Error: ${message}`, error);
     return res.status(500).json({
       error: message,
-      ...(process.env.NODE_ENV === 'development' && { details: error.message })
+      ...(config.nodeEnv === 'development' && { details: error.message })
     });
   }
 
@@ -77,28 +78,7 @@ class ErrorHandler {
   }
 
   // Global error middleware
-  static globalErrorHandler(err, req, res, next) {
-    logger.error('Unhandled Error', err);
-    
-    // Handle specific error types
-    if (err.name === 'ValidationError') {
-      return this.validationError(res, err.errors);
-    }
-    
-    if (err.name === 'JsonWebTokenError') {
-      return this.unauthorized(res, 'Invalid token');
-    }
-    
-    if (err.name === 'TokenExpiredError') {
-      return this.unauthorized(res, 'Token expired');
-    }
-    
-    // Default server error
-    return this.serverError(res, err);
-  }
-
-  // Global error middleware
-  static globalErrorHandler(err, req, res, next) {
+  static globalErrorHandler(err, req, res, _next) {
     logger.error('Unhandled Error', err);
 
     if (err.name === 'ValidationError') {

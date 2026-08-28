@@ -8,6 +8,8 @@ out/
 # env files
 .env
 .env.*
+# ...but the placeholder template is meant to be committed.
+!.env.example
 
 # logs
 npm-debug.log*

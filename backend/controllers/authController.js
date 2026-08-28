@@ -3,10 +3,15 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
+const config = require('../config');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
 const axios = require('axios');
 
-// List of known disposable email domains (partial list - you can expand this)
+// List of known disposable email domains (partial list - you can expand this).
+// Unused: the MailboxLayer call replaced it, but that call hard-fails without
+// an API key, so this list is the fallback that would make registration
+// degrade instead of 500. See IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 const DISPOSABLE_EMAIL_DOMAINS = [
   '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
   'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
@@ -22,7 +27,7 @@ const DISPOSABLE_EMAIL_DOMAINS = [
 
 // MailboxLayer API validation
 async function validateEmailMailboxLayer(email) {
-  const apiKey = process.env.MAILBOXLAYER_API_KEY;
+  const apiKey = config.apiKeys.mailboxLayer;
   if (!apiKey) {
     throw new Error('MailboxLayer API key not set');
   }
@@ -99,7 +104,7 @@ const authController = {
 
       // Generate email verification token
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
       console.log(`[Register] Generated verification token for ${email}:`, verificationToken);
 
       // Create user with email verification fields
@@ -173,8 +178,8 @@ const authController = {
       // Generate JWT token
       const token = jwt.sign(
         { userId: user.rows[0].id, email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
       );
 
       const { password_hash, email_verified, ...userWithoutPassword } = user.rows[0];
@@ -195,26 +200,21 @@ const authController = {
   async verifyEmail(req, res) {
     try {
       const { token } = req.params;
-      console.log(`[VerifyEmail] Received verification request for token:`, token);
+      console.log('[VerifyEmail] Received verification request'); // token is a credential — not logged
       // Find user with this verification token
       const user = await db.query(
         'SELECT id, email, first_name, email_verification_expires, created_at FROM users WHERE email_verification_token = $1',
         [token]
       );
       if (user.rows.length === 0) {
-        console.log(`[VerifyEmail] No user found for token:`, token);
-        // Try to find a recently verified user (last 30 min)
-        const recentVerified = await db.query(
-          `SELECT id, email, first_name FROM users WHERE email_verified = TRUE AND email_verification_token IS NULL AND created_at > NOW() - INTERVAL '30 minutes' ORDER BY created_at DESC LIMIT 1`
-        );
-        if (recentVerified.rows.length > 0) {
-          console.log(`[VerifyEmail] User already verified:`, recentVerified.rows[0].email);
-          return res.status(200).json({
-            message: 'Your email is already verified. You can now log in to your account.',
-            alreadyVerified: true,
-            user: recentVerified.rows[0]
-          });
-        }
+        console.log('[VerifyEmail] No user found for the supplied token');
+        // There used to be a fallback here that answered "already verified" by
+        // looking up whichever account had verified most recently. Verification
+        // clears the token, so a second click on a real link is indistinguishable
+        // from a forged one — and that query guessed. On an unauthenticated
+        // route it returned a stranger's id, email and first name, which the
+        // frontend then displayed. Telling the two apart requires knowing which
+        // token was consumed; until the schema records that, this is a 400.
         return res.status(400).json({ error: 'Invalid verification token' });
       }
       const now = new Date();
@@ -271,17 +271,17 @@ const authController = {
         return res.status(400).json({ error: 'Email is already verified' });
       }
 
-      // Check if previous token is still valid (within 1 hour)
+      // Check if previous token is still valid (within the resend cooldown)
       if (user.rows[0].email_verification_expires && 
           new Date() < new Date(user.rows[0].email_verification_expires) &&
-          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - 60 * 60 * 1000)) {
+          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - config.emailVerification.resendCooldown)) {
         return res.status(400).json({ error: 'Please wait before requesting another verification email' });
       }
 
       // Generate new verification token
       const crypto = require('crypto');
       const verificationToken = crypto.randomBytes(32).toString('hex');
-      const verificationExpires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
 
       // Update user with new token
       await db.query(
@@ -376,12 +376,13 @@ const authController = {
     }
   },
 
-  // Scheduled job: Delete unverified accounts older than 30 minutes
+  // Scheduled job: delete unverified accounts older than dataRetention.unverifiedAccountMinutes
   async deleteUnverifiedAccounts() {
     try {
       console.log(`[Cleanup] Running unverified user cleanup job at`, new Date());
       const result = await db.query(
-        `DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - INTERVAL '30 minutes' RETURNING id, email, created_at` 
+        'DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - make_interval(mins => $1) RETURNING id, email, created_at',
+        [config.dataRetention.unverifiedAccountMinutes]
       );
       if (result.rows.length > 0) {
         console.log(`[Cleanup] Deleted ${result.rows.length} unverified accounts:`, result.rows.map(u => ({email: u.email, created_at: u.created_at})));
@@ -395,6 +396,9 @@ const authController = {
 };
 
 // Helper function to create sample data for new users
+// Never called — new accounts get no starter data. Unclear whether that is a
+// removed feature or a lost wiring; see IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 async function createSampleDataForNewUser(userId) {
   try {
     const currentDate = new Date();

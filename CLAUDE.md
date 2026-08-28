@@ -15,8 +15,8 @@ npm start              # node app.js (production)
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)
 npm run db:seed        # seed sample data (demo account: john.doe@example.com / password123)
 npm run docs:generate  # regenerate API docs via scripts/generateDocs.js
-npm run lint           # eslint .
-npm test               # NO-OP — prints "No tests specified" and exits 0. There is no backend test suite.
+npm run lint           # eslint . (eslint 9, flat config in eslint.config.js)
+npm test               # node --test — unit tests always run; see below for the integration suite
 ```
 
 ### Frontend (`cd frontend`)
@@ -24,11 +24,29 @@ npm test               # NO-OP — prints "No tests specified" and exits 0. Ther
 npm run dev            # next dev  (http://localhost:3000)
 npm run build          # next build
 npm start              # next start (serve production build)
-npm run lint           # next lint
-# There is no `npm test` script defined despite README claims.
+npm run lint           # next lint (needs .eslintrc.json — without it, it prompts and hangs)
+npm run check:locales  # fails on duplicate keys in public/locales/*/common.json
+# There is still no `npm test` in the frontend, despite README claims.
 ```
 
-There is currently **no automated test suite** in either project. Verify changes by running the servers and exercising the flow manually.
+## Tests
+
+`backend/test/` holds the only automated tests. `npm test` runs them via `node --test` — no test framework is installed, and none is needed.
+
+- **Unit tests always run**, with no database and no network: `exchangeRateService.test.js` (conversion, caching, and the failure modes that would silently produce a plausible wrong number) and `configValidate.test.js` (the startup check, exercised in a child process because it calls `process.exit`).
+- **`api.test.js` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`; point it at a throwaway database instead:
+
+  ```bash
+  TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
+  ```
+
+  The database must already have the schema (`npm run db:setup`). The suite creates and deletes users, which is why opting in is deliberate — never point it at production.
+
+  It raises `RATE_LIMIT_AUTH_MAX` for itself. `authLimiter` allows 5 requests per 15 minutes per IP across `/register`, `/login`, `/resend-verification` and `/test-email` **combined**, and a suite that touches both login and register trips that almost immediately.
+
+The frontend has no tests. Verify UI changes by running the app.
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint plus tests for the backend against a Postgres service container, and `check:locales`, lint and `build` for the frontend. It uses `npm ci`, so a `package.json` that disagrees with its lockfile fails the build rather than resolving to whatever the registry serves.
 
 ## Ports (README is stale on this)
 
