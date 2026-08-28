@@ -3,7 +3,6 @@ const config = require('../config');
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 let pool = null;
-let lastRequestTime = Date.now();
 let inactivityTimer = null;
 
 // Pin the schema explicitly. Every query in this codebase names tables
@@ -53,7 +52,6 @@ function createPool() {
 }
 
 function getPool() {
-  lastRequestTime = Date.now();
   if (!pool) {
     pool = createPool();
   }

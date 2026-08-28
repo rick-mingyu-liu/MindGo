@@ -380,11 +380,6 @@ const investmentController = {
   
       if (finnhubData && Array.isArray(finnhubData.data)) {
         for (const report of finnhubData.data) {
-          const period = report.period;
-          const filingUrl = (report.cik && report.accessNumber)
-            ? `https://www.sec.gov/Archives/edgar/data/${report.cik.replace(/^0+/, '')}/${report.accessNumber.replace(/-/g, '')}/${report.accessNumber}-index.htm`
-            : null;
-  
           const reportData = report.report || {};
           const bs = reportData.bs || {};
           const ic = reportData.ic || {};

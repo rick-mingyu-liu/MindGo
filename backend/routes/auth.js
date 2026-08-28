@@ -15,12 +15,6 @@ const validateEmail = (email) => {
     return false;
   }
   
-  // Check for common invalid patterns
-  const invalidPatterns = [
-    /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, // Valid format
-    /^[^@]+@[^@]+\.[^@]+$/, // Has @ and domain
-  ];
-  
   // Additional checks
   if (email.length > config.validation.emailMaxLength) return false; // RFC 5321 limit
   if (email.split('@')[0].length > 64) return false; // Local part limit

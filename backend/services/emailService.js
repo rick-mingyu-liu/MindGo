@@ -93,6 +93,9 @@ The MindGo Team
 };
 
 // Helper function to create ASCII pie chart
+// Never called; the weekly report is assembled without it.
+// See IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 function createAsciiPieChart(data, title, maxWidth = 40) {
   if (Object.keys(data).length === 0) return '';
   
@@ -102,7 +105,7 @@ function createAsciiPieChart(data, title, maxWidth = 40) {
   const total = Object.values(data).reduce((sum, val) => sum + val, 0);
   const sortedData = Object.entries(data).sort((a, b) => b[1] - a[1]);
   
-  sortedData.forEach(([category, amount], index) => {
+  sortedData.forEach(([category, amount]) => {
     const percentage = ((amount / total) * 100).toFixed(1);
     const barLength = Math.round((amount / total) * (maxWidth - 20));
     const bar = '█'.repeat(barLength);

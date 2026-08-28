@@ -7,7 +7,11 @@ const config = require('../config');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
 const axios = require('axios');
 
-// List of known disposable email domains (partial list - you can expand this)
+// List of known disposable email domains (partial list - you can expand this).
+// Unused: the MailboxLayer call replaced it, but that call hard-fails without
+// an API key, so this list is the fallback that would make registration
+// degrade instead of 500. See IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 const DISPOSABLE_EMAIL_DOMAINS = [
   '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
   'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
@@ -397,6 +401,9 @@ const authController = {
 };
 
 // Helper function to create sample data for new users
+// Never called — new accounts get no starter data. Unclear whether that is a
+// removed feature or a lost wiring; see IMPROVEMENTS.md item 13.
+// eslint-disable-next-line no-unused-vars
 async function createSampleDataForNewUser(userId) {
   try {
     const currentDate = new Date();

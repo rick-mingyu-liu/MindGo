@@ -19,7 +19,7 @@ const OPTIONAL = [
   ['EMAIL_USER', 'no verification or weekly-report email can be sent'],
   ['EMAIL_PASS', 'no verification or weekly-report email can be sent'],
   ['FINNHUB_API_KEY', 'stock quotes fall back to the free Yahoo / Alpha Vantage path'],
-  ['MAILBOXLAYER_API_KEY', 'registration skips deliverability checks on new emails'],
+  ['MAILBOXLAYER_API_KEY', 'registration fails outright with a 500 — authController throws before it can degrade'],
 ];
 
 const MIN_SECRET_LENGTH = 32;
