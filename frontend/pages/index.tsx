@@ -104,6 +104,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Healthcare': '#f97316',
   'Education': '#14b8a6',
   'Travel': '#6366f1',
+  'Savings': '#64748b',
   'Other Expenses': '#a16207',
   // Income
   'Salary': '#22c55e',

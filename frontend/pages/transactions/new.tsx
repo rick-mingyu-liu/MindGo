@@ -46,6 +46,7 @@ export const categories = {
     'Healthcare',
     'Education',
     'Travel',
+    'Savings',
     'Other Expenses'
   ]
 }
