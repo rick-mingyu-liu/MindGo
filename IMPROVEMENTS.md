@@ -20,7 +20,7 @@ can be answered without reading the whole backlog.
 | 4 | Six wrong Chinese translations (duplicate keys) | ✅ done — PR #12 |
 | 5 | No tests; `npm test` passes by doing nothing | ✅ done — round 2 |
 | 6 | `npm run lint` cannot run in *either* project | ✅ done — round 2 |
-| 7 | Orphan `Savings` category | open — **decision A** |
+| 7 | Orphan `Savings` category | ✅ done — round 9 |
 | 8 | Scheduler depends upward on controllers | ✅ done — round 5 |
 | 9 | 59 Chinese strings missing entirely | ✅ done — round 4 |
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
@@ -31,35 +31,24 @@ can be answered without reading the whole backlog.
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 | 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
 | 17 | Retention deletions are silent in production | open — **decision D** |
+| 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
 
 ---
 
 ## Decisions needed
 
-Four open questions. Each one is blocked on a judgement call, not on work — the
-investigation behind each is done and recorded in the item it points to. A
-recommendation is given for each; none is so clear-cut that it should be taken
-without a look.
+Three open questions remain — **B**, **C** and **D**. Each is blocked on a
+judgement call, not on work: the investigation behind each is done and recorded
+in the item it points to. A recommendation is given for each; none is so
+clear-cut that it should be taken without a look.
 
-### A. The `Savings` category — item 7
+**A is answered** — see below.
 
-**What was found.** All four rows come **verbatim from `db/seed.sql` lines
-51–54**: same amount (`500.00`), same description (`Emergency Fund
-Contribution`), dates on the 25th of Mar–Jun 2025, all owned by user 1 — the
-demo account. **No real user ever chose `Savings`**, because the UI has never
-offered it. This is the seed file disagreeing with the category list, not user
-data needing rescue.
+### A. The `Savings` category — item 7 — ✅ ANSWERED 2026-08-29
 
-| Option | Consequence |
-|---|---|
-| **Promote `Savings` to a real category** | Add it to `categories.expense` in `frontend/pages/transactions/new.tsx` and to `CATEGORY_COLORS` in `frontend/pages/index.tsx`. The seed stays as-is and the four rows become legitimate. Note the app already has a whole `savings_goals` table and feature, so the concept is not foreign to it. |
-| **Migrate the rows to `Other Expenses`** | One `UPDATE` plus an edit to `db/seed.sql`, so fresh setups stop reintroducing it. Loses the distinction between "money spent" and "money set aside" in the demo data. |
-
-**Recommendation: promote it.** "Emergency Fund Contribution" is a real thing a
-finance app should be able to categorise, the feature it pairs with already
-exists, and the migration option requires editing the seed file anyway — so
-neither option is cheaper. Whichever you pick, `db/seed.sql` and the category
-list must end up agreeing; that they disagree today is the actual defect.
+**Decision: promote it**, the recommended option. `Savings` is now a real
+expense category rather than a value only the seed file knew about. The work is
+in item 7; nothing here is still open.
 
 ### B. The three dead symbols — item 13
 
@@ -390,30 +379,51 @@ Both lint scripts run in CI as of item 5, so nothing runs unattended any more.
 
 ## 7. Orphan `Savings` category
 
-**Status:** open — **decision A**
-**Effort:** trivial once decided
+**Status:** ✅ DONE 2026-08-29 — decision A answered: promoted
 
-Four expense rows are categorised `Savings`, which appears in no category list
-in the code — not `categories.expense` in
-[frontend/pages/transactions/new.tsx](frontend/pages/transactions/new.tsx), not
-`CATEGORY_COLORS` in [frontend/pages/index.tsx](frontend/pages/index.tsx). They
-render with fallback styling, and the value cannot be re-selected if the
-transaction is edited.
+`Savings` is a real expense category now. Four edits, all frontend:
 
-**Where they came from — checked against the live database.** All four are
-verbatim `db/seed.sql` lines 51–54: `500.00`, `Emergency Fund Contribution`,
-the 25th of March, April, May and June 2025, all owned by user 1, the demo
-account. Nothing here is user-entered, and nothing else in the table uses the
-category:
+- added to `categories.expense` in
+  [frontend/pages/transactions/new.tsx](frontend/pages/transactions/new.tsx) —
+  the canonical list, which the edit page and the dashboard both import;
+- given a colour in `CATEGORY_COLORS` in
+  [frontend/pages/index.tsx](frontend/pages/index.tsx);
+- translated in both locale files (`储蓄`), because the picker renders
+  categories through `t(category)`.
+
+**What was actually wrong.** Not orphaned user data. All four rows are verbatim
+`db/seed.sql` lines 51–54: `500.00`, `Emergency Fund Contribution`, the 25th of
+March–June 2025, all owned by user 1 — the demo account. No real user ever
+chose `Savings`, because the UI never offered it. The defect was **`db/seed.sql`
+disagreeing with the category list**, which is why editing the rows would not
+have fixed it.
+
+**Verified against the live database after the change.** Every category that
+appears in `transactions` is now in the canonical list, with the matching type:
 
 ```
-Savings         | expense | 4 rows | all 2025-06-29, user 1 (demo)
-Other Expenses  | expense | 5 rows
+Business 3 | Dining Out 22 | Education 20 | Entertainment 110 | Freelance 26
+Groceries 34 | Healthcare 11 | Housing 17 | Investment Returns 9
+Other Expenses 5 | Other Income 1 | Salary 17 | Savings 4 | Shopping 27
+Transportation 60 | Travel 2 | Utilities 29
 ```
 
-So this is not orphaned user data — it is **`db/seed.sql` disagreeing with the
-category list**, which is why fixing only the rows would not fix the problem.
-See decision A above.
+`Savings` was the only mismatch, and its 4 rows belong to user 1 alone. `Tax
+Refund` and `Investment` are offered but unused — the list is a superset of what
+exists, which is the harmless direction.
+
+**Two things this fixed that were easy to miss:**
+
+- The dashboard was classifying `Savings` as an expense only by falling through
+  to a default in `getCategoryChartData`
+  ([frontend/pages/index.tsx](frontend/pages/index.tsx)) — the right answer with
+  no reasoning behind it, and the wrong one for any unlisted *income* category
+  someone adds later. It is explicit now.
+- Its colour came from `getCategoryColor`'s name hash: stable, but arbitrary,
+  and free to land next to a real category's. It is `#64748b` now, picked from
+  slate — the one hue family none of the other seventeen occupy.
+
+**What this does not fix:** nothing enforces the agreement. See item 18.
 
 ---
 
@@ -834,6 +844,37 @@ decision D.
 
 ---
 
+## 18. Nothing keeps `db/seed.sql` and the category list in step
+
+**Status:** open
+**Effort:** small
+
+Item 7 existed for months because the seed file used a category the UI did not
+offer, and nothing anywhere noticed. Fixing it removed the disagreement; it did
+not remove the way the disagreement happened.
+
+The two halves live in different npm projects. The category list is
+`categories` in
+[frontend/pages/transactions/new.tsx](frontend/pages/transactions/new.tsx); the
+seed rows are [backend/db/seed.sql](backend/db/seed.sql). Backend CI never reads
+the frontend, frontend CI never reads the backend, and the backend does not
+validate `category` against any list either — `routes/transactions.js:15` only
+requires it to be non-empty. So a new seed category, or a renamed frontend one,
+drifts silently again.
+
+Options, cheapest first:
+
+| Option | Consequence |
+|---|---|
+| **A script in the frontend, run by `check:locales`'s job** | Parse the category names out of `../backend/db/seed.sql` and assert each is in `categories` with the right type. Cheap, and CI already runs frontend scripts. Reaches across the project boundary with a relative path, which is ugly but honest — the coupling is real. |
+| **Move the category list to a shared JSON file** both projects read | Removes the parsing. Costs a new shared location the repo does not currently have, and a build step for the frontend to import it. |
+| **Validate `category` server-side** against the list | Fixes more than drift — it also stops a client sending an arbitrary category. But it puts the list in the backend, so the frontend then has to derive from *it*, which is the same coupling pointed the other way. |
+
+No recommendation yet; the third is the most valuable and the most work, and it
+is worth deciding alongside whether categories should ever be user-defined.
+
+---
+
 ## Operational follow-ups
 
 Not code — carried over from the 2026-08-27 database work.
@@ -866,15 +907,19 @@ Not code — carried over from the 2026-08-27 database work.
 
 10. ~~Stop logging verification tokens~~ — done (round 8, item 16), which also
     fixed nine address-logging sites and produced `utils/privacy.js`
-11. **Next:** whichever of decisions **A**–**D** you have answered. C is worth
+11. ~~Promote `Savings` to a real category~~ — done (round 9, item 7, decision
+    A), which turned up that the dashboard was classifying it correctly only by
+    accident, and produced item 18
+12. **Next:** whichever of decisions **B**–**D** you have answered. C is worth
     answering early: registration is 500ing for anyone who deploys without a
     MailboxLayer key, and both `.env.example` and the startup check currently
     tell them the key is optional.
 
-**Waiting on you, not on work:** decisions **A** (the `Savings` category, item
-7), **B** and **C** (the dead symbols and the register 500, item 13), and **D**
-(production visibility for the retention jobs, item 17). Each is written up
-under [Decisions needed](#decisions-needed) with options and a recommendation.
+**Waiting on you, not on work:** decisions **B** and **C** (the dead symbols and
+the register 500, item 13) and **D** (production visibility for the retention
+jobs, item 17). Each is written up under
+[Decisions needed](#decisions-needed) with options and a recommendation. **A**
+is answered and done.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
@@ -882,4 +927,5 @@ Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `..
 A native reader should still skim them; the check can prove a key *resolves*,
 never that the wording is good.
 
-Item 7 is cleanup rather than risk; do it when touching that code.
+Item 18 is prevention rather than a defect — there is nothing broken today. It
+is worth doing before the next person adds a category, not urgently.
