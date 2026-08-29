@@ -988,8 +988,8 @@ production (errors and deletions) are. It is a trap for whoever next assumes
 
 ## 20. The 4-month window is a term, and the feature around it is unfinished
 
-**Status:** open — design decided 2026-08-29; **steps 1 and part of 2 built in
-round 14**
+**Status:** open — design decided 2026-08-29; **steps 1 and 2 built in rounds
+14–15**; the dashboard still asks for a rolling count (item 22)
 **Effort:** small for the defect, medium for the feature
 **Found:** by asking whether the 4-month window deletes anything
 
@@ -1268,6 +1268,55 @@ tests exercise it. If step 2 does not follow reasonably soon, delete it rather
 than let it sit — the argument for keeping unused code does not improve with
 age.
 
+### What round 15 wired
+
+`GET /summary/rolling` takes **either** `?term=` **or** `?months=`:
+
+```
+?term=2026-spring   an explicit term
+?term=current       resolved server-side, so no client knows the calendar
+?term=previous      the comparison a co-op budget is for
+?months=4           the original rolling count, unchanged in meaning
+```
+
+Three decisions in it:
+
+- **The two are mutually exclusive**, not one silently winning. A request with
+  both is a client bug, and answering it either way would hide that.
+- **The response echoes the window** — `term`, `termLabel`, `startDate`,
+  `endDate`, and `period` set to the label. A client never computes a date or a
+  term name, and a log line says *which* window was served; `months=4` never
+  told you which four months.
+- **`?months=` is validated here now too**, the same 1–60 as the delete
+  endpoint. It had no validation at all, so `?months=abc` reached the date
+  arithmetic.
+
+**Fixed while in the function:** the window was built with
+`new Date(y, m, 1).toISOString().split('T')[0]` — the off-by-one east of UTC
+described in item 21. Both paths now use integer arithmetic, so the rolling
+window and the term window cannot disagree about a boundary, which is the whole
+reason `terms.js` exists. Item 21 keeps the payload problem; this part of it is
+done.
+
+**Checked against the live database**, read-only, for the heaviest real user:
+
+| Window | Dates | Income | Expenses |
+|---|---|---|---|
+| `?term=current` → Spring 2026 | 2026-05-01 → 2026-09-01 | 2,923 | 9,740 |
+| `?term=previous` → Winter 2026 | 2026-01-01 → 2026-05-01 | 16,919 | 13,975 |
+
+Two terms with completely different financial shapes — a school term and a
+co-op term — which is the argument for the whole feature in one table. Note
+that `?months=4` returned **the same numbers as `?term=current`** on the day
+this was run: August is one of the three months a year when a rolling window
+happens to equal the term. Run it in September and they diverge by three
+months' data.
+
+**20 tests**, again mounting the real router on a real server: unmounting the
+validator fails 7 of them. Five mutations checked, all caught — aliasing
+`previous` to `current`, restoring the drifting date maths, allowing both
+parameters, and dropping the echo.
+
 ### Order of work
 
 1. ~~**Validate `months`** on the auto-delete endpoint (Finding 3)~~ — ✅ done
@@ -1275,9 +1324,12 @@ age.
    route file, plus the `validationResult` check the controller was missing.
    The first query-parameter validation in this backend; every other validated
    handler checks a body.
-2. **Make the term view term-aligned** (Finding 1). ✅ **`utils/terms.js` exists
-   as of round 14**; what remains is wiring it into `/summary/rolling` and the
-   dashboard.
+2. ~~**Make the term view term-aligned** (Finding 1)~~ — ✅ done round 15 on the
+   API. `GET /summary/rolling?term=2026-spring|current|previous` resolves
+   through `utils/terms.js` and echoes the window it served. **The dashboard
+   still sends `months=4`**, so the bug is fixed but not yet reaching users —
+   that switch belongs with item 22, because the "Last 4 months" labels have to
+   change with it.
 3. **Add the yearly view** — item 22.
 4. **Fix `/summary/rolling`** — item 21. It has to land before a longer window
    is affordable.
@@ -1325,15 +1377,15 @@ The dashboard uses the totals and the per-month figures. It does not need the
 transaction list at all — `pages/transactions/index.tsx` fetches that
 separately.
 
-**A second bug in the same function.** The window is built with
-`new Date(y, m, 1).toISOString().split('T')[0]`, which is off by a day in any
-timezone east of UTC — under `TZ=Asia/Shanghai` that expression yields
-`2026-04-30` for May 1st, so every window boundary shifts back a day and one
-day's transactions land in the wrong month. It does not bite today only because
-the server runs UTC; it would the moment anyone ran the backend locally in
-Europe or Asia, which the `zh` locale suggests someone might.
-[utils/terms.js](backend/utils/terms.js) (item 20) shows the shape that avoids
-it, and rewriting this function is the natural time to adopt it.
+**A second bug in the same function — ✅ fixed in round 15.** The window was
+built with `new Date(y, m, 1).toISOString().split('T')[0]`, which is off by a
+day in any timezone east of UTC: under `TZ=Asia/Shanghai` that expression yields
+`2026-04-30` for May 1st, so every boundary shifted back a day and one day's
+transactions landed in the wrong month. It never bit because the server runs
+UTC. Both window paths use integer arithmetic now, and
+`test/rollingSummary.test.js` asserts first-of-month boundaries under four
+timezones including UTC+14. **The payload problem below is what remains of this
+item.**
 
 **Why this matters for item 20:** this cost is *per user, per request*. Deleting
 other users' old data does nothing for it. A `SUM(...) GROUP BY` in SQL and
