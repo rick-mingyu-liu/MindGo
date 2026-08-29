@@ -26,7 +26,7 @@ can be answered without reading the whole backlog.
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
-| 13 | Three dead top-level symbols, and a 500 on register | 500 fixed — round 10; two symbols still open under **decision B** |
+| 13 | Three dead top-level symbols, and a 500 on register | ✅ done — rounds 10 and 11 |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 | 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
@@ -37,12 +37,12 @@ can be answered without reading the whole backlog.
 
 ## Decisions needed
 
-Two open questions remain — **B** and **D**. Each is blocked on a
+One open question remains — **D**. Each is blocked on a
 judgement call, not on work: the investigation behind each is done and recorded
 in the item it points to. A recommendation is given for each; none is so
 clear-cut that it should be taken without a look.
 
-**A and C are answered** — see below.
+**A, B and C are answered** — see below.
 
 ### A. The `Savings` category — item 7 — ✅ ANSWERED 2026-08-29
 
@@ -50,24 +50,13 @@ clear-cut that it should be taken without a look.
 expense category rather than a value only the seed file knew about. The work is
 in item 7; nothing here is still open.
 
-### B. The three dead symbols — item 13
+### B. The three dead symbols — item 13 — ✅ ANSWERED 2026-08-29
 
-Each was left in place with an `eslint-disable`, because "delete it" and "wire
-it up" are both defensible:
-
-| Symbol | Where | The question |
-|---|---|---|
-| ~~`DISPOSABLE_EMAIL_DOMAINS`~~ | ~~`controllers/authController.js`~~ | **Settled by C.** Wired up in round 10 as the fallback; it moved to `services/emailValidationService.js` and is no longer dead. |
-| `createSampleDataForNewUser` | `controllers/authController.js` | New accounts currently get no starter data. Removed feature, or lost wiring? Only you know which was intended. |
-| `createAsciiPieChart` | `services/emailService.js` | The weekly report is assembled without it. |
-
-**Recommendation: delete `createAsciiPieChart`, and decide
-`createSampleDataForNewUser` on product grounds.** An ASCII pie chart in an HTML
-email is not something the report is missing. The starter-data one is genuinely
-a product question — an empty dashboard on first login is a worse first
-impression, but fake transactions in a real finance app are worse still.
-
-`DISPOSABLE_EMAIL_DOMAINS` is no longer part of this decision; C answered it.
+**Decision: delete all three.** The recommendation was to delete
+`createAsciiPieChart`, decide `createSampleDataForNewUser` on product grounds,
+and leave `DISPOSABLE_EMAIL_DOMAINS` to C. C wired the domain list up, and the
+product question turned out to have an answer in the history rather than
+needing one — see item 13. Nothing here is still open.
 
 ### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13 — ✅ ANSWERED 2026-08-29
 
@@ -358,8 +347,8 @@ already-installed `eslint-config-next` provides. It now completes: six
 
 The first backend run found 19 problems, including three real defects — see
 item 12 and the `globalErrorHandler` duplicate. The rest were dead bindings,
-now removed. Three dead top-level symbols are marked rather than deleted; see
-item 13.
+now removed. Three dead top-level symbols were marked rather than deleted at
+the time; all three are resolved as of round 11 — see item 13.
 
 Both lint scripts run in CI as of item 5, so nothing runs unattended any more.
 
@@ -619,8 +608,8 @@ sign — an account in CAD was described to the model as USD.
 
 ## 13. Three dead top-level symbols, and a 500 on register
 
-**Status:** the 500 is ✅ FIXED 2026-08-29 (decision C); two symbols still open
-under **decision B**
+**Status:** ✅ DONE 2026-08-29 — the 500 in round 10 (decision C), the symbols
+in round 11 (decision B)
 **Found:** by the linter
 
 ### The 500 — fixed
@@ -663,16 +652,40 @@ Also fixed in passing: the domain list was a 40-element array containing 30
 distinct domains — `tmpmail.net` and three neighbours appeared three times
 each. It is a sorted `Set` now, so a repeat shows up in a diff.
 
-### The two symbols still open — decision B
+### The three symbols — all resolved
 
-1. **`createSampleDataForNewUser`** ([controllers/authController.js](backend/controllers/authController.js)) —
-   never called, so new accounts get no starter data. Removed feature, or lost
-   wiring?
-2. **`createAsciiPieChart`** ([services/emailService.js](backend/services/emailService.js)) —
-   the weekly report is assembled without it.
+`DISPOSABLE_EMAIL_DOMAINS` was settled by decision C: it is the fallback now,
+and lives in `services/emailValidationService.js`. The other two are **deleted**
+(round 11, 134 lines), and the last `eslint-disable` in the backend went with
+them.
 
-~~**`DISPOSABLE_EMAIL_DOMAINS`**~~ — settled by decision C. It is the fallback
-now, and lives in `services/emailValidationService.js`.
+Both were written up as judgement calls — "removed feature or lost wiring?" —
+and **both turned out to have an answer in the git history**, which is worth
+recording because the question was posed as if it needed a product decision:
+
+- **`createSampleDataForNewUser`** (108 lines, `authController.js`) seeded a new
+  account with eight sample transactions, an Emergency Fund goal and three
+  watchlist stocks. It was **deliberately unwired**: commit `6746ca1`,
+  2025-07-03, *"clear the mock data implementation"*, deleting exactly the three
+  lines that called it and leaving the body behind. Not lost wiring — a removed
+  feature, removed on purpose, by the repo owner. Nothing to decide.
+
+  Worth knowing if it is ever wanted back: it inserted `'Sample Salary
+  Payment'`-style rows straight into `transactions` with no flag marking them
+  synthetic, so they would have been indistinguishable from real entries in
+  every total, chart and AI plan. Reviving it should not mean reviving that.
+
+- **`createAsciiPieChart`** (26 lines, `emailService.js`) was **never called in
+  any revision** — checked by walking every commit that touched the file; it
+  appears exactly once per revision, as its own definition. Born dead in
+  `e2a4761`, "email sending service with formatted email". The weekly report has
+  always been HTML, where a `█`-bar chart in a monospace block would have been
+  the wrong medium anyway.
+
+Verified after deleting: lint clean (the disables went with the code they were
+suppressing), 79 tests still green, and `generateWeeklyReport` still returns its
+`{ text, html }` pair — exercised directly with `db.query` stubbed, since no
+test covers it.
 
 ### How it was verified
 
@@ -945,13 +958,18 @@ Not code — carried over from the 2026-08-27 database work.
     item 13, decision C), which turned up three more ways validation became a
     gate — an outage, an expired key and an exhausted quota — and settled one
     of decision B's three symbols
-13. **Next:** whichever of decisions **B** and **D** you have answered. Neither
-    is urgent now; C was the one with a live defect behind it.
+13. ~~Delete the dead symbols~~ — done (round 11, item 13, decision B). Both
+    questions had answers in the git history rather than needing a product
+    call: one was deliberately unwired in `6746ca1`, the other was never called
+    in any revision
+14. **Next:** decision **D**, the last one. Nothing behind it is broken — the
+    retention jobs run, and a *failing* one is still visible; what is missing
+    is the record of a successful one.
 
-**Waiting on you, not on work:** decisions **B** (the two remaining dead
-symbols, item 13) and **D** (production visibility for the retention jobs,
-item 17). Both are written up under [Decisions needed](#decisions-needed) with
-options and a recommendation. **A** and **C** are answered and done.
+**Waiting on you, not on work:** decision **D** alone (production visibility for
+the retention jobs, item 17), written up under
+[Decisions needed](#decisions-needed) with options and a recommendation.
+**A**, **B** and **C** are answered and done.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
