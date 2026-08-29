@@ -1,5 +1,11 @@
+const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const { getExchangeRate } = require('../services/exchangeRateService');
+const { boundsOf, labelOf, currentTerm, previousTerm } = require('../utils/terms');
+
+/** `(2026, 4, 1)` -> `'2026-05-01'`. month is 0-based, as in `Date`. */
+const isoDate = (year, month, day) =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 const summaryController = {
   // Get monthly summary
@@ -97,24 +103,67 @@ const summaryController = {
     }
   },
 
-  // Get 4-month rolling summary
+  /**
+   * Summary over a window, chosen either as a **term** (`?term=2026-spring`,
+   * `current`, `previous`) or as a rolling month count (`?months=4`).
+   *
+   * The term form exists because a rolling four months is not a term. Counting
+   * back from today, the window equals the term only in April, August and
+   * December — the last month of each, when it is already over. In the *first*
+   * month of a co-op term, which is when someone sets a budget, three quarters
+   * of a rolling window is the previous term's money. See IMPROVEMENTS.md
+   * item 20.
+   *
+   * Term boundaries come from `utils/terms.js` and are never computed here:
+   * the retention job will delete whole terms using the same module, and a view
+   * and a deletion that disagree about where a term starts would fail silently.
+   */
   async getRollingSummary(req, res) {
     try {
-      const { months = 4, targetCurrency = 'CAD' } = req.query;
-      const currentDate = new Date();
-      
-      // Calculate date range for the last N months (including current month)
-      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1); // First day of next month
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - parseInt(months) + 1, 1);
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
 
-      // Get transactions for the rolling period
+      const { months = 4, term, targetCurrency = 'CAD' } = req.query;
+      const currentDate = new Date();
+
+      let window;
+      if (term !== undefined) {
+        const termId =
+          term === 'current' ? currentTerm(currentDate)
+            : term === 'previous' ? previousTerm(currentTerm(currentDate))
+              : term;
+        const { start, end } = boundsOf(termId);
+        window = { start, end, term: termId, label: labelOf(termId), period: labelOf(termId) };
+      } else {
+        // Half-open, like the term form: first of the month N-1 months back, up
+        // to the first of next month.
+        //
+        // Built by arithmetic rather than `new Date(y, m, 1).toISOString()`,
+        // which is what this used to do and is off by a day east of UTC —
+        // under TZ=Asia/Shanghai that expression yields '2026-04-30' for May 1,
+        // shifting every boundary and putting a day's transactions in the wrong
+        // month. It escaped only because the server runs UTC.
+        const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(months) + 1;
+        const endAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() + 1;
+        window = {
+          start: isoDate(Math.floor(startAbsolute / 12), startAbsolute % 12, 1),
+          end: isoDate(Math.floor(endAbsolute / 12), endAbsolute % 12, 1),
+          term: null,
+          label: null,
+          period: `${months}-month rolling`,
+        };
+      }
+
+      // Get transactions for the window
       const transactions = await db.query(
         `SELECT * FROM transactions 
          WHERE user_id = $1 
          AND date >= $2 
          AND date < $3
          ORDER BY date DESC`,
-        [req.user.userId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+        [req.user.userId, window.start, window.end]
       );
 
       // Prepare for conversion
@@ -201,9 +250,14 @@ const summaryController = {
       });
 
       const summary = {
-        period: `${months}-month rolling`,
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        period: window.period,
+        // Echoed so the client never computes a date or a term name itself, and
+        // so a log line or a bug report says which window was actually served —
+        // `months=4` does not tell you which four months.
+        term: window.term,
+        termLabel: window.label,
+        startDate: window.start,
+        endDate: window.end,
         totalIncome,
         totalExpenses,
         netIncome,
