@@ -1,5 +1,26 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const config = require('../config');
+
+// A DATE column is a calendar day: no time, no zone. node-pg turns it into a
+// JS Date at local midnight, and res.json() then serialises that through
+// toISOString(), so one stored day leaves the server as a different string
+// depending on where the server runs:
+//
+//   stored 2026-08-28  ->  UTC (Render)     '2026-08-28T00:00:00.000Z'
+//                      ->  Toronto (laptop) '2026-08-28T04:00:00.000Z'
+//                      ->  Shanghai         '2026-08-27T16:00:00.000Z'
+//
+// Both halves of that are bugs. A client rendering it with `new Date(...)`
+// shows the previous day for every viewer west of the server — which is why
+// the transactions list read a day early against Render and looked fine in
+// local dev. And the edit form, which takes the day part of the string, reads
+// the wrong day outright on any server east of UTC, then writes it back on
+// save; that one moves the row, not just its label.
+//
+// Handing back the raw 'YYYY-MM-DD' makes the wire format identical on every
+// host, and leaves the value the only thing it ever was: a day.
+// See IMPROVEMENTS.md item 23.
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 let pool = null;

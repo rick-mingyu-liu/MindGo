@@ -148,6 +148,55 @@ function lastNTerms(n, now = new Date()) {
   return out;
 }
 
+/**
+ * ## Years
+ *
+ * A year needs no separate calendar. The three terms tile Jan–Dec exactly, so
+ * a calendar year *is* three terms — Winter, Spring and Fall of that year —
+ * and "this year" and "the terms in this year" can never disagree about a
+ * boundary. That is the whole reason the yearly view is expressed here rather
+ * than as its own month arithmetic somewhere in the controller.
+ */
+
+const YEAR_ID = /^\d{4}$/;
+
+/** True for '2026'. Deliberately not true for 2026 the number: ids are strings. */
+function isYearId(value) {
+  return typeof value === 'string' && YEAR_ID.test(value);
+}
+
+function parseYearId(yearId) {
+  if (!isYearId(String(yearId))) throw new TypeError(`Not a year id: ${String(yearId)}`);
+  return Number(yearId);
+}
+
+/** Half-open, like boundsOf: '2026' is 2026-01-01 up to but not including 2027-01-01. */
+function yearBoundsOf(yearId) {
+  const year = parseYearId(yearId);
+  return { start: isoDate(year, 0, 1), end: isoDate(year + 1, 0, 1) };
+}
+
+function yearLabelOf(yearId) {
+  return String(parseYearId(yearId));
+}
+
+/** The three terms of a year, in order. The yearly view's term axis. */
+function termsOfYear(yearId) {
+  const year = parseYearId(yearId);
+  return TERMS.map((_, index) => idOf(year, index));
+}
+
+function currentYear(now = new Date()) {
+  return String(partsOf(now).year);
+}
+
+function shiftYear(yearId, by) {
+  return String(parseYearId(yearId) + by);
+}
+
+const previousYear = (yearId) => shiftYear(yearId, -1);
+const nextYear = (yearId) => shiftYear(yearId, 1);
+
 module.exports = {
   TERMS,
   MONTHS_PER_TERM,
@@ -159,4 +208,11 @@ module.exports = {
   previousTerm,
   nextTerm,
   lastNTerms,
+  isYearId,
+  yearBoundsOf,
+  yearLabelOf,
+  termsOfYear,
+  currentYear,
+  previousYear,
+  nextYear,
 };

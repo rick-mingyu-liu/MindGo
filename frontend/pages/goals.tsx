@@ -17,7 +17,8 @@ import React from 'react'
 import Swal from 'sweetalert2'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { formatCurrency } from '@/utils/formatters';
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next'
+import { toDay, formatDay, daysUntil } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface Goal {
@@ -147,7 +148,7 @@ export default function Goals() {
   const handleEdit = (goal: Goal) => {
     setEditingGoal(goal);
     const formattedDate = goal.target_date
-      ? new Date(goal.target_date).toISOString().slice(0, 10)
+      ? toDay(goal.target_date) ?? ''
       : '';
     reset({
       name: goal.name,
@@ -409,9 +410,7 @@ export default function Goals() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {goals.map((goal) => {
                 const progress = (goal.current_amount / goal.target_amount) * 100
-                const daysRemaining = Math.ceil(
-                  (new Date(goal.target_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-                )
+                const daysRemaining = daysUntil(goal.target_date) ?? 0
                 const progressColor = progress >= 100 ? 'bg-green-500' : progress >= 75 ? 'bg-blue-500' : progress >= 50 ? 'bg-yellow-500' : 'bg-red-500';
                 return (
                   <Card
@@ -470,7 +469,7 @@ export default function Goals() {
                         <div className="flex items-center gap-2">
                           <Calendar className="w-5 h-5 text-muted-foreground" />
                           <span className="text-base text-muted-foreground">
-                            {new Date(goal.target_date).toLocaleDateString()}
+                            {formatDay(goal.target_date)}
                           </span>
                         </div>
                         <Badge variant={daysRemaining < 0 ? "destructive" : daysRemaining < 30 ? "default" : "secondary"} className="text-base px-3 py-1 rounded-full">
@@ -512,7 +511,7 @@ export default function Goals() {
               </div>
               <div>
                 <Label className="font-semibold">{t('Target Date')}</Label>
-                <div className="mt-1">{viewingGoal.target_date ? new Date(viewingGoal.target_date).toISOString().slice(0, 10) : ''}</div>
+                <div className="mt-1">{toDay(viewingGoal.target_date) ?? ''}</div>
               </div>
               <div>
                 <Label className="font-semibold">{t('Description')}</Label>

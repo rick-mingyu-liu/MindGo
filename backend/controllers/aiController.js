@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const aiPlanner = require('../services/aiPlanner');
+const { monthOf, monthSpan } = require('../utils/dates');
 
 const aiController = {
   // Generate AI financial plan
@@ -282,12 +283,12 @@ const aiController = {
   getMonthCount(transactions) {
     if (transactions.length === 0) return 0;
 
-    const dates = transactions.map(t => new Date(t.date));
-    const minDate = new Date(Math.min(...dates));
-    const maxDate = new Date(Math.max(...dates));
-    
-    return (maxDate.getFullYear() - minDate.getFullYear()) * 12 + 
-           (maxDate.getMonth() - minDate.getMonth()) + 1;
+    // Month keys sort lexicographically, so min/max need no Date at all — and
+    // going through one would shift a 1st-of-the-month into the month before.
+    const months = transactions.map(t => monthOf(t.date)).filter(Boolean).sort();
+    if (months.length === 0) return 0;
+
+    return monthSpan(months[0], months[months.length - 1]);
   },
 
   // Calculate spending by category

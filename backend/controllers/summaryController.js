@@ -1,7 +1,11 @@
 const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const { getExchangeRate } = require('../services/exchangeRateService');
-const { boundsOf, labelOf, currentTerm, previousTerm } = require('../utils/terms');
+const {
+  boundsOf, labelOf, currentTerm, previousTerm,
+  yearBoundsOf, yearLabelOf, currentYear, previousYear,
+} = require('../utils/terms');
+const { monthOf } = require('../utils/dates');
 
 /** `(2026, 4, 1)` -> `'2026-05-01'`. month is 0-based, as in `Date`. */
 const isoDate = (year, month, day) =>
@@ -125,7 +129,7 @@ const summaryController = {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { months = 4, term, targetCurrency = 'CAD' } = req.query;
+      const { months = 4, term, year, targetCurrency = 'CAD' } = req.query;
       const currentDate = new Date();
 
       let window;
@@ -135,7 +139,24 @@ const summaryController = {
             : term === 'previous' ? previousTerm(currentTerm(currentDate))
               : term;
         const { start, end } = boundsOf(termId);
-        window = { start, end, term: termId, label: labelOf(termId), period: labelOf(termId) };
+        window = {
+          start, end, term: termId, year: null,
+          label: labelOf(termId), period: labelOf(termId),
+        };
+      } else if (year !== undefined) {
+        // A year is three terms here, not twelve rolling months, so its bounds
+        // come from the same module the term bounds do. A yearly total that
+        // disagreed with the three term totals inside it would be worse than
+        // no yearly view at all.
+        const yearId =
+          year === 'current' ? currentYear(currentDate)
+            : year === 'previous' ? previousYear(currentYear(currentDate))
+              : year;
+        const { start, end } = yearBoundsOf(yearId);
+        window = {
+          start, end, term: null, year: yearId,
+          label: yearLabelOf(yearId), period: yearLabelOf(yearId),
+        };
       } else {
         // Half-open, like the term form: first of the month N-1 months back, up
         // to the first of next month.
@@ -151,6 +172,7 @@ const summaryController = {
           start: isoDate(Math.floor(startAbsolute / 12), startAbsolute % 12, 1),
           end: isoDate(Math.floor(endAbsolute / 12), endAbsolute % 12, 1),
           term: null,
+          year: null,
           label: null,
           period: `${months}-month rolling`,
         };
@@ -224,8 +246,10 @@ const summaryController = {
       // Group by month (for monthlyBreakdown, use converted amounts)
       const monthlyData = {};
       for (const tx of convertedTxs) {
-        const transactionDate = new Date(tx.date);
-        const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+        // Read the month off the day string. Rebuilding a Date to ask for its
+        // month files every 1st-of-the-month under the month before, for any
+        // reader west of UTC.
+        const monthKey = monthOf(tx.date);
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
             month: monthKey,
@@ -255,6 +279,12 @@ const summaryController = {
         // so a log line or a bug report says which window was actually served —
         // `months=4` does not tell you which four months.
         term: window.term,
+        year: window.year,
+        // The name of whichever window was served — a term, a year, or null
+        // for a rolling count, which has no name. `termLabel` is the same value
+        // under its old name, kept so a client built against the term-only
+        // version keeps working.
+        periodLabel: window.label,
         termLabel: window.label,
         startDate: window.start,
         endDate: window.end,
@@ -279,7 +309,10 @@ const summaryController = {
     try {
       const { months = 6 } = req.query;
       const currentDate = new Date();
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - parseInt(months) + 1, 1);
+      // Integer arithmetic, not `new Date(y, m, 1).toISOString()`: that form is
+      // off by a day east of UTC, which would drop the first day of the window.
+      const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(months) + 1;
+      const startDate = isoDate(Math.floor(startAbsolute / 12), startAbsolute % 12, 1);
 
       // Get monthly spending by category
       const trends = await db.query(
@@ -295,7 +328,7 @@ const summaryController = {
          AND date >= $2
          GROUP BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date), category, type
          ORDER BY year, month, category`,
-        [req.user.userId, startDate.toISOString().split('T')[0]]
+        [req.user.userId, startDate]
       );
 
       // Process trends data

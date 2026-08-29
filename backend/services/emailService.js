@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const db = require('../db/connection');
 const { getExchangeRate } = require('./exchangeRateService');
+const { toDay, formatDay } = require('../utils/dates');
 const config = require('../config');
 
 // The dashboard defaults to CAD, so the report reads in the same currency.
@@ -102,11 +103,11 @@ exports.generateWeeklyReport = async (userId) => {
       `SELECT * FROM transactions 
        WHERE user_id = $1 AND date >= $2 
        ORDER BY date DESC, created_at DESC`,
-      [userId, sevenDaysAgo.toISOString().split('T')[0]]
+      [userId, toDay(sevenDaysAgo)]
     );
 
     if (transactions.rows.length === 0) {
-      return `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
+      return `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
     }
 
     // Organize transactions by type
@@ -171,7 +172,7 @@ exports.generateWeeklyReport = async (userId) => {
     const endOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
     const rollingTx = await db.query(
       `SELECT * FROM transactions WHERE user_id = $1 AND date >= $2 AND date < $3`,
-      [userId, fourMonthsAgo.toISOString().split('T')[0], endOfThisMonth.toISOString().split('T')[0]]
+      [userId, toDay(fourMonthsAgo), toDay(endOfThisMonth)]
     );
     let rollingIncome = 0, rollingExpenses = 0;
     rollingTx.rows.forEach(t => {
@@ -181,7 +182,7 @@ exports.generateWeeklyReport = async (userId) => {
     const rollingNetIncome = rollingIncome - rollingExpenses;
 
     // --- Plain Text Content ---
-    let content = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}\n\n`;
+    let content = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\n`;
     // Dashboard-style 4-month summary
     content += `==========================\n`;
     content += `📅 LAST 4 MONTHS SUMMARY\n`;
@@ -207,7 +208,7 @@ exports.generateWeeklyReport = async (userId) => {
       content += '--------------------------------------------------------------\n';
       goals.forEach(g => {
         const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
-        content += pad(g.name, 18) + pad(money(g.current_amount), 10) + pad(money(g.target_amount), 10) + pad(g.target_date ? new Date(g.target_date).toLocaleDateString() : '-', 12) + pad(percent.toFixed(1) + '%', 6) + '\n';
+        content += pad(g.name, 18) + pad(money(g.current_amount), 10) + pad(money(g.target_amount), 10) + pad(formatDay(g.target_date), 12) + pad(percent.toFixed(1) + '%', 6) + '\n';
       });
       content += '\n';
     }
@@ -247,7 +248,7 @@ exports.generateWeeklyReport = async (userId) => {
     content += pad('Date', 12) + pad('Type', 12) + pad('Description', 28) + pad('Amount', 10) + '\n';
     content += '--------------------------------------------------------------\n';
     transactions.rows.slice(0, 10).forEach(t => {
-      const date = new Date(t.date).toLocaleDateString();
+      const date = formatDay(t.date);
       const type = t.type === 'income' ? 'INCOME' : 'EXPENSE';
       const desc = t.description.length > 25 ? t.description.slice(0, 22) + '...' : t.description;
       content += pad(date, 12) + pad(type, 12) + pad(desc, 28) + pad(money(t.amount), 10) + '\n';
@@ -263,7 +264,7 @@ exports.generateWeeklyReport = async (userId) => {
     let html = `
       <div style="font-family: Arial, sans-serif; color: #222; max-width: 600px; margin: auto;">
         <h1 style="font-size: 2em; color: #2d3748; margin-bottom: 0.2em;">📊 WEEKLY FINANCIAL REPORT</h1>
-        <div style="font-size: 1.1em; margin-bottom: 1.5em;">Period: ${sevenDaysAgo.toISOString().split('T')[0]} to ${new Date().toISOString().split('T')[0]}</div>
+        <div style="font-size: 1.1em; margin-bottom: 1.5em;">Period: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}</div>
 
         <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📅 LAST 4 MONTHS SUMMARY</h2>
         <table style="width: 100%; font-size: 1.1em; margin-bottom: 1.5em;">
@@ -297,7 +298,7 @@ exports.generateWeeklyReport = async (userId) => {
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
           <tr style="background: #f7fafc;"><th align="left">Date</th><th align="left">Type</th><th align="left">Description</th><th align="right">Amount</th></tr>
           ${transactions.rows.slice(0, 10).map(t => {
-            const date = new Date(t.date).toLocaleDateString();
+            const date = formatDay(t.date);
             const type = t.type === 'income' ? 'INCOME' : 'EXPENSE';
             const desc = t.description.length > 25 ? t.description.slice(0, 22) + '...' : t.description;
             return `<tr><td>${date}</td><td>${type}</td><td>${desc}</td><td align="right">${money(t.amount)}</td></tr>`;
@@ -309,7 +310,7 @@ exports.generateWeeklyReport = async (userId) => {
           <tr style="background: #f7fafc;"><th align="left">Goal</th><th align="right">Current</th><th align="right">Target</th><th align="center">Date</th><th align="right">%</th></tr>
           ${goals.map(g => {
             const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
-            return `<tr><td>${g.name}</td><td align="right">${money(g.current_amount)}</td><td align="right">${money(g.target_amount)}</td><td align="center">${g.target_date ? new Date(g.target_date).toLocaleDateString() : '-'}</td><td align="right">${percent.toFixed(1)}%</td></tr>`;
+            return `<tr><td>${g.name}</td><td align="right">${money(g.current_amount)}</td><td align="right">${money(g.target_amount)}</td><td align="center">${formatDay(g.target_date)}</td><td align="right">${percent.toFixed(1)}%</td></tr>`;
           }).join('')}
         </table>
 

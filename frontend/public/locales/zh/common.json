@@ -222,7 +222,6 @@
   "Active Goals": "活跃目标",
   "Savings goals": "储蓄目标",
   "complete": "完成",
-  "4-Month Income vs Expenses": "4个月收入与支出",
   "Track your financial trends over time": "跟踪您的财务趋势",
   "Jan": "1月",
   "Feb": "2月",
@@ -236,7 +235,6 @@
   "Oct": "10月",
   "Nov": "11月",
   "Dec": "12月",
-  "Last 4 months": "最近4个月",
   "income": "收入",
   "expense": "支出",
   "MindGo": "智行",
@@ -554,5 +552,14 @@
     "Low": "最低",
     "Close": "收盘",
     "Net Income": "净利润"
-  }
+  },
+  "This term": "本学期",
+  "Last term": "上学期",
+  "This year": "今年",
+  "Last year": "去年",
+  "Winter": "冬季",
+  "Spring": "春季",
+  "Fall": "秋季",
+  "termWindowLabel": "{{year}}年{{season}}",
+  "Income vs Expenses": "收入与支出"
 }

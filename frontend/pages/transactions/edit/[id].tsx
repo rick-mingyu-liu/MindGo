@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Swal from 'sweetalert2'
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next'
+import { toDay } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface Transaction {
@@ -74,7 +75,7 @@ export default function EditTransaction() {
         amount: targetTransaction.amount.toString(),
         type: targetTransaction.type,
         category: targetTransaction.category,
-        date: targetTransaction.date.split('T')[0],
+        date: toDay(targetTransaction.date) ?? '',
         currency: targetTransaction.currency || 'CAD',
       })
     } catch (error) {
