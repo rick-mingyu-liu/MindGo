@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next'
+import { todayDay } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface TransactionForm {
@@ -66,7 +67,7 @@ export default function NewTransaction() {
   } = useForm<TransactionForm>({
     defaultValues: {
       type: 'expense',
-      date: new Date().toISOString().split('T')[0],
+      date: todayDay(),
       currency: 'CAD', // Default currency
     }
   })

@@ -35,7 +35,8 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
 import { categories as categoryTypeMap } from './transactions/new';
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next'
+import { formatDay } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface FinancialSummary {
@@ -1053,7 +1054,7 @@ export default function Dashboard() {
                         <div>
                           <p className="font-medium">{transaction.description}</p>
                           <p className="text-sm text-muted-foreground">
-                            {t(transaction.category)} • {new Date(transaction.date).toLocaleDateString()}
+                            {t(transaction.category)} • {formatDay(transaction.date)}
                           </p>
                         </div>
                       </div>

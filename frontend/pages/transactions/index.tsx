@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Swal from 'sweetalert2'
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next'
+import { formatDay } from '@/lib/date';
 import { i18n } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
@@ -286,7 +287,7 @@ export default function Transactions() {
                             <span>•</span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              {new Date(transaction.date).toLocaleDateString()}
+                              {formatDay(transaction.date)}
                             </span>
                           </div>
                         </div>

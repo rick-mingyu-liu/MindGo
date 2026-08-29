@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const db = require('../db/connection');
 const { getExchangeRate } = require('../services/exchangeRateService');
 const { boundsOf, labelOf, currentTerm, previousTerm } = require('../utils/terms');
+const { monthOf } = require('../utils/dates');
 
 /** `(2026, 4, 1)` -> `'2026-05-01'`. month is 0-based, as in `Date`. */
 const isoDate = (year, month, day) =>
@@ -224,8 +225,10 @@ const summaryController = {
       // Group by month (for monthlyBreakdown, use converted amounts)
       const monthlyData = {};
       for (const tx of convertedTxs) {
-        const transactionDate = new Date(tx.date);
-        const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+        // Read the month off the day string. Rebuilding a Date to ask for its
+        // month files every 1st-of-the-month under the month before, for any
+        // reader west of UTC.
+        const monthKey = monthOf(tx.date);
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
             month: monthKey,
