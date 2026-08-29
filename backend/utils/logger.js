@@ -23,6 +23,33 @@ class Logger {
     }
   }
 
+  /**
+   * Always prints, in every environment — the point of it.
+   *
+   * `info`/`warn`/`debug` are gated on `enableConsoleLogs`, which is
+   * `NODE_ENV === 'development'`, so anything routed through them is silent in
+   * production. That is right for chatter and wrong for a record of user data
+   * being destroyed: the retention jobs delete accounts and AI plans
+   * unattended, and "how many did they remove last week" was unanswerable from
+   * a production log. `error` already always prints, so a *failing* cleanup was
+   * visible; a *successful* one was not.
+   *
+   * Reserve this for events that destroy or irreversibly change user data.
+   * Everything that is merely useful belongs in `info` — an audit level that
+   * fills up with routine chatter stops being one.
+   *
+   * See IMPROVEMENTS.md item 17, decision D. The general fix — giving this
+   * class a real level hierarchy, since `level` today gates only `debug()` —
+   * is item 19.
+   */
+  audit(message, data = null) {
+    const timestamp = new Date().toISOString();
+    console.log(`[AUDIT] ${timestamp} - ${message}`);
+    if (data) {
+      console.log(JSON.stringify(data, null, 2));
+    }
+  }
+
   warn(message, data = null) {
     if (this.enabled) {
       const timestamp = new Date().toISOString();
