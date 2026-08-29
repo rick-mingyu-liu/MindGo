@@ -117,6 +117,20 @@ These are minor and common in Express apps, but worth noting:
   was a move, not a split. `IMPROVEMENTS.md` item 8 has the detail, including
   three timer bugs found alongside it.
 
+- **Address validation lived in the controller.** `authController` held a
+  30-domain disposable list, an apilayer client and the verdict logic, ~60
+  lines above the controller object. All of it is
+  [services/emailValidationService.js](services/emailValidationService.js) now;
+  the controller makes one call, `validateEmail(email)`.
+
+  Worth noting as a **strategy/fallback** instance, the same shape the stock
+  services use: MailboxLayer is the primary, the domain list is the fallback,
+  and the caller sees one function and one result shape (`{ valid, reason?,
+  source }`). The rule it encodes — **a validator that cannot reach its service
+  must not become a gate** — is what `IMPROVEMENTS.md` item 13 is about: the
+  previous version turned a missing key, an outage, an expired key and an
+  exhausted quota all into a blocked registration, three of them silently.
+
 ## Bottom line
 
 - **Yes to MVC** — clean, idiomatic Express layering.

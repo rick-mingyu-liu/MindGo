@@ -26,7 +26,7 @@ can be answered without reading the whole backlog.
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
-| 13 | Three dead top-level symbols, and a 500 on register | open — **decisions B and C** |
+| 13 | Three dead top-level symbols, and a 500 on register | 500 fixed — round 10; two symbols still open under **decision B** |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 | 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
@@ -37,12 +37,12 @@ can be answered without reading the whole backlog.
 
 ## Decisions needed
 
-Three open questions remain — **B**, **C** and **D**. Each is blocked on a
+Two open questions remain — **B** and **D**. Each is blocked on a
 judgement call, not on work: the investigation behind each is done and recorded
 in the item it points to. A recommendation is given for each; none is so
 clear-cut that it should be taken without a look.
 
-**A is answered** — see below.
+**A and C are answered** — see below.
 
 ### A. The `Savings` category — item 7 — ✅ ANSWERED 2026-08-29
 
@@ -57,36 +57,24 @@ it up" are both defensible:
 
 | Symbol | Where | The question |
 |---|---|---|
-| `DISPOSABLE_EMAIL_DOMAINS` | `controllers/authController.js` | See decision C — it is the natural fallback. |
+| ~~`DISPOSABLE_EMAIL_DOMAINS`~~ | ~~`controllers/authController.js`~~ | **Settled by C.** Wired up in round 10 as the fallback; it moved to `services/emailValidationService.js` and is no longer dead. |
 | `createSampleDataForNewUser` | `controllers/authController.js` | New accounts currently get no starter data. Removed feature, or lost wiring? Only you know which was intended. |
 | `createAsciiPieChart` | `services/emailService.js` | The weekly report is assembled without it. |
 
-**Recommendation: delete `createAsciiPieChart`, decide `createSampleDataForNewUser`
-on product grounds, and keep `DISPOSABLE_EMAIL_DOMAINS` pending decision C.** An
-ASCII pie chart in an HTML email is not something the report is missing. The
-starter-data one is genuinely a product question — an empty dashboard on first
-login is a worse first impression, but fake transactions in a real finance app
-are worse still.
+**Recommendation: delete `createAsciiPieChart`, and decide
+`createSampleDataForNewUser` on product grounds.** An ASCII pie chart in an HTML
+email is not something the report is missing. The starter-data one is genuinely
+a product question — an empty dashboard on first login is a worse first
+impression, but fake transactions in a real finance app are worse still.
 
-### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13
+`DISPOSABLE_EMAIL_DOMAINS` is no longer part of this decision; C answered it.
 
-**Verified, not inferred.** `validateEmailMailboxLayer()` throws at
-`authController.js:32` when the key is missing, and that `throw` sits **outside**
-the function's own `try` (which opens at line 35). It escapes to `register`'s
-catch at line 138, which returns `res.status(500)`. So **`/auth/register` returns
-500 for every caller** when the key is unset — while `.env.example` and the
-startup check both describe the key as optional.
+### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13 — ✅ ANSWERED 2026-08-29
 
-| Option | Consequence |
-|---|---|
-| **Fall back to `DISPOSABLE_EMAIL_DOMAINS`** | Registration works without the key, with weaker disposable-address filtering. Gives the dead list a job and makes "optional" true. |
-| **Skip validation entirely when the key is absent** | Simplest. Registration works; no disposable filtering at all. |
-| **Make the key genuinely required** | Fail at boot in `config/validate.js` rather than at the first registration. Honest, but the app cannot run without a paid third-party key. |
-
-**Recommendation: fall back to the domain list.** It resolves B and C together,
-makes the documented "optional" accurate, and keeps some filtering rather than
-none. Whichever you choose, the current state — documented optional, actually
-required, and failing as an opaque 500 — should not be one of them.
+**Decision: fall back to the domain list**, the recommended option. Registration
+works without the key, with weaker filtering rather than none, and "optional" is
+now true in the code as well as in the docs. The work is in item 13; nothing
+here is still open.
 
 ### D. Should retention deletions be visible in production? — item 17
 
@@ -631,43 +619,86 @@ sign — an account in CAD was described to the model as USD.
 
 ## 13. Three dead top-level symbols, and a 500 on register
 
-**Status:** open — **decisions B and C**
+**Status:** the 500 is ✅ FIXED 2026-08-29 (decision C); two symbols still open
+under **decision B**
 **Found:** by the linter
 
-Marked with `eslint-disable` and a comment rather than deleted, because "remove
-it" and "wire it up" are both defensible and the choice is not mine:
+### The 500 — fixed
 
-1. **`DISPOSABLE_EMAIL_DOMAINS`** ([controllers/authController.js](backend/controllers/authController.js)) —
-   ~30 throwaway-mail domains, superseded by the MailboxLayer API call.
-2. **`createSampleDataForNewUser`** (same file) — never called, so new accounts
-   get no starter data. Removed feature, or lost wiring?
-3. **`createAsciiPieChart`** ([services/emailService.js](backend/services/emailService.js)) —
+`validateEmailMailboxLayer()` threw at line 32 when `MAILBOXLAYER_API_KEY` was
+absent, and the `throw` sat **outside** the function's own `try` (which opened
+at line 35). It escaped to `register`'s catch and became
+`res.status(500).json({ error: 'Server error' })`, so **`/auth/register`
+returned 500 for every caller** — while `.env.example` and `config/validate.js`
+both called the key optional.
+
+It now falls back to the disposable-domain list, in a new
+[services/emailValidationService.js](backend/services/emailValidationService.js).
+The controller keeps one call, `validateEmail(email)`, which never throws.
+
+**The fix covers three more paths that produced the same outcome**, and this is
+the part worth reading. A missing key was the loudest way to make validation a
+gate, not the only one:
+
+| Situation | What it used to do | What it does now |
+|---|---|---|
+| No key | threw → **500 for everyone** | domain list |
+| apilayer unreachable / HTTP error | old `catch` returned `{ valid: false }` → **every address rejected** | domain list |
+| Expired key or exhausted quota | 200 with `success: false` and no `format_valid`, read as falsy → **"Invalid email format"** on a perfectly good address | domain list |
+| Any unrecognised response shape | same as above | domain list |
+
+The third is the nastiest: a *wrong* answer rather than a missing one, blaming
+the user for the service's problem. That is why `isUsableResponse()` requires
+`format_valid` to be a boolean rather than just checking the HTTP status —
+apilayer reports its own errors with HTTP 200.
+
+The rule the module is built on: **a validator that cannot reach its service
+must not become a gate.** Filtering degrades from "deliverability plus a large
+disposable database" to "30 known disposable domains" — weaker, but a real
+check, and every fallback prints via `console.error`/`console.warn` so it is
+visible in production, where it means registrations are being waved through on
+the weaker check.
+
+Also fixed in passing: the domain list was a 40-element array containing 30
+distinct domains — `tmpmail.net` and three neighbours appeared three times
+each. It is a sorted `Set` now, so a repeat shows up in a diff.
+
+### The two symbols still open — decision B
+
+1. **`createSampleDataForNewUser`** ([controllers/authController.js](backend/controllers/authController.js)) —
+   never called, so new accounts get no starter data. Removed feature, or lost
+   wiring?
+2. **`createAsciiPieChart`** ([services/emailService.js](backend/services/emailService.js)) —
    the weekly report is assembled without it.
 
-All three are still present and still unreferenced.
+~~**`DISPOSABLE_EMAIL_DOMAINS`**~~ — settled by decision C. It is the fallback
+now, and lives in `services/emailValidationService.js`.
 
-### The live bug entangled with the first one
+### How it was verified
 
-`validateEmailMailboxLayer()` throws at **line 32** when
-`MAILBOXLAYER_API_KEY` is absent:
+- 23 new tests in [test/emailValidation.test.js](backend/test/emailValidation.test.js),
+  one per row of the table above plus the MailboxLayer verdict paths. Suite:
+  55 → **79**, green with and without every optional key.
+- Four mutations, each caught: making the no-key path a gate (4 failures),
+  restoring the old rejecting `catch` (2), removing the usable-response check
+  (2), and turning the domain list into a waiver (5).
+- The characterisation test in `registerLogging.test.js` that pinned the 500
+  now asserts a 201, plus a second test that the fallback path leaks no token
+  or raw address either — it prints different lines from the MailboxLayer path.
+- `configValidate.test.js` pinned the old warning text ("registration fails
+  outright"). It now pins the new text **and** asserts the old wording is gone;
+  a startup warning describing behaviour the code no longer has is worse than
+  none.
+- Real boot on port 3099, `NODE_ENV=production`, key removed, database pointed
+  at a dead socket: `someone@mailinator.com` → **400** "Disposable email
+  addresses are not allowed" `(domain-list)`; `john.doe@example.com` → past
+  validation and into the database, failing with `ECONNREFUSED` rather than at
+  the validator. The one-per-process "no key" warning printed exactly once
+  across both requests.
 
-```js
-const apiKey = config.apiKeys.mailboxLayer;
-if (!apiKey) {
-  throw new Error('MailboxLayer API key not set');   // line 32
-}
-const url = `...`;
-try {                                                 // line 35 — the try opens HERE
-```
-
-The `throw` is **outside** the function's own `try`. It escapes to `register`'s
-catch at **line 138**, which returns `res.status(500).json({ error: 'Server
-error' })`. So **`/auth/register` returns 500 for every caller** when the key is
-unset — while `.env.example` and `config/validate.js` both describe the key as
-optional.
-
-Wiring the dead domain list in as the fallback would make it genuinely optional.
-That is the case for "wire it up"; see decision C.
+  Note for anyone repeating this: `env -u MAILBOXLAYER_API_KEY` does **not**
+  remove the key, because `.env` puts it back. `MAILBOXLAYER_API_KEY=` does —
+  dotenv will not overwrite a variable already present in the environment.
 
 ---
 
@@ -811,11 +842,11 @@ test now sets the key on `config` itself and the HTTP call stays mocked, so it
 no longer depends on the environment — verified by running it with the key
 blanked.
 
-That failure is worth keeping in mind for **decision C**: the missing key does
+That failure was the strongest argument for **decision C**: the missing key did
 not merely break registration in production, it silently changed what a test of
-unrelated code was exercising. `test/registerLogging.test.js` ends with a
-characterisation test pinning the 500, labelled as a bug rather than desired
-behaviour, which should be rewritten when decision C lands.
+unrelated code was exercising. Round 10 answered C, so the characterisation
+test that pinned the 500 now asserts a 201, and a second test covers the
+fallback path's own log lines.
 
 ---
 
@@ -910,16 +941,17 @@ Not code — carried over from the 2026-08-27 database work.
 11. ~~Promote `Savings` to a real category~~ — done (round 9, item 7, decision
     A), which turned up that the dashboard was classifying it correctly only by
     accident, and produced item 18
-12. **Next:** whichever of decisions **B**–**D** you have answered. C is worth
-    answering early: registration is 500ing for anyone who deploys without a
-    MailboxLayer key, and both `.env.example` and the startup check currently
-    tell them the key is optional.
+12. ~~Make registration work without a MailboxLayer key~~ — done (round 10,
+    item 13, decision C), which turned up three more ways validation became a
+    gate — an outage, an expired key and an exhausted quota — and settled one
+    of decision B's three symbols
+13. **Next:** whichever of decisions **B** and **D** you have answered. Neither
+    is urgent now; C was the one with a live defect behind it.
 
-**Waiting on you, not on work:** decisions **B** and **C** (the dead symbols and
-the register 500, item 13) and **D** (production visibility for the retention
-jobs, item 17). Each is written up under
-[Decisions needed](#decisions-needed) with options and a recommendation. **A**
-is answered and done.
+**Waiting on you, not on work:** decisions **B** (the two remaining dead
+symbols, item 13) and **D** (production visibility for the retention jobs,
+item 17). Both are written up under [Decisions needed](#decisions-needed) with
+options and a recommendation. **A** and **C** are answered and done.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
