@@ -33,6 +33,7 @@ can be answered without reading the whole backlog.
 | 17 | Retention deletions are silent in production | ✅ done — round 12 |
 | 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
 | 19 | `utils/logger.js` has no real level hierarchy | open |
+| 20 | The 4-month transaction retention feature was never finished | open |
 
 ---
 
@@ -983,6 +984,97 @@ production (errors and deletions) are. It is a trap for whoever next assumes
 
 ---
 
+## 20. The 4-month transaction retention feature was never finished
+
+**Status:** open
+**Effort:** small to remove, medium to finish
+**Found:** by asking whether the dashboard's 4-month window deletes anything
+
+**It does not, and that is the first thing to say.** The "4-Month Income vs
+Expenses" window is a `WHERE` clause, nothing more. `frontend/pages/index.tsx`
+calls `/summary/rolling?months=4`, and `getRollingSummary`
+([controllers/summaryController.js](backend/controllers/summaryController.js))
+runs one **SELECT**:
+
+```sql
+SELECT * FROM transactions
+ WHERE user_id = $1 AND date >= $2 AND date < $3
+```
+
+Rows outside the range are not returned to the dashboard. They are untouched in
+the table. Checked against the live database: **282 of 397 transactions are
+older than four months and still present**, the oldest dated 2025-03-01, about
+eighteen months back. If anything purged on this window, none of them would
+exist.
+
+The scheduler's only two jobs are `deleteOldAIPlans` and
+`deleteUnverifiedAccounts` (item 8). Neither touches `transactions`.
+
+### What is actually there
+
+Commit `0bfc252`, 2025-06-28, *"data auto deleting after 4 months"*, added a
+controller method, a route, and a settings page — and **no caller**. Three
+pieces of an unfinished feature are live today:
+
+**1. `DELETE /transactions/auto-delete` is mounted, reachable and manual-only.**
+`routes/transactions.js:26` → `autoDeleteOldTransactions`, which runs
+`DELETE FROM transactions WHERE user_id = $1 AND date < $2`. Nothing calls it:
+not the scheduler, not the frontend (grepped), not its own origin commit. The
+name describes an intention, not a behaviour.
+
+**2. Its `months` parameter is unvalidated, on an irreversible delete.**
+Verified by running the arithmetic:
+
+| `?months=` | cutoff | effect |
+|---|---|---|
+| `4` (or absent) | 4 months back | intended |
+| `0` | **today** | deletes every transaction dated before today |
+| `-6` | **6 months in the future** | deletes everything, future-dated rows included |
+| `abc`, empty, or a huge number | — | `toISOString()` throws → 500 |
+
+The empty case is worth noting because it looks safe: `const { months = 4 }`
+only defaults on `undefined`, so `?months=` is `''`, not `4`, and 500s.
+
+This is scoped to the caller's own `user_id` and needs their JWT, so it is not
+a cross-user risk. It is a live, irreversible, unvalidated delete that no part
+of the product exposes — which is exactly the kind of thing that gets called
+once by accident.
+
+**3. The retention settings API reports persistence it does not do.**
+`getDataRetentionSettings` returns a hardcoded
+`{ autoDeleteEnabled: false, retentionMonths: 4, lastCleanup: null }`.
+`updateDataRetentionSettings` validates `retentionMonths` (1–60), then returns
+`"Data retention settings updated successfully"` **without writing anything** —
+its own comment says *"In a real app, you'd save these to a user_preferences
+table"*. `settings.tsx` fetches and PUTs both fields but renders no control
+bound to either, so nothing lies to a user today; the fields just round-trip.
+The moment someone adds the toggle the UI starts lying, which is the trap.
+
+### The decision
+
+**Finish it or remove it — the middle state is the problem.**
+
+| Option | Consequence |
+|---|---|
+| **Remove** | Delete the route, the controller method and the two settings handlers; drop the vestigial fields from `settings.tsx`. Smallest diff, removes the footgun, and matches what the product actually does today — nothing auto-deletes. |
+| **Finish** | A `user_preferences` table, real persistence, validation on `months`, and a scheduler job reading each user's setting. It is a genuine feature — a finance app offering "keep only N months" is reasonable — but it is a feature, not a fix. |
+
+**Recommendation: remove it**, and open a fresh item if the feature is wanted.
+Nothing depends on it, the settings page renders no control for it, and it has
+sat unfinished for fourteen months. Whichever way it goes, **validate `months`
+first** if the endpoint survives at all — that part is a defect regardless.
+
+### One real automatic path, for completeness
+
+`transactions.user_id` is `ON DELETE CASCADE`
+([db/schema.sql](backend/db/schema.sql)), so `deleteUnverifiedAccounts` removes
+an unverified account's transactions along with it. Those accounts are under 30
+minutes old, so in practice there is nothing to lose — but it is the one
+scheduled job that can reach the table, and worth knowing before anyone widens
+that retention window.
+
+---
+
 ## Operational follow-ups
 
 Not code — carried over from the 2026-08-27 database work.
@@ -1030,15 +1122,21 @@ Not code — carried over from the 2026-08-27 database work.
     item 17, decision D), which also caught two raw email addresses in the
     weekly-report logs that item 16's sweep had missed, and produced item 19
 
-**Nothing is waiting on you.** All four decisions — **A**, **B**, **C** and
-**D** — are answered and shipped. The backlog's two open items need no decision:
+**All four original decisions — A, B, C and D — are answered and shipped.**
+Three items remain:
 
 - **18** — nothing keeps `db/seed.sql` and the frontend category list in step.
   Prevention, not a defect; worth doing before the next person adds a category.
+  Needs no decision.
 - **19** — `utils/logger.js` has no real level hierarchy, so `LOG_LEVEL` is
-  inert except for `debug`. A trap rather than a bug.
+  inert except for `debug`. A trap rather than a bug. Needs no decision.
+- **20** — the 4-month transaction retention feature was never finished: a live,
+  unvalidated, irreversible delete endpoint nothing calls, and a settings API
+  that reports saving what it discards. **Does need a decision** — finish it or
+  remove it — written up in the item, recommendation: remove.
 
-Neither is urgent. Item 18 is the one with a repeat offence behind it.
+Item 18 is the one with a repeat offence behind it; item 20 is the one with a
+live footgun in it.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
