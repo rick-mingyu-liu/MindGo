@@ -11,9 +11,9 @@
  * the file is parsed the evidence is gone. It scans raw lines instead.
  *
  * It also reports keys the app asks for that no locale file answers. Those are
- * warnings, not errors: there is a standing backlog of them (IMPROVEMENTS.md
- * item 9), and failing on those would block every build rather than stopping
- * new ones from being added. Duplicates stay fatal.
+ * warnings, not errors: there is a standing backlog of them, and failing on
+ * those would block every build rather than stopping new ones from being
+ * added. Duplicates stay fatal.
  *
  * Run: npm run check:locales
  */

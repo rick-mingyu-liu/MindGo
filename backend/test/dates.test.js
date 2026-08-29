@@ -19,8 +19,6 @@ const aiController = require('../controllers/aiController');
  * So one stored day leaves the server as a different string per host, and a
  * browser that renders it with `new Date(...)` subtracts the viewer's offset
  * again. Under Render (UTC) + a Toronto viewer that is exactly one day.
- *
- * See IMPROVEMENTS.md item 23.
  */
 
 describe('the DATE type parser', () => {

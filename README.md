@@ -84,10 +84,10 @@ git clone <repository-url>
 cd MindGo
 ```
 
-### 2. Run the Setup Script
+### 2. Install Dependencies
 ```bash
-chmod +x setup.sh
-./setup.sh
+(cd backend && npm install)
+(cd frontend && npm install)
 ```
 
 ### 3. Configure Environment Variables
@@ -181,11 +181,8 @@ MindGo/
 │   │   ├── freeStockDataService.js # Free stock data alternatives
 │   │   └── schedulerService.js     # Automated tasks and cron jobs
 │   ├── utils/                       # Helper functions
-│   │   ├── apiDocs.js              # API documentation generator
 │   │   ├── errorHandler.js         # Error handling utilities
 │   │   └── logger.js               # Logging utilities
-│   └── scripts/                     # Utility scripts
-│       └── generateDocs.js         # API documentation generation
 ├── frontend/                        # Next.js React application
 │   ├── package.json                # Frontend dependencies
 │   ├── next.config.js              # Next.js configuration
@@ -234,7 +231,6 @@ MindGo/
 │   │   │   │   └── common.json     # English locale
 │   │   │   └── zh/                 # Chinese translations
 │   │   │       └── common.json     # Chinese locale
-│   │   ├── logo_pure_dark.png      # Dark theme logo
 │   │   ├── logo_pure.jpg           # Light theme logo
 │   │   ├── MindGo_dark.png         # Dark theme app logo
 │   │   └── MindGo.png              # Light theme app logo
@@ -243,7 +239,6 @@ MindGo/
 │   └── utils/                       # Helper functions
 │       ├── api.ts                   # API client and utilities
 │       └── formatters.ts            # Data formatting utilities
-└── setup.sh                         # Automated setup script
 ```
 
 ## 🔧 Development
@@ -254,7 +249,6 @@ cd backend
 npm run dev          # Start development server
 npm run db:setup     # Setup database
 npm run db:seed      # Seed sample data
-npm run docs:generate # Generate API documentation
 ```
 
 ### Frontend Development
@@ -345,7 +339,6 @@ The backend provides comprehensive API endpoints:
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
 - **[Radix UI](https://www.radix-ui.com/)** - Accessible UI primitives
 - **[Recharts](https://recharts.org/)** - Chart library for data visualization
-- **[React Financial Charts](https://react-financial-charts.com/)** - Financial chart components
 - **[React Hook Form](https://react-hook-form.com/)** - Form state management
 - **[Lucide React](https://lucide.dev/)** - Icon library
 - **[React Hot Toast](https://react-hot-toast.com/)** - Toast notifications
@@ -353,8 +346,6 @@ The backend provides comprehensive API endpoints:
 - **[React Markdown](https://github.com/remarkjs/react-markdown)** - Markdown rendering
 - **[i18next](https://www.i18next.com/)** - Internationalization
 - **[next-i18next](https://github.com/i18next/next-i18next)** - Next.js i18n integration
-- **[date-fns](https://date-fns.org/)** - Date utility library
-- **[d3-format](https://github.com/d3/d3-format)** - Number formatting
 - **[class-variance-authority](https://cva.style/docs)** - Component variant management
 - **[clsx](https://github.com/lukeed/clsx)** - Conditional className utility
 - **[tailwind-merge](https://github.com/dcastil/tailwind-merge)** - Tailwind class merging

@@ -6,7 +6,7 @@
  * effectively mandatory: `validateEmailMailboxLayer` threw when the key was
  * absent, outside its own try, so the throw escaped to `register`'s catch and
  * **every** registration returned 500 — while `.env.example` and the startup
- * check both called the key optional. See IMPROVEMENTS.md item 13, decision C.
+ * check both called the key optional.
  *
  * The rule now: **a validator that cannot reach its service must not become a
  * gate.** Whenever MailboxLayer cannot give a usable answer — no key, network

@@ -789,11 +789,7 @@ export default function Settings() {
                 <li>Radix UI (@radix-ui/react-*)</li>
                 <li>lucide-react</li>
                 <li>recharts</li>
-                <li>react-financial-charts</li>
-                <li>d3-format</li>
-                <li>date-fns</li>
                 <li>react-hook-form</li>
-                <li>@hookform/resolvers</li>
                 <li>next-i18next</li>
                 <li>react-i18next</li>
                 <li>i18next</li>

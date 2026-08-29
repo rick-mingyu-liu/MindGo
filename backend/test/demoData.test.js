@@ -130,7 +130,7 @@ describe('the story the demo tells', () => {
 
 describe('categories stay in step with the frontend', () => {
   /**
-   * IMPROVEMENTS.md item 18: the canonical category list lives in
+   * The canonical category list lives in
    * `frontend/pages/transactions/new.tsx`, and the seed has always kept its
    * own copy with nothing checking the two agree. A demo transaction in an
    * unlisted category renders with a hash-derived colour and an untranslated

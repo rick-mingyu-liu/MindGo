@@ -28,7 +28,6 @@ const transactionValidation = [
 //
 // 1-60 is not invented: it is the range updateDataRetentionSettings already
 // enforces on the same concept, so the write path and the settings path agree.
-// See IMPROVEMENTS.md item 20.
 const autoDeleteValidation = [
   query('months').optional().isInt({ min: 1, max: 60 })
     .withMessage('months must be a whole number between 1 and 60'),

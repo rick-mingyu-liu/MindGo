@@ -38,9 +38,8 @@ class Logger {
    * Everything that is merely useful belongs in `info` — an audit level that
    * fills up with routine chatter stops being one.
    *
-   * See IMPROVEMENTS.md item 17, decision D. The general fix — giving this
-   * class a real level hierarchy, since `level` today gates only `debug()` —
-   * is item 19.
+   * The general fix — giving this class a real level hierarchy, since `level`
+   * today gates only `debug()` — is still open.
    */
   audit(message, data = null) {
     const timestamp = new Date().toISOString();

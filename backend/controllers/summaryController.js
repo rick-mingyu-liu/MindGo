@@ -115,8 +115,7 @@ const summaryController = {
    * back from today, the window equals the term only in April, August and
    * December — the last month of each, when it is already over. In the *first*
    * month of a co-op term, which is when someone sets a budget, three quarters
-   * of a rolling window is the previous term's money. See IMPROVEMENTS.md
-   * item 20.
+   * of a rolling window is the previous term's money.
    *
    * Term boundaries come from `utils/terms.js` and are never computed here:
    * the retention job will delete whole terms using the same module, and a view

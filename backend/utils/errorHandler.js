@@ -1,16 +1,12 @@
 const logger = require('./logger');
 const config = require('../config');
 
+/**
+ * Only two of these are mounted: globalErrorHandler and notFoundHandler, both
+ * in app.js. The rest are the helpers those two call. Controllers build their
+ * own responses rather than going through this class.
+ */
 class ErrorHandler {
-  // Standard error responses
-  static badRequest(res, message = 'Bad request', details = null) {
-    logger.warn(`Bad Request: ${message}`, details);
-    return res.status(400).json({
-      error: message,
-      details: details
-    });
-  }
-
   static unauthorized(res, message = 'Unauthorized') {
     logger.warn(`Unauthorized: ${message}`);
     return res.status(401).json({
@@ -18,23 +14,9 @@ class ErrorHandler {
     });
   }
 
-  static forbidden(res, message = 'Forbidden') {
-    logger.warn(`Forbidden: ${message}`);
-    return res.status(403).json({
-      error: message
-    });
-  }
-
   static notFound(res, message = 'Resource not found') {
     logger.warn(`Not Found: ${message}`);
     return res.status(404).json({
-      error: message
-    });
-  }
-
-  static conflict(res, message = 'Resource conflict') {
-    logger.warn(`Conflict: ${message}`);
-    return res.status(409).json({
       error: message
     });
   }
@@ -53,28 +35,6 @@ class ErrorHandler {
       error: message,
       ...(config.nodeEnv === 'development' && { details: error.message })
     });
-  }
-
-  // Database error handling
-  static databaseError(res, error) {
-    logger.error('Database Error', error);
-    
-    if (error.code === '23505') { // Unique constraint violation
-      return this.conflict(res, 'Resource already exists');
-    }
-    
-    if (error.code === '23503') { // Foreign key violation
-      return this.badRequest(res, 'Referenced resource does not exist');
-    }
-    
-    return this.serverError(res, error, 'Database operation failed');
-  }
-
-  // Async error wrapper
-  static asyncHandler(fn) {
-    return (req, res, next) => {
-      Promise.resolve(fn(req, res, next)).catch(next);
-    };
   }
 
   // Global error middleware

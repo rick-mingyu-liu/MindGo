@@ -8,7 +8,6 @@
     "dev": "nodemon app.js",
     "db:setup": "node db/setup.js",
     "db:seed": "node db/seed.js",
-    "docs:generate": "node scripts/generateDocs.js",
     "lint": "eslint .",
     "test": "node --test"
   },
