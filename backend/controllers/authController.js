@@ -6,73 +6,7 @@ const db = require('../db/connection');
 const config = require('../config');
 const { maskEmail } = require('../utils/privacy');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
-const axios = require('axios');
-
-// List of known disposable email domains (partial list - you can expand this).
-// Unused: the MailboxLayer call replaced it, but that call hard-fails without
-// an API key, so this list is the fallback that would make registration
-// degrade instead of 500. See IMPROVEMENTS.md item 13.
-// eslint-disable-next-line no-unused-vars
-const DISPOSABLE_EMAIL_DOMAINS = [
-  '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
-  'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
-  'sharklasers.com', 'getairmail.com', 'getnada.com', 'yopmail.com',
-  'trashmail.com', 'maildrop.cc', 'mailinator.net', 'tempmailaddress.com',
-  'fakeinbox.com', 'mailmetrash.com', 'spam4.me', 'bccto.me',
-  'chacuo.net', 'dispostable.com', 'mailnesia.com', 'mailnull.com',
-  'spamspot.com', 'spam.la', 'tempr.email', 'tmpeml.com',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net'
-];
-
-// MailboxLayer API validation
-async function validateEmailMailboxLayer(email) {
-  const apiKey = config.apiKeys.mailboxLayer;
-  if (!apiKey) {
-    throw new Error('MailboxLayer API key not set');
-  }
-  const url = `https://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}`;
-  try {
-    const response = await axios.get(url);
-    const data = response.data;
-    // The full response carries the address back plus everything MailboxLayer
-    // inferred about it. Log the verdict, which is what a failed registration
-    // actually needs explaining.
-    console.log('[MailboxLayer] Checked', maskEmail(email), {
-      format_valid: data.format_valid,
-      disposable: data.disposable,
-      mx_found: data.mx_found,
-      smtp_check: data.smtp_check,
-    });
-
-    if (!data.format_valid) {
-      return { valid: false, reason: 'Invalid email format' };
-    }
-    if (data.disposable) {
-      return { valid: false, reason: 'Disposable email addresses are not allowed' };
-    }
-    const emailDomain = email.split('@')[1]?.toLowerCase();
-    const majorDomains = [
-      'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com',
-      '163.com', 'qq.com', 'sina.com', '126.com', '139.com', 'sohu.com'
-    ];
-    // Loosen MX/SMTP checks for major and Chinese providers
-    if ((!data.mx_found || !data.smtp_check) && majorDomains.includes(emailDomain)) {
-      return { valid: true };
-    }
-    if (!data.mx_found) {
-      return { valid: false, reason: 'Email domain cannot receive mail' };
-    }
-    if (!data.smtp_check) {
-      return { valid: false, reason: 'Email address is not deliverable' };
-    }
-    return { valid: true };
-  } catch (error) {
-    console.error('MailboxLayer API error:', error?.response?.data || error.message || error);
-    return { valid: false, reason: 'Email validation service error' };
-  }
-}
+const { validateEmail } = require('../services/emailValidationService');
 
 const authController = {
   // Register new user
@@ -85,9 +19,12 @@ const authController = {
 
       const { email, password, first_name, last_name } = req.body;
 
-      // MailboxLayer email validation
-      const emailValidation = await validateEmailMailboxLayer(email);
+      // MailboxLayer where a key is configured, the disposable-domain list
+      // where it is not. Never throws, so it cannot short-circuit the rest of
+      // this handler the way it used to.
+      const emailValidation = await validateEmail(email);
       if (!emailValidation.valid) {
+        console.log(`[Register] Rejected ${maskEmail(email)}: ${emailValidation.reason} (${emailValidation.source})`);
         return res.status(400).json({ error: emailValidation.reason });
       }
 
@@ -389,113 +326,5 @@ const authController = {
     }
   }
 };
-
-// Helper function to create sample data for new users
-// Never called — new accounts get no starter data. Unclear whether that is a
-// removed feature or a lost wiring; see IMPROVEMENTS.md item 13.
-// eslint-disable-next-line no-unused-vars
-async function createSampleDataForNewUser(userId) {
-  try {
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
-
-    // Create sample transactions for the current month and previous months
-    const sampleTransactions = [
-      // Sample income - current month
-      {
-        amount: 5000.00,
-        description: 'Sample Salary Payment',
-        category: 'Salary',
-        type: 'income',
-        date: new Date(currentYear, currentMonth, 15).toISOString().split('T')[0]
-      },
-      {
-        amount: 300.00,
-        description: 'Sample Freelance Income',
-        category: 'Freelance',
-        type: 'income',
-        date: new Date(currentYear, currentMonth, 20).toISOString().split('T')[0]
-      },
-      // Sample expenses - current month
-      {
-        amount: 1200.00,
-        description: 'Sample Rent Payment',
-        category: 'Housing',
-        type: 'expense',
-        date: new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]
-      },
-      {
-        amount: 400.00,
-        description: 'Sample Grocery Shopping',
-        category: 'Groceries',
-        type: 'expense',
-        date: new Date(currentYear, currentMonth, 5).toISOString().split('T')[0]
-      },
-      {
-        amount: 150.00,
-        description: 'Sample Utility Bill',
-        category: 'Utilities',
-        type: 'expense',
-        date: new Date(currentYear, currentMonth, 10).toISOString().split('T')[0]
-      },
-      {
-        amount: 200.00,
-        description: 'Sample Transportation',
-        category: 'Transportation',
-        type: 'expense',
-        date: new Date(currentYear, currentMonth, 12).toISOString().split('T')[0]
-      },
-      // Add some data from previous months to ensure it shows in summary
-      {
-        amount: 5000.00,
-        description: 'Sample Previous Month Salary',
-        category: 'Salary',
-        type: 'income',
-        date: new Date(currentYear, currentMonth - 1, 15).toISOString().split('T')[0]
-      },
-      {
-        amount: 1200.00,
-        description: 'Sample Previous Month Rent',
-        category: 'Housing',
-        type: 'expense',
-        date: new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0]
-      }
-    ];
-
-    // Insert sample transactions
-    for (const transaction of sampleTransactions) {
-      await db.query(
-        'INSERT INTO transactions (user_id, amount, description, category, type, date, currency) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [userId, transaction.amount, transaction.description, transaction.category, transaction.type, transaction.date, 'CAD']
-      );
-    }
-
-    // Create sample savings goal
-    await db.query(
-      'INSERT INTO savings_goals (user_id, name, target_amount, current_amount, target_date, description) VALUES ($1, $2, $3, $4, $5, $6)',
-      [userId, 'Emergency Fund', 10000.00, 500.00, new Date(currentYear + 1, currentMonth, 31).toISOString().split('T')[0], 'Build emergency fund to cover 6 months of expenses']
-    );
-
-    // Create sample watchlist items
-    const sampleStocks = [
-      ['AAPL', 'Apple Inc.'],
-      ['GOOGL', 'Alphabet Inc.'],
-      ['MSFT', 'Microsoft Corporation']
-    ];
-
-    for (const [symbol, company] of sampleStocks) {
-      await db.query(
-        'INSERT INTO watchlist (user_id, symbol, company_name) VALUES ($1, $2, $3)',
-        [userId, symbol, company]
-      );
-    }
-
-    console.log(`Sample data created for user ${userId}`);
-  } catch (error) {
-    console.error('Error creating sample data:', error);
-    // Don't fail registration if sample data creation fails
-  }
-}
 
 module.exports = authController; 

@@ -50,7 +50,17 @@ class SchedulerService {
     const timer = setInterval(async () => {
       try {
         const deleted = await task();
-        logger.info(`${name}: deleted ${deleted} row(s)`);
+        const line = `${name}: deleted ${deleted} row(s)`;
+        // Only a real deletion is an audit event. These intervals fire 432
+        // times a day between them and almost always delete nothing; routing
+        // the zeros through audit too would bury the lines that matter in a
+        // production log. The zero case stays on the dev-only channel, where
+        // it is still useful for watching the schedule tick.
+        if (deleted > 0) {
+          logger.audit(line);
+        } else {
+          logger.info(line);
+        }
       } catch (error) {
         logger.error(`${name} failed`, error);
       }
@@ -78,10 +88,12 @@ class SchedulerService {
             const report = await generateWeeklyReport(user.id);
             await sendWeeklyReport(user.email, report.text, report.html);
             successCount++;
-            logger.info(`Weekly report sent to ${user.email}`);
+            // Was `${user.email}`. The rule from item 16: log a user id where
+            // one exists. The SELECT above already fetches it.
+            logger.info(`Weekly report sent to user ${user.id}`);
           } catch (error) {
             errorCount++;
-            logger.error(`Failed to send weekly report to ${user.email}`, error);
+            logger.error(`Failed to send weekly report to user ${user.id}`, error);
           }
         }
 
@@ -109,7 +121,14 @@ class SchedulerService {
       () => cleanupService.deleteUnverifiedAccounts()
     );
 
-    logger.info('Cleanup tasks scheduled');
+    // Audit rather than info: with the zero-row runs silent in production, a
+    // log with no [AUDIT] deletion lines in it is ambiguous between "nothing
+    // needed deleting" and "the jobs were never mounted". This one line at boot
+    // separates the two.
+    logger.audit(
+      `Retention jobs scheduled: aiCleanup every ${config.cron.aiPlanCleanup}ms, ` +
+      `accountCleanup every ${config.cron.unverifiedAccountCleanup}ms`
+    );
   }
 
   /**

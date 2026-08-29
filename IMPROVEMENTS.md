@@ -26,23 +26,28 @@ can be answered without reading the whole backlog.
 | 10 | Environment variables are undocumented | ✅ done — round 2 |
 | 11 | `package-lock.json` drifted from `package.json` | ✅ fixed in passing — PR #12 |
 | 12 | AI plans ignored the user's finances | ✅ fixed in passing — round 2 |
-| 13 | Three dead top-level symbols, and a 500 on register | open — **decisions B and C** |
+| 13 | Three dead top-level symbols, and a 500 on register | ✅ done — rounds 10 and 11 |
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 | 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
-| 17 | Retention deletions are silent in production | open — **decision D** |
+| 17 | Retention deletions are silent in production | ✅ done — round 12 |
 | 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
+| 19 | `utils/logger.js` has no real level hierarchy | open |
+| 20 | The 4-month window is a term, and the feature around it is unfinished | open — design decided |
+| 21 | `/summary/rolling` returns every transaction, twice | open |
+| 22 | No yearly view, and no way to pick a period | open |
 
 ---
 
 ## Decisions needed
 
-Three open questions remain — **B**, **C** and **D**. Each is blocked on a
-judgement call, not on work: the investigation behind each is done and recorded
-in the item it points to. A recommendation is given for each; none is so
-clear-cut that it should be taken without a look.
+**All four are answered** — A, B, C and D. Each write-up is kept below with the
+decision recorded against it, because the reasoning is the part worth having
+later; the work is in the item each one points to.
 
-**A is answered** — see below.
+Two items are open but need no decision from you: **18** (nothing keeps the
+seed file and the category list in step) and **19** (the logger has no real
+level hierarchy).
 
 ### A. The `Savings` category — item 7 — ✅ ANSWERED 2026-08-29
 
@@ -50,54 +55,29 @@ clear-cut that it should be taken without a look.
 expense category rather than a value only the seed file knew about. The work is
 in item 7; nothing here is still open.
 
-### B. The three dead symbols — item 13
+### B. The three dead symbols — item 13 — ✅ ANSWERED 2026-08-29
 
-Each was left in place with an `eslint-disable`, because "delete it" and "wire
-it up" are both defensible:
+**Decision: delete all three.** The recommendation was to delete
+`createAsciiPieChart`, decide `createSampleDataForNewUser` on product grounds,
+and leave `DISPOSABLE_EMAIL_DOMAINS` to C. C wired the domain list up, and the
+product question turned out to have an answer in the history rather than
+needing one — see item 13. Nothing here is still open.
 
-| Symbol | Where | The question |
-|---|---|---|
-| `DISPOSABLE_EMAIL_DOMAINS` | `controllers/authController.js` | See decision C — it is the natural fallback. |
-| `createSampleDataForNewUser` | `controllers/authController.js` | New accounts currently get no starter data. Removed feature, or lost wiring? Only you know which was intended. |
-| `createAsciiPieChart` | `services/emailService.js` | The weekly report is assembled without it. |
+### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13 — ✅ ANSWERED 2026-08-29
 
-**Recommendation: delete `createAsciiPieChart`, decide `createSampleDataForNewUser`
-on product grounds, and keep `DISPOSABLE_EMAIL_DOMAINS` pending decision C.** An
-ASCII pie chart in an HTML email is not something the report is missing. The
-starter-data one is genuinely a product question — an empty dashboard on first
-login is a worse first impression, but fake transactions in a real finance app
-are worse still.
+**Decision: fall back to the domain list**, the recommended option. Registration
+works without the key, with weaker filtering rather than none, and "optional" is
+now true in the code as well as in the docs. The work is in item 13; nothing
+here is still open.
 
-### C. Should registration work without `MAILBOXLAYER_API_KEY`? — item 13
+### D. Should retention deletions be visible in production? — item 17 — ✅ ANSWERED 2026-08-29
 
-**Verified, not inferred.** `validateEmailMailboxLayer()` throws at
-`authController.js:32` when the key is missing, and that `throw` sits **outside**
-the function's own `try` (which opens at line 35). It escapes to `register`'s
-catch at line 138, which returns `res.status(500)`. So **`/auth/register` returns
-500 for every caller** when the key is unset — while `.env.example` and the
-startup check both describe the key as optional.
+**Decision: add an always-printing level**, the recommended option —
+`logger.audit`. The third option, a real level hierarchy for `utils/logger.js`,
+was explicitly the bigger job and is now item 19; it did not need to block this.
+The work is in item 17.
 
-| Option | Consequence |
-|---|---|
-| **Fall back to `DISPOSABLE_EMAIL_DOMAINS`** | Registration works without the key, with weaker disposable-address filtering. Gives the dead list a job and makes "optional" true. |
-| **Skip validation entirely when the key is absent** | Simplest. Registration works; no disposable filtering at all. |
-| **Make the key genuinely required** | Fail at boot in `config/validate.js` rather than at the first registration. Honest, but the app cannot run without a paid third-party key. |
-
-**Recommendation: fall back to the domain list.** It resolves B and C together,
-makes the documented "optional" accurate, and keeps some filtering rather than
-none. Whichever you choose, the current state — documented optional, actually
-required, and failing as an opaque 500 — should not be one of them.
-
-### D. Should retention deletions be visible in production? — item 17
-
-`logger.info` is gated on `config.logging.enableConsoleLogs`, which is
-`NODE_ENV === 'development'`. Routing the cleanup row counts through it (round 5)
-matches the rest of `schedulerService`, but means **those counts are silent in
-production**, where the old `console.log` always printed. Errors still always
-print, in every environment.
-
-| Option | Consequence |
-|---|---|
+---|---|
 | **Leave it** | Consistent with the rest of the scheduler. No record of what the retention jobs deleted in production. |
 | **Add a level that always prints** | e.g. `logger.audit`, for events that delete user data. Small change, confined to `utils/logger.js` and its callers. |
 | **Give `utils/logger.js` a real level hierarchy** | Today `logging.level` gates only `debug()`; `info`/`warn` ignore it and key off `enabled`, and `error` always prints. A proper hierarchy is the general fix, and the bigger job. |
@@ -370,8 +350,8 @@ already-installed `eslint-config-next` provides. It now completes: six
 
 The first backend run found 19 problems, including three real defects — see
 item 12 and the `globalErrorHandler` duplicate. The rest were dead bindings,
-now removed. Three dead top-level symbols are marked rather than deleted; see
-item 13.
+now removed. Three dead top-level symbols were marked rather than deleted at
+the time; all three are resolved as of round 11 — see item 13.
 
 Both lint scripts run in CI as of item 5, so nothing runs unattended any more.
 
@@ -631,43 +611,110 @@ sign — an account in CAD was described to the model as USD.
 
 ## 13. Three dead top-level symbols, and a 500 on register
 
-**Status:** open — **decisions B and C**
+**Status:** ✅ DONE 2026-08-29 — the 500 in round 10 (decision C), the symbols
+in round 11 (decision B)
 **Found:** by the linter
 
-Marked with `eslint-disable` and a comment rather than deleted, because "remove
-it" and "wire it up" are both defensible and the choice is not mine:
+### The 500 — fixed
 
-1. **`DISPOSABLE_EMAIL_DOMAINS`** ([controllers/authController.js](backend/controllers/authController.js)) —
-   ~30 throwaway-mail domains, superseded by the MailboxLayer API call.
-2. **`createSampleDataForNewUser`** (same file) — never called, so new accounts
-   get no starter data. Removed feature, or lost wiring?
-3. **`createAsciiPieChart`** ([services/emailService.js](backend/services/emailService.js)) —
-   the weekly report is assembled without it.
+`validateEmailMailboxLayer()` threw at line 32 when `MAILBOXLAYER_API_KEY` was
+absent, and the `throw` sat **outside** the function's own `try` (which opened
+at line 35). It escaped to `register`'s catch and became
+`res.status(500).json({ error: 'Server error' })`, so **`/auth/register`
+returned 500 for every caller** — while `.env.example` and `config/validate.js`
+both called the key optional.
 
-All three are still present and still unreferenced.
+It now falls back to the disposable-domain list, in a new
+[services/emailValidationService.js](backend/services/emailValidationService.js).
+The controller keeps one call, `validateEmail(email)`, which never throws.
 
-### The live bug entangled with the first one
+**The fix covers three more paths that produced the same outcome**, and this is
+the part worth reading. A missing key was the loudest way to make validation a
+gate, not the only one:
 
-`validateEmailMailboxLayer()` throws at **line 32** when
-`MAILBOXLAYER_API_KEY` is absent:
+| Situation | What it used to do | What it does now |
+|---|---|---|
+| No key | threw → **500 for everyone** | domain list |
+| apilayer unreachable / HTTP error | old `catch` returned `{ valid: false }` → **every address rejected** | domain list |
+| Expired key or exhausted quota | 200 with `success: false` and no `format_valid`, read as falsy → **"Invalid email format"** on a perfectly good address | domain list |
+| Any unrecognised response shape | same as above | domain list |
 
-```js
-const apiKey = config.apiKeys.mailboxLayer;
-if (!apiKey) {
-  throw new Error('MailboxLayer API key not set');   // line 32
-}
-const url = `...`;
-try {                                                 // line 35 — the try opens HERE
-```
+The third is the nastiest: a *wrong* answer rather than a missing one, blaming
+the user for the service's problem. That is why `isUsableResponse()` requires
+`format_valid` to be a boolean rather than just checking the HTTP status —
+apilayer reports its own errors with HTTP 200.
 
-The `throw` is **outside** the function's own `try`. It escapes to `register`'s
-catch at **line 138**, which returns `res.status(500).json({ error: 'Server
-error' })`. So **`/auth/register` returns 500 for every caller** when the key is
-unset — while `.env.example` and `config/validate.js` both describe the key as
-optional.
+The rule the module is built on: **a validator that cannot reach its service
+must not become a gate.** Filtering degrades from "deliverability plus a large
+disposable database" to "30 known disposable domains" — weaker, but a real
+check, and every fallback prints via `console.error`/`console.warn` so it is
+visible in production, where it means registrations are being waved through on
+the weaker check.
 
-Wiring the dead domain list in as the fallback would make it genuinely optional.
-That is the case for "wire it up"; see decision C.
+Also fixed in passing: the domain list was a 40-element array containing 30
+distinct domains — `tmpmail.net` and three neighbours appeared three times
+each. It is a sorted `Set` now, so a repeat shows up in a diff.
+
+### The three symbols — all resolved
+
+`DISPOSABLE_EMAIL_DOMAINS` was settled by decision C: it is the fallback now,
+and lives in `services/emailValidationService.js`. The other two are **deleted**
+(round 11, 134 lines), and the last `eslint-disable` in the backend went with
+them.
+
+Both were written up as judgement calls — "removed feature or lost wiring?" —
+and **both turned out to have an answer in the git history**, which is worth
+recording because the question was posed as if it needed a product decision:
+
+- **`createSampleDataForNewUser`** (108 lines, `authController.js`) seeded a new
+  account with eight sample transactions, an Emergency Fund goal and three
+  watchlist stocks. It was **deliberately unwired**: commit `6746ca1`,
+  2025-07-03, *"clear the mock data implementation"*, deleting exactly the three
+  lines that called it and leaving the body behind. Not lost wiring — a removed
+  feature, removed on purpose, by the repo owner. Nothing to decide.
+
+  Worth knowing if it is ever wanted back: it inserted `'Sample Salary
+  Payment'`-style rows straight into `transactions` with no flag marking them
+  synthetic, so they would have been indistinguishable from real entries in
+  every total, chart and AI plan. Reviving it should not mean reviving that.
+
+- **`createAsciiPieChart`** (26 lines, `emailService.js`) was **never called in
+  any revision** — checked by walking every commit that touched the file; it
+  appears exactly once per revision, as its own definition. Born dead in
+  `e2a4761`, "email sending service with formatted email". The weekly report has
+  always been HTML, where a `█`-bar chart in a monospace block would have been
+  the wrong medium anyway.
+
+Verified after deleting: lint clean (the disables went with the code they were
+suppressing), 79 tests still green, and `generateWeeklyReport` still returns its
+`{ text, html }` pair — exercised directly with `db.query` stubbed, since no
+test covers it.
+
+### How it was verified
+
+- 23 new tests in [test/emailValidation.test.js](backend/test/emailValidation.test.js),
+  one per row of the table above plus the MailboxLayer verdict paths. Suite:
+  55 → **79**, green with and without every optional key.
+- Four mutations, each caught: making the no-key path a gate (4 failures),
+  restoring the old rejecting `catch` (2), removing the usable-response check
+  (2), and turning the domain list into a waiver (5).
+- The characterisation test in `registerLogging.test.js` that pinned the 500
+  now asserts a 201, plus a second test that the fallback path leaks no token
+  or raw address either — it prints different lines from the MailboxLayer path.
+- `configValidate.test.js` pinned the old warning text ("registration fails
+  outright"). It now pins the new text **and** asserts the old wording is gone;
+  a startup warning describing behaviour the code no longer has is worse than
+  none.
+- Real boot on port 3099, `NODE_ENV=production`, key removed, database pointed
+  at a dead socket: `someone@mailinator.com` → **400** "Disposable email
+  addresses are not allowed" `(domain-list)`; `john.doe@example.com` → past
+  validation and into the database, failing with `ECONNREFUSED` rather than at
+  the validator. The one-per-process "no key" warning printed exactly once
+  across both requests.
+
+  Note for anyone repeating this: `env -u MAILBOXLAYER_API_KEY` does **not**
+  remove the key, because `.env` puts it back. `MAILBOXLAYER_API_KEY=` does —
+  dotenv will not overwrite a variable already present in the environment.
 
 ---
 
@@ -811,36 +858,70 @@ test now sets the key on `config` itself and the HTTP call stays mocked, so it
 no longer depends on the environment — verified by running it with the key
 blanked.
 
-That failure is worth keeping in mind for **decision C**: the missing key does
+That failure was the strongest argument for **decision C**: the missing key did
 not merely break registration in production, it silently changed what a test of
-unrelated code was exercising. `test/registerLogging.test.js` ends with a
-characterisation test pinning the 500, labelled as a bug rather than desired
-behaviour, which should be rewritten when decision C lands.
+unrelated code was exercising. Round 10 answered C, so the characterisation
+test that pinned the 500 now asserts a 201, and a second test covers the
+fallback path's own log lines.
 
 ---
 
 ## 17. Retention deletions are silent in production
 
-**Status:** open — **decision D**
-**Effort:** small
+**Status:** ✅ DONE 2026-08-29 — decision D answered: an always-printing level
 
 Round 5 routed the cleanup jobs' row counts through `logger.info`, matching the
 rest of `schedulerService`. `logger.info` is gated on
-`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'` — so
-in production those counts print nowhere. The `console.log` they replaced always
-printed.
+`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'`, so in
+production those counts printed nowhere — while the `console.log` they replaced
+always had. Errors always print, so a *failing* cleanup stayed visible; what was
+lost was the record of a *successful* one.
 
-Errors still always print, in every environment, so a *failing* cleanup is still
-visible. What is lost is the record of a *successful* one: how many accounts and
-AI plans the retention jobs deleted.
+`logger.audit(message, data)` now exists in
+[utils/logger.js](backend/utils/logger.js) and prints in every environment. It
+is documented as being for events that **destroy or irreversibly change user
+data** — an audit level that fills up with routine chatter stops being one.
 
-Related, and the reason this is worth deciding rather than patching: there is no
-real level hierarchy in `utils/logger.js`. `config.logging.level` is consulted in
-exactly one place — `debug()` at line 37, which needs `enabled` **and**
-`level === 'debug'`. `info()` and `warn()` are gated on `enabled` alone and
-ignore the level entirely; `error()` ignores both and always prints. So
-`LOG_LEVEL` can only ever turn `debug` on, and only in development. See
-decision D.
+**Two judgement calls inside the implementation**, both worth disagreeing with
+if you see it differently:
+
+- **Only a non-zero deletion is audited.** The two intervals fire **432 times a
+  day** between them (`aiPlanCleanup` every 5 minutes, `unverifiedAccountCleanup`
+  every 10) and almost always delete nothing. Auditing the zeros would bury the
+  lines that matter under ~13k rows a month. A zero-row run still logs through
+  `logger.info`, so development output is unchanged.
+- **Scheduling the jobs is itself audited**, one line at boot naming both jobs
+  and their intervals. This is the cost of the first decision: with zero-row
+  runs silent, a production log containing no deletion lines is otherwise
+  ambiguous between "nothing needed deleting" and "the jobs were never
+  mounted". One line at startup separates those.
+
+**Fixed in passing:** `scheduleWeeklyReports` logged `Weekly report sent to
+${user.email}` and the matching failure line, two raw addresses that round 8's
+sweep of item 16 missed because it only covered `authController`. The `SELECT`
+above them already fetches `id`, so both now name the user id — the rule from
+item 16, applied where it had not been.
+
+### How it was verified
+
+- 8 new tests in [test/logger.test.js](backend/test/logger.test.js), the first
+  tests this file has had: `audit` and `error` print with `enabled` false,
+  `info`/`warn`/`debug` stay silent, and the audit line carries an ISO timestamp
+  and an optional payload.
+- 4 new tests in `schedulerService.test.js`: a real deletion is audited, a
+  zero-row run is not, the scheduling line is audited, and — the one that
+  matters — the count **reaches `console.log` with `logger.enabled` false**,
+  asserted through the real logger rather than a mock of it. Suite: 79 → **91**.
+- One existing test broke and was retargeted rather than deleted: it asserted
+  the count arrived via `logger.info`. It now captures both channels and still
+  pins what it was really for — that the number logged is the number the task
+  returned.
+- Four mutations, each caught: gating `audit` on `enabled` (5 failures),
+  auditing every run including zeros (1), putting the count back on `info` (2),
+  and putting the boot line back on `info` (1).
+- A real run under `NODE_ENV=production` with `enableConsoleLogs` confirmed
+  `false`: a 4-row deletion printed `[AUDIT]`, a 0-row run printed nothing, and
+  a throwing task still printed `[ERROR]` with its stack.
 
 ---
 
@@ -872,6 +953,474 @@ Options, cheapest first:
 
 No recommendation yet; the third is the most valuable and the most work, and it
 is worth deciding alongside whether categories should ever be user-defined.
+
+---
+
+## 19. `utils/logger.js` has no real level hierarchy
+
+**Status:** open
+**Effort:** small, but it touches every logging call site
+
+The third option under decision D, deferred rather than rejected — it was the
+general fix, and `logger.audit` did not need to wait for it.
+
+`config.logging.level` (`LOG_LEVEL`, default `'info'`) is consulted in **exactly
+one place**: `debug()`, which needs `enabled` *and* `level === 'debug'`. `info()`
+and `warn()` are gated on `enabled` alone and ignore the level entirely;
+`error()` and now `audit()` ignore both and always print. So `LOG_LEVEL` can
+only ever turn `debug` on, and only in development — setting it to `'warn'` or
+`'error'` in production does nothing at all, which is not what anyone reading
+`.env.example` would expect.
+
+`enabled` is also a constructor snapshot of `NODE_ENV === 'development'`, so the
+real switch is the environment, not the level. Two knobs, one of which is
+inert.
+
+A hierarchy would mean ranking the levels, comparing against `level` in one
+place, and deciding where `audit` sits — probably outside the ranking entirely,
+since "always print" is its whole purpose.
+
+Not urgent: nothing is broken, and the two things that must be visible in
+production (errors and deletions) are. It is a trap for whoever next assumes
+`LOG_LEVEL` works.
+
+---
+
+## 20. The 4-month window is a term, and the feature around it is unfinished
+
+**Status:** open — design decided 2026-08-29; **steps 1 and 2 built in rounds
+14–15**; the dashboard still asks for a rolling count (item 22)
+**Effort:** small for the defect, medium for the feature
+**Found:** by asking whether the 4-month window deletes anything
+
+### First, the correction
+
+An earlier draft of this item recommended **deleting** the auto-delete endpoint
+as an unfinished feature nobody wanted. That was wrong, and wrong in an
+instructive way: I read "no caller" as "no intent". The 4-month figure is not
+arbitrary — **it is a Waterloo term.** Study terms and co-op terms are both four
+months, and budgeting across one co-op term is the thing this app is for. The
+feature has a motivation; it is the implementation that is unfinished.
+
+### The window does not delete anything, and that part is fine
+
+`/summary/rolling?months=4` is a `WHERE` clause on a `SELECT`. Checked against
+the live database: **282 of 397 transactions are older than four months and
+still present**, the oldest dated 2025-03-01. The scheduler's only two jobs
+touch `ai_plans` and `users`, never `transactions`.
+
+### Finding 1 — a *rolling* four months is not a *term*
+
+This is the substantive bug, and it is in the feature that works, not the one
+that is missing. `getRollingSummary` counts back four months from *today*, so
+the window equals the term **only in the last month of each term**:
+
+| Viewing in | Window covers | Term | |
+|---|---|---|---|
+| Jan | Oct, Nov, Dec, Jan | Winter (Jan–Apr) | straddles |
+| Feb | Nov, Dec, Jan, Feb | Winter | straddles |
+| Mar | Dec, Jan, Feb, Mar | Winter | straddles |
+| **Apr** | **Jan, Feb, Mar, Apr** | **Winter** | **= the term** |
+| May | Feb, Mar, Apr, May | Spring (May–Aug) | straddles |
+| … | | | |
+| **Aug** | **May, Jun, Jul, Aug** | **Spring** | **= the term** |
+| **Dec** | **Sep, Oct, Nov, Dec** | **Fall** | **= the term** |
+
+Three months out of twelve — and precisely when the term is already over. In
+the **first** month of a co-op term, which is when someone actually sets a
+budget, three quarters of the window is the previous term's money: a student
+starting co-op in May sees February–April, most of it a school term with
+different income and different spending.
+
+Fixing this does not need new storage. It needs the window to snap to term
+boundaries (Jan–Apr, May–Aug, Sep–Dec) instead of counting back from today —
+the same `WHERE date >= $2 AND date < $3` query with different endpoints, plus
+a way to pick *which* term. That is the feature the 4-month number was reaching
+for.
+
+### Finding 2 — deleting old data is the wrong lever for the scaling worry
+
+The concern behind the sliding window was memory: more users, more rows, the
+app falls over. Measured rather than assumed, on the live database:
+
+| | |
+|---|---|
+| 397 transactions | **128 kB** total (48 kB heap + 80 kB indexes) |
+| per row, including indexes | **~330 bytes** (124 B heap; the rest is index and page overhead that amortises) |
+| whole database, 12 users | 7.8 MB, most of it Postgres catalogue |
+
+Extrapolating at a generous 1,000 transactions per user per year:
+
+| Scale | Rows | Storage |
+|---|---|---|
+| 1,000 users × 4 years | 4M | **~1.3 GB** |
+| 10,000 users × 4 years | 40M | **~13 GB** |
+
+40M rows in one Postgres table is unremarkable, and the index this app needs
+already exists — `idx_transactions_user_date` on
+`(user_id, date DESC, created_at DESC)` (migration 006). Every summary query is
+`WHERE user_id = $1 AND date >= … AND date <  …`, which that index answers as a
+range scan over one user's rows. **How many other users exist does not affect
+it.** Storage becomes a bill before it becomes a crash, and a bill is answered
+by archiving to a summary table, not by destroying the data.
+
+There is also a product cost to deleting: term-over-term comparison — *this
+co-op term versus last year's* — is exactly what this audience wants, and it is
+impossible if the data is gone.
+
+### Finding 3 — the endpoint that exists is a footgun
+
+`DELETE /transactions/auto-delete` is mounted (`routes/transactions.js:26`) and
+runs `DELETE FROM transactions WHERE user_id = $1 AND date < $2`. Nothing calls
+it — not the scheduler, not the frontend, not its own origin commit `0bfc252`.
+Its `months` parameter is unvalidated; verified by running the arithmetic:
+
+| `?months=` | cutoff | effect |
+|---|---|---|
+| `4` / absent | 4 months back | intended |
+| `0` | **today** | deletes every transaction before today |
+| `-6` | **6 months ahead** | deletes everything, future-dated rows included |
+| `abc`, empty, huge | — | `toISOString()` throws → 500 |
+
+The empty case looks safe and is not: `const { months = 4 }` defaults only on
+`undefined`, so `?months=` is `''`.
+
+Scoped to the caller's own `user_id` and requires their JWT, so it is not a
+cross-user risk — but it is a live, irreversible, unvalidated delete that no
+part of the product exposes.
+
+**And `months` means two opposite things in this API.** Three endpoints take it:
+
+| Endpoint | `months` means |
+|---|---|
+| `GET /summary/rolling` | show me the last N months |
+| `GET /summary/trends` | show me the last N months |
+| `DELETE /transactions/auto-delete` | **destroy everything older than N months** |
+
+Same name, same type, same default of 4 — and one of them is irreversible. That
+is worth fixing beyond validation; see below.
+
+#### What "validate `months`" actually means
+
+Nothing to do with the term design. It is one line in the route file, in the
+style the project already uses for bodies — `routes/transactions.js` has
+`transactionValidation` as a `body([...])` array, and **no route in the backend
+validates a query parameter at all** today:
+
+```js
+const autoDeleteValidation = [
+  query('months').optional().isInt({ min: 1, max: 60 })
+    .withMessage('months must be a whole number between 1 and 60'),
+];
+router.delete('/auto-delete', autoDeleteValidation, transactionController.autoDeleteOldTransactions);
+```
+
+plus the `validationResult(req)` check at the top of the controller method, the
+same as every other validated handler. The 1–60 bound is not invented — it is
+the range `updateDataRetentionSettings` already enforces on the same concept
+(Finding 4), so this makes the write path agree with the settings path.
+
+**Better than validating it: stop taking a relative count.** For a destructive
+call, `?before=2025-05-01` is safer than `?months=4` — there is no arithmetic to
+get wrong, no `months=0` edge, no timezone question about when "four months ago"
+starts, and the caller has to state exactly what will be destroyed. Once
+retention is term-based (see below) the endpoint should take
+`?keepTerms=6` or nothing at all, and the relative-month form can go.
+
+### Finding 4 — the retention settings API reports persistence it does not do
+
+`getDataRetentionSettings` returns a hardcoded
+`{ autoDeleteEnabled: false, retentionMonths: 4, lastCleanup: null }`, and
+`updateDataRetentionSettings` validates `retentionMonths` (1–60) then returns
+`"updated successfully"` **without writing anything** — its own comment says
+*"In a real app, you'd save these to a user_preferences table"*. `settings.tsx`
+round-trips both fields but renders no control bound to them, so nothing lies to
+a user today. It starts lying the moment someone adds the toggle.
+
+### The design — decided 2026-08-29
+
+Settled in conversation: **the window is a view concept and is not coupled to
+deletion.** Data is kept for **2 years**, and the app grows a yearly view
+alongside the term view. Three refinements came out of working through it.
+
+**1. Retain by terms, not by months.** A rolling 24-month cutoff slices a term
+in half. In April 2027, Winter 2025 (Jan–Apr 2025) is 27 months back, so January
+and February fall off while March and April survive — and the chart shows a
+Winter term with 60% of its real spending. A partial term in a comparison is
+worse than a missing one. **Keep the last 6 complete terms; delete only whole
+terms.** Same principle as the view fix: snap to the boundary.
+
+**2. The justification is data hygiene, not scale.** At the measured ~330 bytes
+per row, 10,000 users over 4 years is ~13 GB and over 2 years is ~6.5 GB —
+halving a number that was never the problem (Finding 2). The real case is that
+this is financial history, and holding less of it is a smaller breach surface.
+That reason stands on its own and does not depend on a scaling claim the
+measurements do not support.
+
+**3. Archive to monthly totals before deleting, so the yearly view survives the
+retention edge.** The charts need per-month, per-category totals and nothing
+else — they do not read the transaction rows at all (item 21). So: **2 years of
+rows, monthly aggregates kept indefinitely.**
+
+Measured on the live database, aggregating at `(month, category, type)`:
+
+| user | transactions | aggregate rows | ratio |
+|---|---|---|---|
+| 6 (heaviest) | 348 | 105 | 3.3× |
+| 1 | 43 | 39 | 1.1× |
+
+The ratio is not the point, and it is deliberately recorded here so nobody
+oversells it later. **The point is that aggregate rows are bounded by
+time × categories — roughly 180 per user-year, a hard ceiling — regardless of
+how much a user logs.** Someone recording 500 transactions a month costs the
+same in the summary table as someone recording 20. That decouples storage from
+activity, which rolling deletion never does.
+
+### How a term becomes a parameter
+
+The question the design leaves open: if the view is "Spring 2026" rather than
+"the last four months", what does the request look like?
+
+**The server owns the term calendar.** This is the load-bearing decision, and
+it is item 18's lesson in a new place: the *view* needs term boundaries and the
+*retention job* needs the same boundaries to delete whole terms. If the frontend
+computes them and the cleanup job computes them separately, they drift, and the
+drift is silent until a chart and a deletion disagree about where Spring starts.
+One module, two consumers:
+
+```js
+// backend/utils/terms.js — a Waterloo term is four months.
+//   Winter Jan–Apr | Spring May–Aug | Fall Sep–Dec
+termOf(date)            // Date        -> '2026-spring'
+boundsOf('2026-spring') // term id     -> { start: '2026-05-01', end: '2026-09-01' }
+currentTerm(now)        //             -> '2026-spring'
+previousTerm(id)        // '2026-spring' -> '2026-winter'
+lastNTerms(n, now)      // 6           -> ['2025-winter' … '2026-spring']
+```
+
+Bounds are **half-open** `[start, end)`, matching the query the summary
+controller already runs (`date >= $2 AND date < $3`), which sidesteps
+end-of-month and leap-day questions entirely.
+
+**The API then takes a term id, not a month count:**
+
+```
+GET /summary/rolling?term=2026-spring
+GET /summary/rolling?term=current      # alias, so the client needs no calendar
+GET /summary/rolling?term=previous
+```
+
+and the response echoes what it resolved to:
+
+```json
+{ "term": "2026-spring", "label": "Spring 2026",
+  "start": "2026-05-01", "end": "2026-09-01", … }
+```
+
+That echo is the part that keeps the frontend out of the calendar business: it
+renders `label` on the chart and passes `term` back, never computing a date. It
+also makes the response self-describing in a log or a bug report — `months=4`
+tells you nothing about *which* four months a user was looking at, `2026-spring`
+tells you exactly.
+
+`?months=` stays for `/summary/trends` and for anything that genuinely wants a
+rolling count; the two are different questions and can coexist. What changes is
+that the **dashboard** stops asking for a rolling count it never wanted.
+
+**And the retention job calls `lastNTerms(6)`** for its cutoff, which is what
+makes "delete only whole terms" true by construction rather than by a comment.
+
+Term ids sort by year then need a term order, so store a term index (0/1/2)
+alongside the key if a sort ever matters — `'2026-fall' < '2026-spring' <
+'2026-winter'` lexically, which is wrong three ways.
+
+### What round 14 built
+
+**[utils/terms.js](backend/utils/terms.js)** — the calendar described above,
+with 26 tests. Two things in it are worth not undoing:
+
+- **Bounds are half-open**, so consecutive terms share a boundary and there is
+  no end-of-month or leap-day arithmetic anywhere. A test walks eight
+  consecutive terms asserting `boundsOf(t).end === boundsOf(next(t)).start`, and
+  another checks that every day of three years — including a leap day — lands in
+  exactly one term and inside that term's own bounds.
+- **No date is built with `new Date(y, m, d).toISOString()`.** That pattern is a
+  latent off-by-one: under `TZ=Asia/Shanghai`, `new Date(2026, 4, 1)` is local
+  midnight on May 1, which is `2026-04-30T16:00Z`, so `toISOString()` returns
+  **`2026-04-30`**. `getRollingSummary` builds its window exactly that way today
+  and escapes only because the server runs UTC — see item 21. `terms.js` uses
+  integer arithmetic formatted into a string, and the test file sweeps four
+  timezones in-process (Node applies a `process.env.TZ` change to Dates created
+  after it) including UTC+14, with one test asserting the sweep is actually
+  taking effect so it cannot silently stop proving anything.
+
+**`months` validation**, with 10 tests that run the **real router on a real
+server** rather than the validation chain alone — the failure worth guarding
+against is "the validator exists but is not mounted", which a unit test of the
+chain would pass. Removing it from the route fails 7 of them. Every rejection
+case also asserts `db.query` was never called: a 400 that still deleted the rows
+would be worse than the bug.
+
+**`terms.js` has no production caller yet, and that is deliberate.** This repo
+deleted two dead symbols in round 11, so it is worth saying why this is not a
+third: it is the foundation step 2 needs, its consumers are named above, and its
+tests exercise it. If step 2 does not follow reasonably soon, delete it rather
+than let it sit — the argument for keeping unused code does not improve with
+age.
+
+### What round 15 wired
+
+`GET /summary/rolling` takes **either** `?term=` **or** `?months=`:
+
+```
+?term=2026-spring   an explicit term
+?term=current       resolved server-side, so no client knows the calendar
+?term=previous      the comparison a co-op budget is for
+?months=4           the original rolling count, unchanged in meaning
+```
+
+Three decisions in it:
+
+- **The two are mutually exclusive**, not one silently winning. A request with
+  both is a client bug, and answering it either way would hide that.
+- **The response echoes the window** — `term`, `termLabel`, `startDate`,
+  `endDate`, and `period` set to the label. A client never computes a date or a
+  term name, and a log line says *which* window was served; `months=4` never
+  told you which four months.
+- **`?months=` is validated here now too**, the same 1–60 as the delete
+  endpoint. It had no validation at all, so `?months=abc` reached the date
+  arithmetic.
+
+**Fixed while in the function:** the window was built with
+`new Date(y, m, 1).toISOString().split('T')[0]` — the off-by-one east of UTC
+described in item 21. Both paths now use integer arithmetic, so the rolling
+window and the term window cannot disagree about a boundary, which is the whole
+reason `terms.js` exists. Item 21 keeps the payload problem; this part of it is
+done.
+
+**Checked against the live database**, read-only, for the heaviest real user:
+
+| Window | Dates | Income | Expenses |
+|---|---|---|---|
+| `?term=current` → Spring 2026 | 2026-05-01 → 2026-09-01 | 2,923 | 9,740 |
+| `?term=previous` → Winter 2026 | 2026-01-01 → 2026-05-01 | 16,919 | 13,975 |
+
+Two terms with completely different financial shapes — a school term and a
+co-op term — which is the argument for the whole feature in one table. Note
+that `?months=4` returned **the same numbers as `?term=current`** on the day
+this was run: August is one of the three months a year when a rolling window
+happens to equal the term. Run it in September and they diverge by three
+months' data.
+
+**20 tests**, again mounting the real router on a real server: unmounting the
+validator fails 7 of them. Five mutations checked, all caught — aliasing
+`previous` to `current`, restoring the drifting date maths, allowing both
+parameters, and dropping the echo.
+
+### Order of work
+
+1. ~~**Validate `months`** on the auto-delete endpoint (Finding 3)~~ — ✅ done
+   round 14. `query('months').optional().isInt({ min: 1, max: 60 })` in the
+   route file, plus the `validationResult` check the controller was missing.
+   The first query-parameter validation in this backend; every other validated
+   handler checks a body.
+2. ~~**Make the term view term-aligned** (Finding 1)~~ — ✅ done round 15 on the
+   API. `GET /summary/rolling?term=2026-spring|current|previous` resolves
+   through `utils/terms.js` and echoes the window it served. **The dashboard
+   still sends `months=4`**, so the bug is fixed but not yet reaching users —
+   that switch belongs with item 22, because the "Last 4 months" labels have to
+   change with it.
+3. **Add the yearly view** — item 22.
+4. **Fix `/summary/rolling`** — item 21. It has to land before a longer window
+   is affordable.
+5. **Make retention settings actually persist.** `updateDataRetentionSettings`
+   validates its input and returns *"updated successfully"* while writing
+   nothing (Finding 4). If a retention toggle ships on top of that, the user
+   gets a switch that silently does not govern the deletion of their own
+   financial records. **This is a prerequisite for any of the rest**, not a
+   follow-up.
+6. **Then the monthly summary table and the 6-term retention job**, in that
+   order — the archive has to exist before the first deletion, or the first
+   deletion is the one that loses data with no aggregate behind it.
+
+**Still not recommended: deleting to save space.** Deleting for hygiene, with an
+archive behind it and a real setting in front of it, is a different thing and is
+what this design does.
+
+---
+
+## 21. `/summary/rolling` returns every transaction, twice
+
+**Status:** open
+**Effort:** medium
+**Found:** while testing the scaling premise behind item 20
+
+The real per-request cost, and the thing that will actually strain under load —
+unlike total row count, which item 20 measures as a non-issue.
+
+`getRollingSummary` ([controllers/summaryController.js](backend/controllers/summaryController.js))
+does `SELECT *`, loads every row in the window into Node, converts each one, and
+then puts the full list into the response **twice**: once as `transactions`, and
+again inside each `monthlyBreakdown[].transactions`. All aggregation — totals,
+per-category, per-month — happens in JavaScript over that array.
+
+Measured from real rows (286 bytes per converted transaction as JSON, doubled):
+
+| Window | Transactions | Response |
+|---|---|---|
+| 4 months, light user | 60 | ~34 kB |
+| 4 months, heavy user | 200 | ~112 kB |
+| 12 months, heavy | 600 | ~335 kB |
+| 4 years, heavy | 2,400 | ~1.3 MB |
+
+The dashboard uses the totals and the per-month figures. It does not need the
+transaction list at all — `pages/transactions/index.tsx` fetches that
+separately.
+
+**A second bug in the same function — ✅ fixed in round 15.** The window was
+built with `new Date(y, m, 1).toISOString().split('T')[0]`, which is off by a
+day in any timezone east of UTC: under `TZ=Asia/Shanghai` that expression yields
+`2026-04-30` for May 1st, so every boundary shifted back a day and one day's
+transactions landed in the wrong month. It never bit because the server runs
+UTC. Both window paths use integer arithmetic now, and
+`test/rollingSummary.test.js` asserts first-of-month boundaries under four
+timezones including UTC+14. **The payload problem below is what remains of this
+item.**
+
+**Why this matters for item 20:** this cost is *per user, per request*. Deleting
+other users' old data does nothing for it. A `SUM(...) GROUP BY` in SQL and
+dropping the duplicated array would cut the response by an order of magnitude
+and move the work to the database, which is what the existing
+`(user_id, date)` index is for. That is the change that makes a longer window —
+a year, or all of history — cheap.
+
+---
+
+## 22. No yearly view, and no way to pick a period
+
+**Status:** open
+**Effort:** small once item 21 lands
+**Comes from:** the item 20 design
+
+The dashboard offers exactly one period: whatever
+`/summary/rolling?months=4` returns, with `4` hardcoded at
+[frontend/pages/index.tsx](frontend/pages/index.tsx). The API already accepts
+`?months=`, so the backend is most of the way there — what is missing is
+term-aligned endpoints and a control.
+
+The selector this needs, for an audience whose year is three four-month terms:
+
+- **This term** — term-aligned, the default (item 20, Finding 1)
+- **Last term** — the comparison that makes a co-op budget mean something
+- **This year** — and *which* year is a real choice: calendar (Jan–Dec),
+  academic (Sep–Aug), or rolling 12 months. Rolling 12 is the least surprising
+  mid-term; academic matches how the audience already thinks. Worth deciding
+  deliberately rather than defaulting to calendar because it is easiest.
+- **All time** — cheap once the monthly summary table exists (item 20), since
+  it reads aggregates rather than rows.
+
+Blocked in practice on item 21: a yearly window at today's response shape is
+~335 kB for a heavy user, and all-time is worse.
 
 ---
 
@@ -910,22 +1459,45 @@ Not code — carried over from the 2026-08-27 database work.
 11. ~~Promote `Savings` to a real category~~ — done (round 9, item 7, decision
     A), which turned up that the dashboard was classifying it correctly only by
     accident, and produced item 18
-12. **Next:** whichever of decisions **B**–**D** you have answered. C is worth
-    answering early: registration is 500ing for anyone who deploys without a
-    MailboxLayer key, and both `.env.example` and the startup check currently
-    tell them the key is optional.
+12. ~~Make registration work without a MailboxLayer key~~ — done (round 10,
+    item 13, decision C), which turned up three more ways validation became a
+    gate — an outage, an expired key and an exhausted quota — and settled one
+    of decision B's three symbols
+13. ~~Delete the dead symbols~~ — done (round 11, item 13, decision B). Both
+    questions had answers in the git history rather than needing a product
+    call: one was deliberately unwired in `6746ca1`, the other was never called
+    in any revision
+14. ~~Make retention deletions visible in production~~ — done (round 12,
+    item 17, decision D), which also caught two raw email addresses in the
+    weekly-report logs that item 16's sweep had missed, and produced item 19
 
-**Waiting on you, not on work:** decisions **B** and **C** (the dead symbols and
-the register 500, item 13) and **D** (production visibility for the retention
-jobs, item 17). Each is written up under
-[Decisions needed](#decisions-needed) with options and a recommendation. **A**
-is answered and done.
+**All four original decisions — A, B, C and D — are answered and shipped.**
+Three items remain:
+
+- **18** — nothing keeps `db/seed.sql` and the frontend category list in step.
+  Prevention, not a defect; worth doing before the next person adds a category.
+  Needs no decision.
+- **19** — `utils/logger.js` has no real level hierarchy, so `LOG_LEVEL` is
+  inert except for `debug`. A trap rather than a bug. Needs no decision.
+- **20** — the 4-month window is a **Waterloo term**, and the feature built
+  around it is unfinished. The window rolls back from today, so it equals the
+  term only in April, August and December — in the *first* month of a co-op
+  term, when a budget actually gets set, three quarters of it is the previous
+  term. Also holds a live, unvalidated, irreversible delete endpoint nothing
+  calls. **Needs a product decision**; the `months` validation is a defect fix
+  either way.
+- **21** — `/summary/rolling` serialises every transaction in the window twice
+  and aggregates in Node rather than SQL. This, not row count, is the real
+  per-request cost — and it is per user, so deleting old data does not help it.
+- **22** — no yearly view and no period selector; `months=4` is hardcoded in the
+  dashboard. Comes out of the item 20 design.
+
+Item 18 is the one with a repeat offence behind it; item 20 has the live
+footgun and now carries a decided design; item 21 has to land before any longer
+window is affordable, which makes it the gate on 22.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
 Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `...`.
 A native reader should still skim them; the check can prove a key *resolves*,
 never that the wording is good.
-
-Item 18 is prevention rather than a defect — there is nothing broken today. It
-is worth doing before the next person adds a category, not urgently.
