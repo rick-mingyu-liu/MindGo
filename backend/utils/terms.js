@@ -158,6 +158,16 @@ function lastNTerms(n, now = new Date()) {
  * than as its own month arithmetic somewhere in the controller.
  */
 
+/** The four months of a term, each as its first day. The seed builds on these. */
+function monthsOf(termId) {
+  const { year, index } = parseTermId(termId);
+  const startMonth = TERMS[index].startMonth;
+  return Array.from({ length: MONTHS_PER_TERM }, (_, i) => {
+    const absolute = startMonth + i;
+    return isoDate(year + Math.floor(absolute / 12), absolute % 12, 1);
+  });
+}
+
 const YEAR_ID = /^\d{4}$/;
 
 /** True for '2026'. Deliberately not true for 2026 the number: ids are strings. */
@@ -208,6 +218,7 @@ module.exports = {
   previousTerm,
   nextTerm,
   lastNTerms,
+  monthsOf,
   isYearId,
   yearBoundsOf,
   yearLabelOf,

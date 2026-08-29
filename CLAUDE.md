@@ -13,7 +13,7 @@ MindGo is a personal finance app: an Express/PostgreSQL REST API (`backend/`) an
 npm run dev            # nodemon app.js (dev server with auto-restart)
 npm start              # node app.js (production)
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)
-npm run db:seed        # seed sample data (demo account: john.doe@example.com / password123)
+npm run db:seed        # (re)seed the demo account (john.doe@example.com / password123)
 npm run docs:generate  # regenerate API docs via scripts/generateDocs.js
 npm run lint           # eslint . (eslint 9, flat config in eslint.config.js)
 npm test               # node --test — unit tests always run; see below for the integration suite
@@ -75,6 +75,8 @@ Request flow: **route → (auth middleware) → validation → controller → se
 - **Scheduler** ([backend/services/schedulerService.js](backend/services/schedulerService.js)): weekly report emails via `node-cron`, plus `setInterval` cleanup jobs for expired AI plans and unverified accounts. The deletions themselves live in [backend/services/cleanupService.js](backend/services/cleanupService.js) and **throw** on failure rather than logging and returning — the caller decides what a failed cleanup means. Nothing mounts them over HTTP; the scheduler is the only caller. Add a new recurring job through `scheduleInterval(name, ms, task)`, which awaits the task, logs the row count, and `unref()`s the timer; a bare `setInterval` with a synchronous `try`/`catch` around an async call silently reports success.
 
 ### Database
+**Demo data is generated, not hardcoded.** [backend/db/demoData.js](backend/db/demoData.js) builds the demo account relative to `new Date()` — five terms of a Waterloo co-op student, alternating study and work terms, with the current term truncated at today. It exists because the old `seed.sql` hardcoded dates in 2025, so by August 2026 the demo's default window (`?term=current`) was empty and all three savings goals showed as overdue. Amounts are jittered by a seeded generator keyed on term and category, so the same day always produces identical data. `db:seed` **replaces** the demo user's rows inside one transaction using a dedicated client (`db.getPool().connect()` — `db.query` would put `BEGIN` and `COMMIT` on different pooled connections); the old seeder relied on `ON CONFLICT DO NOTHING`, which caught nothing because those tables have no unique constraint, so a second run duplicated every row. Re-run it on a schedule to keep the demo current.
+
 Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wholesale by `db:setup`, which is idempotent and safe to re-run. Tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`. `updated_at` is auto-maintained by triggers. `schema.sql` is the desired end state; incremental changes against an existing database go in [backend/db/migrations/](backend/db/migrations/) as numbered files, applied by hand with `psql -v ON_ERROR_STOP=1 -f`. Keep the two in step — a migration without the matching `schema.sql` edit means fresh setups and existing databases diverge.
 
 **Connections**: `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host); the project lives in AWS `us-east-1`, alongside the Render backend. Every query in this codebase names tables unqualified, so [backend/db/connection.js](backend/db/connection.js) issues `SET search_path` on each new pool connection. This is defensive rather than load-bearing today — the AWS pooler hands out a normal `"$user", public` — but Neon's *Azure* pooler handed out an **empty** `search_path`, where every query failed with `relation "transactions" does not exist`. Keep it: it costs one statement per connection and makes the app behave identically on any endpoint. Don't move it into the pool's `options` — Neon's pooler rejects `search_path` as a startup parameter. Use the **direct** endpoint (drop `-pooler` from the host) for `pg_dump`/restore.
@@ -93,9 +95,10 @@ Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wh
   in [frontend/pages/index.tsx](frontend/pages/index.tsx) (or it gets a
   hash-derived colour), and **both** `common.json` files, because the picker
   renders each name through `t(category)`. The backend does not validate the
-  category against any list, and [backend/db/seed.sql](backend/db/seed.sql)
-  keeps its own copy — nothing checks the two agree (`IMPROVEMENTS.md` items 7
-  and 18).
+  category against any list, but the seed's copy in
+  [backend/db/demoData.js](backend/db/demoData.js) is now pinned to this one by
+  `test/demoData.test.js`, which parses this file and compares. The locale
+  files are still unguarded (`IMPROVEMENTS.md` item 18).
 - **i18n**: `next-i18next` with `en` and `zh` locales in [frontend/public/locales/](frontend/public/locales/). Add user-facing strings to both `common.json` files.
 - **Theme**: light/dark via [frontend/contexts/ThemeContext.tsx](frontend/contexts/ThemeContext.tsx).
 
