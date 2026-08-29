@@ -56,12 +56,12 @@ describe('POST /auth/register logging', () => {
     printed = [];
     insertedToken = null;
 
-    // validateEmailMailboxLayer() throws before it ever calls axios when this
-    // key is absent, so without it `register` 500s and never reaches the code
-    // under test. CI sets no key and caught this: the suite passed locally
-    // purely because a developer .env happened to have one. See item 13 /
-    // decision C -- that 500 is the open bug, and the characterisation test at
-    // the bottom of this file pins it.
+    // A key is set so these tests always take the mocked MailboxLayer path and
+    // do not depend on the environment. They used to *need* one: validation
+    // threw without it and `register` 500'd before reaching the code under
+    // test, so the suite passed locally on a developer .env and went red in CI.
+    // Round 10 fixed that -- registration now falls back to the domain list --
+    // and the test at the bottom of this file holds it fixed.
     savedKey = config.apiKeys.mailboxLayer;
     config.apiKeys.mailboxLayer = 'test-key-not-used-the-http-call-is-mocked';
 
@@ -143,20 +143,28 @@ describe('POST /auth/register logging', () => {
     assert.match(output, /user 7/);
   });
 
-  test('CHARACTERISATION: without a MailboxLayer key, register 500s', async () => {
-    // This asserts a **bug**, not desired behaviour. validateEmailMailboxLayer
-    // throws at authController.js:32, outside the try that opens at line 35, so
-    // it escapes to register's catch and becomes a 500 — while .env.example and
-    // config/validate.js both call the key optional.
-    //
-    // It is pinned here because it is what made this suite environment-dependent
-    // and red in CI. When decision C lands (item 13), this test should be
-    // changed to assert whatever the new behaviour is.
+  test('registers successfully with no MailboxLayer key at all', async () => {
+    // Decision C, from the register handler's side rather than the validator's:
+    // the missing key must degrade to the domain list, not 500. This is the
+    // regression that made the suite environment-dependent, so it is asserted
+    // here as well as in emailValidation.test.js.
     config.apiKeys.mailboxLayer = undefined;
 
     const { res } = await register();
 
-    assert.equal(res.statusCode, 500);
-    assert.deepEqual(res.body, { error: 'Server error' });
+    assert.equal(res.statusCode, 201);
+    assert.ok(insertedToken, 'no token reached the INSERT');
+  });
+
+  test('still logs no token or raw address when the key is missing', async () => {
+    // The fallback path prints different lines from the MailboxLayer path, so
+    // it needs its own check rather than inheriting the ones above.
+    config.apiKeys.mailboxLayer = undefined;
+
+    const { output } = await register();
+
+    assert.ok(!output.includes(insertedToken), 'the verification token was written to the log');
+    assert.ok(!output.includes(EMAIL), 'the raw address was written to the log');
+    assert.match(output, /user 7/);
   });
 });

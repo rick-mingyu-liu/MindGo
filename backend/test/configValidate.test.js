@@ -89,9 +89,12 @@ describe('startup configuration check', () => {
     assert.equal(code, 0);
     assert.match(output, /OPENAI_API_KEY is not set/);
     assert.match(output, /MAILBOXLAYER_API_KEY is not set/);
-    // The consequence matters more than the name: this key is documented as
-    // optional but registration 500s without it.
-    assert.match(output, /registration fails outright/);
+    // The consequence matters more than the name. This one was wrong until
+    // round 10: it said registration 500s, which was true and is no longer.
+    // A warning that describes a behaviour the code stopped having is worse
+    // than no warning, so the wording is pinned rather than left to drift.
+    assert.match(output, /disposable list/);
+    assert.doesNotMatch(output, /fails outright|500/);
   });
 
   test('is silent when everything is present', () => {
