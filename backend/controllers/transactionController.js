@@ -253,6 +253,13 @@ const transactionController = {
   // Auto-delete old transactions
   async autoDeleteOldTransactions(req, res) {
     try {
+      // This deletes rows and cannot be undone, so the validator runs before
+      // anything else -- see the note on autoDeleteValidation in the route file.
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const { months = 4 } = req.query;
       const cutoffDate = new Date();
       cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(months));
