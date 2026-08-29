@@ -30,19 +30,21 @@ can be answered without reading the whole backlog.
 | 14 | `/auth/verify-email` leaks another user's email | ✅ done — round 2 |
 | 15 | Two services crashed the whole app at boot without an optional key | ✅ done — round 3 |
 | 16 | Registration writes verification tokens to the log | ✅ done — round 8 |
-| 17 | Retention deletions are silent in production | open — **decision D** |
+| 17 | Retention deletions are silent in production | ✅ done — round 12 |
 | 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
+| 19 | `utils/logger.js` has no real level hierarchy | open |
 
 ---
 
 ## Decisions needed
 
-One open question remains — **D**. Each is blocked on a
-judgement call, not on work: the investigation behind each is done and recorded
-in the item it points to. A recommendation is given for each; none is so
-clear-cut that it should be taken without a look.
+**All four are answered** — A, B, C and D. Each write-up is kept below with the
+decision recorded against it, because the reasoning is the part worth having
+later; the work is in the item each one points to.
 
-**A, B and C are answered** — see below.
+Two items are open but need no decision from you: **18** (nothing keeps the
+seed file and the category list in step) and **19** (the logger has no real
+level hierarchy).
 
 ### A. The `Savings` category — item 7 — ✅ ANSWERED 2026-08-29
 
@@ -65,16 +67,14 @@ works without the key, with weaker filtering rather than none, and "optional" is
 now true in the code as well as in the docs. The work is in item 13; nothing
 here is still open.
 
-### D. Should retention deletions be visible in production? — item 17
+### D. Should retention deletions be visible in production? — item 17 — ✅ ANSWERED 2026-08-29
 
-`logger.info` is gated on `config.logging.enableConsoleLogs`, which is
-`NODE_ENV === 'development'`. Routing the cleanup row counts through it (round 5)
-matches the rest of `schedulerService`, but means **those counts are silent in
-production**, where the old `console.log` always printed. Errors still always
-print, in every environment.
+**Decision: add an always-printing level**, the recommended option —
+`logger.audit`. The third option, a real level hierarchy for `utils/logger.js`,
+was explicitly the bigger job and is now item 19; it did not need to block this.
+The work is in item 17.
 
-| Option | Consequence |
-|---|---|
+---|---|
 | **Leave it** | Consistent with the rest of the scheduler. No record of what the retention jobs deleted in production. |
 | **Add a level that always prints** | e.g. `logger.audit`, for events that delete user data. Small change, confined to `utils/logger.js` and its callers. |
 | **Give `utils/logger.js` a real level hierarchy** | Today `logging.level` gates only `debug()`; `info`/`warn` ignore it and key off `enabled`, and `error` always prints. A proper hierarchy is the general fix, and the bigger job. |
@@ -865,26 +865,60 @@ fallback path's own log lines.
 
 ## 17. Retention deletions are silent in production
 
-**Status:** open — **decision D**
-**Effort:** small
+**Status:** ✅ DONE 2026-08-29 — decision D answered: an always-printing level
 
 Round 5 routed the cleanup jobs' row counts through `logger.info`, matching the
 rest of `schedulerService`. `logger.info` is gated on
-`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'` — so
-in production those counts print nowhere. The `console.log` they replaced always
-printed.
+`config.logging.enableConsoleLogs`, which is `NODE_ENV === 'development'`, so in
+production those counts printed nowhere — while the `console.log` they replaced
+always had. Errors always print, so a *failing* cleanup stayed visible; what was
+lost was the record of a *successful* one.
 
-Errors still always print, in every environment, so a *failing* cleanup is still
-visible. What is lost is the record of a *successful* one: how many accounts and
-AI plans the retention jobs deleted.
+`logger.audit(message, data)` now exists in
+[utils/logger.js](backend/utils/logger.js) and prints in every environment. It
+is documented as being for events that **destroy or irreversibly change user
+data** — an audit level that fills up with routine chatter stops being one.
 
-Related, and the reason this is worth deciding rather than patching: there is no
-real level hierarchy in `utils/logger.js`. `config.logging.level` is consulted in
-exactly one place — `debug()` at line 37, which needs `enabled` **and**
-`level === 'debug'`. `info()` and `warn()` are gated on `enabled` alone and
-ignore the level entirely; `error()` ignores both and always prints. So
-`LOG_LEVEL` can only ever turn `debug` on, and only in development. See
-decision D.
+**Two judgement calls inside the implementation**, both worth disagreeing with
+if you see it differently:
+
+- **Only a non-zero deletion is audited.** The two intervals fire **432 times a
+  day** between them (`aiPlanCleanup` every 5 minutes, `unverifiedAccountCleanup`
+  every 10) and almost always delete nothing. Auditing the zeros would bury the
+  lines that matter under ~13k rows a month. A zero-row run still logs through
+  `logger.info`, so development output is unchanged.
+- **Scheduling the jobs is itself audited**, one line at boot naming both jobs
+  and their intervals. This is the cost of the first decision: with zero-row
+  runs silent, a production log containing no deletion lines is otherwise
+  ambiguous between "nothing needed deleting" and "the jobs were never
+  mounted". One line at startup separates those.
+
+**Fixed in passing:** `scheduleWeeklyReports` logged `Weekly report sent to
+${user.email}` and the matching failure line, two raw addresses that round 8's
+sweep of item 16 missed because it only covered `authController`. The `SELECT`
+above them already fetches `id`, so both now name the user id — the rule from
+item 16, applied where it had not been.
+
+### How it was verified
+
+- 8 new tests in [test/logger.test.js](backend/test/logger.test.js), the first
+  tests this file has had: `audit` and `error` print with `enabled` false,
+  `info`/`warn`/`debug` stay silent, and the audit line carries an ISO timestamp
+  and an optional payload.
+- 4 new tests in `schedulerService.test.js`: a real deletion is audited, a
+  zero-row run is not, the scheduling line is audited, and — the one that
+  matters — the count **reaches `console.log` with `logger.enabled` false**,
+  asserted through the real logger rather than a mock of it. Suite: 79 → **91**.
+- One existing test broke and was retargeted rather than deleted: it asserted
+  the count arrived via `logger.info`. It now captures both channels and still
+  pins what it was really for — that the number logged is the number the task
+  returned.
+- Four mutations, each caught: gating `audit` on `enabled` (5 failures),
+  auditing every run including zeros (1), putting the count back on `info` (2),
+  and putting the boot line back on `info` (1).
+- A real run under `NODE_ENV=production` with `enableConsoleLogs` confirmed
+  `false`: a 4-row deletion printed `[AUDIT]`, a 0-row run printed nothing, and
+  a throwing task still printed `[ERROR]` with its stack.
 
 ---
 
@@ -916,6 +950,36 @@ Options, cheapest first:
 
 No recommendation yet; the third is the most valuable and the most work, and it
 is worth deciding alongside whether categories should ever be user-defined.
+
+---
+
+## 19. `utils/logger.js` has no real level hierarchy
+
+**Status:** open
+**Effort:** small, but it touches every logging call site
+
+The third option under decision D, deferred rather than rejected — it was the
+general fix, and `logger.audit` did not need to wait for it.
+
+`config.logging.level` (`LOG_LEVEL`, default `'info'`) is consulted in **exactly
+one place**: `debug()`, which needs `enabled` *and* `level === 'debug'`. `info()`
+and `warn()` are gated on `enabled` alone and ignore the level entirely;
+`error()` and now `audit()` ignore both and always print. So `LOG_LEVEL` can
+only ever turn `debug` on, and only in development — setting it to `'warn'` or
+`'error'` in production does nothing at all, which is not what anyone reading
+`.env.example` would expect.
+
+`enabled` is also a constructor snapshot of `NODE_ENV === 'development'`, so the
+real switch is the environment, not the level. Two knobs, one of which is
+inert.
+
+A hierarchy would mean ranking the levels, comparing against `level` in one
+place, and deciding where `audit` sits — probably outside the ranking entirely,
+since "always print" is its whole purpose.
+
+Not urgent: nothing is broken, and the two things that must be visible in
+production (errors and deletions) are. It is a trap for whoever next assumes
+`LOG_LEVEL` works.
 
 ---
 
@@ -962,20 +1026,22 @@ Not code — carried over from the 2026-08-27 database work.
     questions had answers in the git history rather than needing a product
     call: one was deliberately unwired in `6746ca1`, the other was never called
     in any revision
-14. **Next:** decision **D**, the last one. Nothing behind it is broken — the
-    retention jobs run, and a *failing* one is still visible; what is missing
-    is the record of a successful one.
+14. ~~Make retention deletions visible in production~~ — done (round 12,
+    item 17, decision D), which also caught two raw email addresses in the
+    weekly-report logs that item 16's sweep had missed, and produced item 19
 
-**Waiting on you, not on work:** decision **D** alone (production visibility for
-the retention jobs, item 17), written up under
-[Decisions needed](#decisions-needed) with options and a recommendation.
-**A**, **B** and **C** are answered and done.
+**Nothing is waiting on you.** All four decisions — **A**, **B**, **C** and
+**D** — are answered and shipped. The backlog's two open items need no decision:
+
+- **18** — nothing keeps `db/seed.sql` and the frontend category list in step.
+  Prevention, not a defect; worth doing before the next person adds a category.
+- **19** — `utils/logger.js` has no real level hierarchy, so `LOG_LEVEL` is
+  inert except for `debug`. A trap rather than a bug.
+
+Neither is urgent. Item 18 is the one with a repeat offence behind it.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
 Chinese, half-width ` ($)` for currency, `例如，` for "e.g.,", half-width `...`.
 A native reader should still skim them; the check can prove a key *resolves*,
 never that the wording is good.
-
-Item 18 is prevention rather than a defect — there is nothing broken today. It
-is worth doing before the next person adds a category, not urgently.
