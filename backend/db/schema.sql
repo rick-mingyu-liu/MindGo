@@ -14,8 +14,17 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     language VARCHAR(10) NOT NULL DEFAULT 'en',
     email_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    weekly_reports_enabled BOOLEAN NOT NULL DEFAULT TRUE
+    weekly_reports_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Marks the demo account. The scheduled refresh deletes and rewrites every
+    -- row belonging to its target, so it matches on this rather than on an
+    -- email address anyone could register. Only a deliberate seed sets it.
+    is_demo BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- At most one demo account: the refresh resolves its target with a bare
+-- `WHERE is_demo = TRUE`, and two matching rows would make which one it
+-- rewrites depend on the query plan.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_demo ON users (is_demo) WHERE is_demo;
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
