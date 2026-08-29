@@ -36,11 +36,19 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
 import { categories as categoryTypeMap } from './transactions/new';
 import { useTranslation } from 'next-i18next'
-import { formatDay } from '@/lib/date';
+import { formatDay, formatDayRange } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface FinancialSummary {
   period: string
+  // The name of the window the server actually served — 'Spring 2026', '2026'.
+  // Read rather than recomputed, so the cards can never label a total with a
+  // window it did not come from.
+  periodLabel?: string | null
+  term?: string | null
+  year?: string | null
+  startDate?: string
+  endDate?: string
   totalIncome: number
   totalExpenses: number
   netIncome: number
@@ -128,6 +136,30 @@ const getCategoryColor = (name: string) => {
 
 type CategoryView = 'all' | 'expense' | 'income'
 
+/**
+ * The windows the dashboard offers, and the query each one sends.
+ *
+ * A term is the unit this app is about — a study term and a co-op term are
+ * both four months — so the default is the term you are in, not a rolling
+ * count back from today. Those are not the same window: counting four months
+ * back equals the term only in April, August and December, the last month of
+ * each. In the *first* month of a term, which is when a budget actually gets
+ * set, three quarters of a rolling window is the previous term's money.
+ *
+ * A year is the three terms of that calendar year, so a yearly total is always
+ * exactly the terms inside it. `backend/utils/terms.js` owns both boundaries.
+ */
+type PeriodKey = 'thisTerm' | 'lastTerm' | 'thisYear' | 'lastYear'
+
+const PERIODS: Record<PeriodKey, { query: string; label: string }> = {
+  thisTerm: { query: 'term=current',  label: 'This term' },
+  lastTerm: { query: 'term=previous', label: 'Last term' },
+  thisYear: { query: 'year=current',  label: 'This year' },
+  lastYear: { query: 'year=previous', label: 'Last year' },
+}
+
+const PERIOD_ORDER: PeriodKey[] = ['thisTerm', 'lastTerm', 'thisYear', 'lastYear']
+
 // The trend lines, their colours and their marker shapes in one place, so the
 // chart and its legend can never drift apart.
 const TREND_SERIES = [
@@ -213,6 +245,7 @@ export default function Dashboard() {
   const [indexLoading, setIndexLoading] = useState(true);
   const [indexError, setIndexError] = useState('');
   const [categoryView, setCategoryView] = useState<CategoryView>('all');
+  const [period, setPeriod] = useState<PeriodKey>('thisTerm');
   const { t, i18n } = useTranslation('common');
 
   // Get user's default currency from localStorage (preferences)
@@ -232,7 +265,7 @@ export default function Dashboard() {
       const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
       const currency = prefs.currency || 'CAD';
       const [summaryRes, goalsRes, watchlistRes, transactionsRes] = await Promise.all([
-        api.get(`/summary/rolling?months=4&targetCurrency=${currency}`),
+        api.get(`/summary/rolling?${PERIODS[period].query}&targetCurrency=${currency}`),
         api.get('/goals'),
         api.get('/investments/watchlist'),
         api.get(`/transactions?limit=10&targetCurrency=${currency}`)
@@ -256,7 +289,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [period])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -372,6 +405,20 @@ export default function Dashboard() {
   }
 
   const categoryChartData = getCategoryChartData(categoryView)
+
+  // The name of the window on screen. Derived from what the server said it
+  // served -- never from `period`, so a label can never get ahead of the data
+  // it sits above while a refetch is in flight.
+  const SEASONS: Record<string, string> = { winter: 'Winter', spring: 'Spring', fall: 'Fall' }
+  const periodLabel = (() => {
+    if (!summary) return t(PERIODS[period].label)
+    if (summary.year) return summary.year
+    if (summary.term) {
+      const [year, season] = summary.term.split('-')
+      return t('termWindowLabel', { season: t(SEASONS[season] ?? season), year })
+    }
+    return summary.periodLabel ?? summary.period
+  })()
 
   const getMonthlyChartData = () => {
     if (!summary?.monthlyBreakdown) return []
@@ -640,6 +687,23 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* Period selector — governs the summary cards and the trend chart */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold leading-none">{periodLabel}</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatDayRange(summary?.startDate, summary?.endDate) || '\u00a0'}
+              </p>
+            </div>
+            <Tabs value={period} onValueChange={(value) => setPeriod(value as PeriodKey)}>
+              <TabsList>
+                {PERIOD_ORDER.map((key) => (
+                  <TabsTrigger key={key} value={key}>{t(PERIODS[key].label)}</TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+
           {/* Summary Cards */}
           <div className="overflow-x-auto scrollbar-hide -mx-2 pb-2 sm:mx-0 sm:pb-0">
             <div className="flex gap-4 min-w-[600px] sm:grid sm:grid-cols-4 lg:grid-cols-4 sm:gap-6 mb-8">
@@ -654,7 +718,7 @@ export default function Dashboard() {
                     {formatCurrency(summary?.totalIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {t('Last 4 months')}
+                    {periodLabel}
                   </p>
                 </CardContent>
               </Card>
@@ -669,7 +733,7 @@ export default function Dashboard() {
                     {formatCurrency(summary?.totalExpenses || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {t('Last 4 months')}
+                    {periodLabel}
                   </p>
                 </CardContent>
               </Card>
@@ -684,7 +748,7 @@ export default function Dashboard() {
                     {formatCurrency(summary?.netIncome || 0, summary?.targetCurrency || defaultCurrency)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {t('Last 4 months')}
+                    {periodLabel}
                   </p>
                 </CardContent>
               </Card>
@@ -712,7 +776,7 @@ export default function Dashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    {t('4-Month Income vs Expenses')}
+                    {t('Income vs Expenses')} · {periodLabel}
                   </CardTitle>
                   <CardDescription>
                     {t('Track your financial trends over time')}

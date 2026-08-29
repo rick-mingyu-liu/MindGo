@@ -134,7 +134,6 @@
   "Add Goal": "Add Goal",
   "Edit Goal": "Edit Goal",
   "Create New Goal": "Create New Goal",
-
   "Delete Goal": "Delete Goal",
   "Update Goal": "Update Goal",
   "Create Goal": "Create Goal",
@@ -185,7 +184,6 @@
   "Active Goals": "Active Goals",
   "Savings goals": "Savings goals",
   "complete": "complete",
-  "4-Month Income vs Expenses": "4-Month Income vs Expenses",
   "Track your financial trends over time": "Track your financial trends over time",
   "Jan": "Jan",
   "Feb": "Feb",
@@ -199,7 +197,6 @@
   "Oct": "Oct",
   "Nov": "Nov",
   "Dec": "Dec",
-  "Last 4 months": "Last 4 months",
   "income": "Income",
   "expense": "Expense",
   "S&P 500": "S&P 500",
@@ -547,5 +544,14 @@
     "Low": "Low",
     "Close": "Close",
     "Net Income": "Net Income"
-  }
+  },
+  "This term": "This term",
+  "Last term": "Last term",
+  "This year": "This year",
+  "Last year": "Last year",
+  "Winter": "Winter",
+  "Spring": "Spring",
+  "Fall": "Fall",
+  "termWindowLabel": "{{season}} {{year}}",
+  "Income vs Expenses": "Income vs Expenses"
 }

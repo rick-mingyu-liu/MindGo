@@ -2,7 +2,10 @@ const { test, describe, before, after, beforeEach, afterEach, mock } = require('
 const assert = require('node:assert/strict');
 const express = require('express');
 const db = require('../db/connection');
-const { boundsOf, currentTerm, previousTerm } = require('../utils/terms');
+const {
+  boundsOf, currentTerm, previousTerm,
+  yearBoundsOf, currentYear, previousYear, termsOfYear,
+} = require('../utils/terms');
 
 /**
  * `/summary/rolling?term=` — the term-aligned window.
@@ -124,7 +127,12 @@ describe('GET /summary/rolling?term=', () => {
     const res = await get('?term=current&months=4');
     assert.equal(res.status, 400);
     assert.equal(queries.length, 0);
-    assert.match(JSON.stringify(await res.json()), /either term or months, not both/);
+    // The message names both offending parameters. Asserted as a pair rather
+    // than as one sentence, because `year` joined this rule later and the
+    // wording had to widen to fit it.
+    const body = JSON.stringify(await res.json());
+    assert.match(body, /term/);
+    assert.match(body, /months/);
   });
 });
 
@@ -181,4 +189,97 @@ describe('window boundaries do not drift with the process timezone', () => {
       assert.deepEqual(boundsUsed(), { start: '2026-05-01', end: '2026-09-01' });
     });
   }
+});
+
+describe('GET /summary/rolling?year=', () => {
+  test('an explicit year is that whole calendar year', async () => {
+    const res = await get('?year=2026');
+    assert.equal(res.status, 200);
+    assert.deepEqual(boundsUsed(), { start: '2026-01-01', end: '2027-01-01' });
+  });
+
+  test('current and previous resolve without the client knowing the date', async () => {
+    await get('?year=current');
+    assert.deepEqual(boundsUsed(), yearBoundsOf(currentYear(new Date())));
+
+    queries = [];
+    await get('?year=previous');
+    assert.deepEqual(boundsUsed(), yearBoundsOf(previousYear(currentYear(new Date()))));
+  });
+
+  test('the year is exactly the three terms inside it', async () => {
+    // The property that makes a yearly view safe to add here rather than as
+    // its own month arithmetic: a year total can never disagree with the term
+    // totals it contains, because they share the same boundaries.
+    await get('?year=2026');
+    const year = boundsUsed();
+    const terms = termsOfYear('2026').map((id) => boundsOf(id));
+
+    assert.equal(terms[0].start, year.start, 'the year starts where Winter does');
+    assert.equal(terms[2].end, year.end, 'the year ends where Fall does');
+    for (let i = 1; i < terms.length; i++) {
+      assert.equal(terms[i - 1].end, terms[i].start, 'the terms tile without a gap');
+    }
+  });
+
+  test('the response says it served a year, and names it', async () => {
+    const body = await (await get('?year=2026')).json();
+    assert.equal(body.year, '2026');
+    assert.equal(body.term, null);
+    assert.equal(body.periodLabel, '2026');
+    assert.equal(body.period, '2026');
+    assert.equal(body.startDate, '2026-01-01');
+    assert.equal(body.endDate, '2027-01-01');
+  });
+
+  test('a term response reports no year, so the two are never confused', async () => {
+    const body = await (await get('?term=2026-spring')).json();
+    assert.equal(body.year, null);
+    assert.equal(body.term, '2026-spring');
+  });
+
+  describe('rejects a year it cannot resolve, without querying', () => {
+    for (const qs of ['?year=', '?year=26', '?year=20260', '?year=2026-spring', '?year=CURRENT', '?year=abcd']) {
+      test(qs, async () => {
+        queries = [];
+        const res = await get(qs);
+        assert.equal(res.status, 400, `${qs} was not rejected`);
+        assert.equal(queries.length, 0, `${qs} reached the database`);
+        assert.match(JSON.stringify(await res.json()), /year must be current, previous, or a four-digit year/);
+      });
+    }
+  });
+
+  test('year boundaries do not drift with the process timezone', async () => {
+    const saved = process.env.TZ;
+    for (const tz of ['UTC', 'America/Toronto', 'Asia/Shanghai', 'Pacific/Kiritimati']) {
+      process.env.TZ = tz;
+      queries = [];
+      await get('?year=2026');
+      assert.deepEqual(boundsUsed(), { start: '2026-01-01', end: '2027-01-01' }, `drifted under ${tz}`);
+    }
+    process.env.TZ = saved;
+  });
+});
+
+describe('the three windows are mutually exclusive', () => {
+  // A request naming more than one is a client bug. Answering it with any
+  // single interpretation would hide that, and the caller would quietly get a
+  // window it did not ask for.
+  for (const qs of ['?term=current&months=4', '?year=2026&months=4', '?term=current&year=2026',
+                    '?term=current&year=2026&months=4']) {
+    test(qs, async () => {
+      queries = [];
+      const res = await get(qs);
+      assert.equal(res.status, 400, `${qs} was accepted`);
+      assert.equal(queries.length, 0, `${qs} reached the database`);
+      assert.match(JSON.stringify(await res.json()), /pass one of term, year or months/);
+    });
+  }
+
+  test('any one of them alone is fine', async () => {
+    for (const qs of ['?term=current', '?year=current', '?months=4', '']) {
+      assert.equal((await get(qs)).status, 200, `${qs} was rejected`);
+    }
+  });
 });

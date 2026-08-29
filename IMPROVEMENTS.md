@@ -1330,7 +1330,7 @@ parameters, and dropping the echo.
    still sends `months=4`**, so the bug is fixed but not yet reaching users —
    that switch belongs with item 22, because the "Last 4 months" labels have to
    change with it.
-3. **Add the yearly view** — item 22.
+3. ~~**Add the yearly view** — item 22.~~ — done (round 16)
 4. **Fix `/summary/rolling`** — item 21. It has to land before a longer window
    is affordable.
 5. **Make retention settings actually persist.** `updateDataRetentionSettings`
@@ -1398,29 +1398,144 @@ a year, or all of history — cheap.
 
 ## 22. No yearly view, and no way to pick a period
 
-**Status:** open
-**Effort:** small once item 21 lands
+**Status:** done (round 16) — the *All time* option is deferred, see below
 **Comes from:** the item 20 design
 
-The dashboard offers exactly one period: whatever
-`/summary/rolling?months=4` returns, with `4` hardcoded at
-[frontend/pages/index.tsx](frontend/pages/index.tsx). The API already accepts
-`?months=`, so the backend is most of the way there — what is missing is
-term-aligned endpoints and a control.
+The dashboard offered exactly one period: `/summary/rolling?months=4`, with the
+`4` hardcoded, under three cards reading **Last 4 months** and a chart titled
+**4-Month Income vs Expenses**. Everything item 20 built — the term calendar,
+`?term=` — was reachable only by curl.
 
-The selector this needs, for an audience whose year is three four-month terms:
+### Which year — decided
 
-- **This term** — term-aligned, the default (item 20, Finding 1)
-- **Last term** — the comparison that makes a co-op budget mean something
-- **This year** — and *which* year is a real choice: calendar (Jan–Dec),
-  academic (Sep–Aug), or rolling 12 months. Rolling 12 is the least surprising
-  mid-term; academic matches how the audience already thinks. Worth deciding
-  deliberately rather than defaulting to calendar because it is easiest.
-- **All time** — cheap once the monthly summary table exists (item 20), since
-  it reads aggregates rather than rows.
+The design listed three candidates and called it a real choice: calendar
+(Jan–Dec), academic (Sep–Aug), or rolling 12 months. **Calendar**, and the
+reason is not that it is easiest.
 
-Blocked in practice on item 21: a yearly window at today's response shape is
-~335 kB for a heavy user, and all-time is worse.
+The three terms tile Jan–Dec exactly: Winter Jan–Apr, Spring May–Aug, Fall
+Sep–Dec. So in *this* calendar a calendar year already **is** three terms, and
+a year total can never disagree with the term totals inside it. An academic
+year (Sep–Aug) would also be three terms but would straddle a year number, and
+rolling 12 would share no boundary with any term at all — a yearly figure that
+did not equal the terms under it is exactly the silent drift item 20 exists to
+prevent. `test/rollingSummary.test.js` asserts the tiling rather than trusting
+it.
+
+### What it added
+
+- **`?year=`** on `GET /summary/rolling` — `2026`, or `current` / `previous`.
+  Bounds come from `utils/terms.js` (`yearBoundsOf`, `termsOfYear`), not from
+  new month arithmetic, so there is still one definition of a boundary.
+- **The three windows are mutually exclusive.** `term`, `year` and `months`;
+  passing more than one is a 400 naming which were passed, because answering it
+  with any single interpretation would hand back a window the caller did not
+  ask for.
+- **The response says which window it served** — `year`, `periodLabel`,
+  `startDate`, `endDate`. `termLabel` still carries the same value under its
+  old name.
+- **A period selector on the dashboard** — This term / Last term / This year /
+  Last year — with **This term** the default, which is the fix item 20,
+  Finding 1 was actually for.
+- **Every label now reads the served window.** The three `Last 4 months`
+  strings and the chart title are gone; the cards, the chart and a new subtitle
+  all render what the server said it served, so a label cannot get ahead of the
+  data it sits above during a refetch. `formatDayRange` shows the exclusive end
+  as the last *included* day, so Spring 2026 reads `2026-05-01 – 2026-08-31`
+  and not `– 2026-09-01`.
+- Both locale files gained the strings, and `Winter`/`Spring`/`Fall` are
+  translated, so the zh dashboard reads `2026年春季` rather than `Spring 2026`.
+
+### Verified
+
+Against real data (user 6, read-only): 2026 returns 19,841.79 in / 23,732.63
+out, which is **exactly** the sum of Winter + Spring + Fall 2026. `year=2025`
+gives the year-on-year comparison the whole item was for: 15,631.52 /
+11,479.50. Suite 168 → **185**, lint clean, frontend builds, `check:locales`
+passes.
+
+### Deferred: *All time*
+
+Still wants the monthly summary table from item 20, and still gated on item 21.
+The year window is the evidence: one user's 2026 is a **154 kB** response, and
+that is eight months of one account. All-time at today's response shape does not
+scale, and the fix is item 21, not a smaller window.
+
+---
+
+## 23. A stored date was served as an instant, and read a day early
+
+**Status:** fixed (round 16)
+**Found by:** the user, on the transactions list
+
+Every date on the transactions page showed one day earlier than the date the
+transaction was entered with. Two conversions, each individually reasonable:
+
+1. `node-pg` parses a `DATE` column into a JS `Date` at the **server's** local
+   midnight.
+2. `res.json()` serialises that `Date` through `toISOString()`, i.e. in **UTC**.
+
+So one stored day left the server as a different string per host:
+
+| server timezone | `2026-08-28` goes over the wire as |
+|---|---|
+| UTC (Render) | `2026-08-28T00:00:00.000Z` |
+| America/Toronto (a laptop) | `2026-08-28T04:00:00.000Z` |
+| Asia/Shanghai | `2026-08-27T16:00:00.000Z` |
+
+A browser rendering that with `new Date(...).toLocaleDateString()` then
+subtracts the viewer's offset again. Render plus a Toronto viewer is exactly
+one day — the reported symptom. It looked fine in local dev because a Toronto
+server and a Toronto viewer cancel out, which is why it survived this long.
+
+**The display was the harmless half.** The edit form prefills from the day part
+of that string, so on any server east of UTC it offered the day *before* and
+wrote it back on save. That moves the row, not its label.
+
+### The fix
+
+A `pg` type parser for `DATE` (OID 1082) that hands back the raw `YYYY-MM-DD`.
+A `DATE` has no time and no zone; turning it into an instant was the whole
+error. One line, and the wire format is now identical on every host.
+
+That breaks everything that relied on it being a `Date`, and those were the
+more dangerous bugs:
+
+- **`summaryController` grouped `monthlyBreakdown`** with
+  `new Date(tx.date).getMonth()`. Against a plain `'2026-08-01'` that parses as
+  UTC midnight and answers **July** for every reader west of UTC — filing a
+  month of first-of-month rent under the month before.
+- **`aiController.getMonthCount`** had the same shape, and it is the divisor of
+  every average the planner builds a plan on.
+- **The report emails** formatted days through `new Date(...)`, and built their
+  query bounds with `new Date(y, m, 1).toISOString()` — the expression
+  `CLAUDE.md` bans, off by a day east of UTC. Nine of those.
+- **`getSpendingTrends`** used the same banned expression for its window start.
+- **`transactions/new.tsx`** defaulted the date field to
+  `new Date().toISOString()`, which after 8pm in Toronto offers **tomorrow**.
+
+On the frontend the same mistake was copied across four pages, so it is now one
+helper, `frontend/lib/date.ts`: `toDay`, `formatDay`, `formatDayRange`,
+`todayDay`, `daysUntil`. It accepts both wire formats, so a stale deploy of
+either side still renders the right day.
+
+### Verified
+
+`test/dates.test.js` — the parser, the helpers, and `monthlyBreakdown` keys
+asserted through the real router under three timezones. Three mutations
+(removing the parser; putting each month-key computation back through
+`new Date()`) each fail 2 tests, against a clean control. The frontend helper
+is compiled with `tsc` and exercised over four timezones, including a check
+that reproduces the original symptom and shows it gone. Live read-only query
+confirms the wire format is now `"2026-08-28"` under UTC, Toronto and Shanghai
+alike.
+
+### One gap, stated plainly
+
+`frontend/lib/date.ts` has **no committed test** — the frontend still has no
+test runner, and adding one was out of scope here. It is verified by a
+compile-and-run script that was not kept. The backend twin
+(`backend/utils/dates.js`) is fully covered, so the logic is pinned somewhere;
+the frontend copy is not.
 
 ---
 
@@ -1494,7 +1609,8 @@ Three items remain:
 
 Item 18 is the one with a repeat offence behind it; item 20 has the live
 footgun and now carries a decided design; item 21 has to land before any longer
-window is affordable, which makes it the gate on 22.
+window is affordable, which makes it the gate on *All time*, the one part of
+22 still open.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around

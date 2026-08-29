@@ -44,6 +44,27 @@ export function formatDay(value: DayInput, locale?: string): string {
 }
 
 /**
+ * A window as a reader expects to see one: its first and last *included* days.
+ *
+ * The API's windows are half-open — Spring 2026 is `2026-05-01` to
+ * `2026-09-01`, and September 1st is not in it — which is right for a query
+ * bound and wrong on a screen, where it reads as a term that runs into
+ * September. So the end shown is the day before the bound.
+ */
+export function formatDayRange(
+  start: DayInput,
+  endExclusive: DayInput,
+  locale?: string,
+): string {
+  const from = toDay(start)
+  const to = toDay(endExclusive)
+  if (!from || !to) return ''
+  const lastIncluded = atLocalNoon(to)
+  lastIncluded.setDate(lastIncluded.getDate() - 1)
+  return `${formatDay(from, locale)} – ${lastIncluded.toLocaleDateString(locale)}`
+}
+
+/**
  * Whole days from today until `value`; negative once it has passed, null when
  * there is no date. Both ends sit at local noon, so the result is a count of
  * calendar days and not a rounded count of elapsed hours.
