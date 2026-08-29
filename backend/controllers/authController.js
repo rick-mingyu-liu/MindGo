@@ -6,73 +6,7 @@ const db = require('../db/connection');
 const config = require('../config');
 const { maskEmail } = require('../utils/privacy');
 const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
-const axios = require('axios');
-
-// List of known disposable email domains (partial list - you can expand this).
-// Unused: the MailboxLayer call replaced it, but that call hard-fails without
-// an API key, so this list is the fallback that would make registration
-// degrade instead of 500. See IMPROVEMENTS.md item 13.
-// eslint-disable-next-line no-unused-vars
-const DISPOSABLE_EMAIL_DOMAINS = [
-  '10minutemail.com', 'guerrillamail.com', 'mailinator.com', 'tempmail.org',
-  'throwaway.email', 'temp-mail.org', '10minutemail.net', 'mailnesia.com',
-  'sharklasers.com', 'getairmail.com', 'getnada.com', 'yopmail.com',
-  'trashmail.com', 'maildrop.cc', 'mailinator.net', 'tempmailaddress.com',
-  'fakeinbox.com', 'mailmetrash.com', 'spam4.me', 'bccto.me',
-  'chacuo.net', 'dispostable.com', 'mailnesia.com', 'mailnull.com',
-  'spamspot.com', 'spam.la', 'tempr.email', 'tmpeml.com',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net',
-  'tmpmail.net', 'tmpmail.org', 'tmpeml.com', 'tmpbox.net'
-];
-
-// MailboxLayer API validation
-async function validateEmailMailboxLayer(email) {
-  const apiKey = config.apiKeys.mailboxLayer;
-  if (!apiKey) {
-    throw new Error('MailboxLayer API key not set');
-  }
-  const url = `https://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}`;
-  try {
-    const response = await axios.get(url);
-    const data = response.data;
-    // The full response carries the address back plus everything MailboxLayer
-    // inferred about it. Log the verdict, which is what a failed registration
-    // actually needs explaining.
-    console.log('[MailboxLayer] Checked', maskEmail(email), {
-      format_valid: data.format_valid,
-      disposable: data.disposable,
-      mx_found: data.mx_found,
-      smtp_check: data.smtp_check,
-    });
-
-    if (!data.format_valid) {
-      return { valid: false, reason: 'Invalid email format' };
-    }
-    if (data.disposable) {
-      return { valid: false, reason: 'Disposable email addresses are not allowed' };
-    }
-    const emailDomain = email.split('@')[1]?.toLowerCase();
-    const majorDomains = [
-      'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com',
-      '163.com', 'qq.com', 'sina.com', '126.com', '139.com', 'sohu.com'
-    ];
-    // Loosen MX/SMTP checks for major and Chinese providers
-    if ((!data.mx_found || !data.smtp_check) && majorDomains.includes(emailDomain)) {
-      return { valid: true };
-    }
-    if (!data.mx_found) {
-      return { valid: false, reason: 'Email domain cannot receive mail' };
-    }
-    if (!data.smtp_check) {
-      return { valid: false, reason: 'Email address is not deliverable' };
-    }
-    return { valid: true };
-  } catch (error) {
-    console.error('MailboxLayer API error:', error?.response?.data || error.message || error);
-    return { valid: false, reason: 'Email validation service error' };
-  }
-}
+const { validateEmail } = require('../services/emailValidationService');
 
 const authController = {
   // Register new user
@@ -85,9 +19,12 @@ const authController = {
 
       const { email, password, first_name, last_name } = req.body;
 
-      // MailboxLayer email validation
-      const emailValidation = await validateEmailMailboxLayer(email);
+      // MailboxLayer where a key is configured, the disposable-domain list
+      // where it is not. Never throws, so it cannot short-circuit the rest of
+      // this handler the way it used to.
+      const emailValidation = await validateEmail(email);
       if (!emailValidation.valid) {
+        console.log(`[Register] Rejected ${maskEmail(email)}: ${emailValidation.reason} (${emailValidation.source})`);
         return res.status(400).json({ error: emailValidation.reason });
       }
 
