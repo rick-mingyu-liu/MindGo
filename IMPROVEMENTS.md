@@ -1086,8 +1086,45 @@ The empty case looks safe and is not: `const { months = 4 }` defaults only on
 
 Scoped to the caller's own `user_id` and requires their JWT, so it is not a
 cross-user risk — but it is a live, irreversible, unvalidated delete that no
-part of the product exposes. **Validating `months` is a defect fix regardless of
-what happens to the feature.**
+part of the product exposes.
+
+**And `months` means two opposite things in this API.** Three endpoints take it:
+
+| Endpoint | `months` means |
+|---|---|
+| `GET /summary/rolling` | show me the last N months |
+| `GET /summary/trends` | show me the last N months |
+| `DELETE /transactions/auto-delete` | **destroy everything older than N months** |
+
+Same name, same type, same default of 4 — and one of them is irreversible. That
+is worth fixing beyond validation; see below.
+
+#### What "validate `months`" actually means
+
+Nothing to do with the term design. It is one line in the route file, in the
+style the project already uses for bodies — `routes/transactions.js` has
+`transactionValidation` as a `body([...])` array, and **no route in the backend
+validates a query parameter at all** today:
+
+```js
+const autoDeleteValidation = [
+  query('months').optional().isInt({ min: 1, max: 60 })
+    .withMessage('months must be a whole number between 1 and 60'),
+];
+router.delete('/auto-delete', autoDeleteValidation, transactionController.autoDeleteOldTransactions);
+```
+
+plus the `validationResult(req)` check at the top of the controller method, the
+same as every other validated handler. The 1–60 bound is not invented — it is
+the range `updateDataRetentionSettings` already enforces on the same concept
+(Finding 4), so this makes the write path agree with the settings path.
+
+**Better than validating it: stop taking a relative count.** For a destructive
+call, `?before=2025-05-01` is safer than `?months=4` — there is no arithmetic to
+get wrong, no `months=0` edge, no timezone question about when "four months ago"
+starts, and the caller has to state exactly what will be destroyed. Once
+retention is term-based (see below) the endpoint should take
+`?keepTerms=6` or nothing at all, and the relative-month form can go.
 
 ### Finding 4 — the retention settings API reports persistence it does not do
 
@@ -1137,6 +1174,64 @@ time × categories — roughly 180 per user-year, a hard ceiling — regardless 
 how much a user logs.** Someone recording 500 transactions a month costs the
 same in the summary table as someone recording 20. That decouples storage from
 activity, which rolling deletion never does.
+
+### How a term becomes a parameter
+
+The question the design leaves open: if the view is "Spring 2026" rather than
+"the last four months", what does the request look like?
+
+**The server owns the term calendar.** This is the load-bearing decision, and
+it is item 18's lesson in a new place: the *view* needs term boundaries and the
+*retention job* needs the same boundaries to delete whole terms. If the frontend
+computes them and the cleanup job computes them separately, they drift, and the
+drift is silent until a chart and a deletion disagree about where Spring starts.
+One module, two consumers:
+
+```js
+// backend/utils/terms.js — a Waterloo term is four months.
+//   Winter Jan–Apr | Spring May–Aug | Fall Sep–Dec
+termOf(date)            // Date        -> '2026-spring'
+boundsOf('2026-spring') // term id     -> { start: '2026-05-01', end: '2026-09-01' }
+currentTerm(now)        //             -> '2026-spring'
+previousTerm(id)        // '2026-spring' -> '2026-winter'
+lastNTerms(n, now)      // 6           -> ['2025-winter' … '2026-spring']
+```
+
+Bounds are **half-open** `[start, end)`, matching the query the summary
+controller already runs (`date >= $2 AND date < $3`), which sidesteps
+end-of-month and leap-day questions entirely.
+
+**The API then takes a term id, not a month count:**
+
+```
+GET /summary/rolling?term=2026-spring
+GET /summary/rolling?term=current      # alias, so the client needs no calendar
+GET /summary/rolling?term=previous
+```
+
+and the response echoes what it resolved to:
+
+```json
+{ "term": "2026-spring", "label": "Spring 2026",
+  "start": "2026-05-01", "end": "2026-09-01", … }
+```
+
+That echo is the part that keeps the frontend out of the calendar business: it
+renders `label` on the chart and passes `term` back, never computing a date. It
+also makes the response self-describing in a log or a bug report — `months=4`
+tells you nothing about *which* four months a user was looking at, `2026-spring`
+tells you exactly.
+
+`?months=` stays for `/summary/trends` and for anything that genuinely wants a
+rolling count; the two are different questions and can coexist. What changes is
+that the **dashboard** stops asking for a rolling count it never wanted.
+
+**And the retention job calls `lastNTerms(6)`** for its cutoff, which is what
+makes "delete only whole terms" true by construction rather than by a comment.
+
+Term ids sort by year then need a term order, so store a term index (0/1/2)
+alongside the key if a sort ever matters — `'2026-fall' < '2026-spring' <
+'2026-winter'` lexically, which is wrong three ways.
 
 ### Order of work
 
