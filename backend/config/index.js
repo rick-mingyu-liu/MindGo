@@ -89,6 +89,16 @@ const config = {
     weeklyReports: '0 19 * * 0', // Every Sunday at 7pm
     aiPlanCleanup: 5 * 60 * 1000, // 5 minutes
     unverifiedAccountCleanup: 10 * 60 * 1000, // 10 minutes
+    demoRefresh: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
+
+  demo: {
+    // Off unless explicitly turned on. The refresh deletes and rewrites every
+    // row belonging to the demo account, and a destructive job that mounts
+    // itself by default in whatever environment happens to load this config is
+    // not something to opt out of — it is something to opt in to. Set
+    // DEMO_REFRESH_ENABLED=true only where a demo account is actually wanted.
+    refreshEnabled: process.env.DEMO_REFRESH_ENABLED === 'true',
   },
 
   // Email verification

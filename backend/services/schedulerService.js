@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const db = require('../db/connection');
 const { sendWeeklyReport, generateWeeklyReport } = require('./emailService');
 const cleanupService = require('./cleanupService');
+const demoAccountService = require('./demoAccountService');
 
 /**
  * Owns the two kinds of recurring work: a node-cron job for weekly reports, and
@@ -120,6 +121,20 @@ class SchedulerService {
       config.cron.unverifiedAccountCleanup,
       () => cleanupService.deleteUnverifiedAccounts()
     );
+
+    // The demo refresh is opt-in. It deletes every row of the demo account
+    // before rewriting them, and it identifies that account by `is_demo`
+    // rather than by an email address anyone could register — see
+    // demoAccountService. It never creates the account, so on a database with
+    // nothing flagged it is a no-op that says so.
+    if (config.demo.refreshEnabled) {
+      this.scheduleInterval(
+        'demoRefresh',
+        config.cron.demoRefresh,
+        () => demoAccountService.refreshDemoAccountOnSchedule()
+      );
+      logger.audit(`Demo refresh scheduled: every ${config.cron.demoRefresh}ms`);
+    }
 
     // Audit rather than info: with the zero-row runs silent in production, a
     // log with no [AUDIT] deletion lines in it is ambiguous between "nothing

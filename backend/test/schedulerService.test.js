@@ -281,3 +281,61 @@ describe('what the retention jobs report', () => {
     assert.match(audits[0], /accountCleanup/);
   });
 });
+
+describe('the demo refresh is opt-in', () => {
+  /**
+   * It deletes every row of the demo account before rewriting them. A
+   * destructive job that mounts itself by default in whatever environment
+   * happens to load this config is not something to opt out of.
+   */
+  const config = require('../config');
+  let saved;
+
+  beforeEach(() => {
+    saved = config.demo.refreshEnabled;
+    mock.method(logger, 'audit', () => {});
+    mock.method(logger, 'info', () => {});
+  });
+
+  afterEach(() => {
+    config.demo.refreshEnabled = saved;
+    scheduler.stop();
+    mock.restoreAll();
+  });
+
+  test('is not mounted when DEMO_REFRESH_ENABLED is unset', () => {
+    config.demo.refreshEnabled = false;
+    scheduler.scheduleCleanupTasks();
+    assert.equal(scheduler.jobs.has('demoRefresh'), false,
+      'a destructive job mounted itself without being asked');
+  });
+
+  test('is mounted when it is turned on', () => {
+    config.demo.refreshEnabled = true;
+    scheduler.scheduleCleanupTasks();
+    assert.equal(scheduler.jobs.has('demoRefresh'), true);
+  });
+
+  test('mounting it is audited, like the retention jobs', () => {
+    const audits = [];
+    mock.restoreAll();
+    mock.method(logger, 'audit', (msg) => audits.push(msg));
+    mock.method(logger, 'info', () => {});
+    config.demo.refreshEnabled = true;
+
+    scheduler.scheduleCleanupTasks();
+
+    assert.ok(audits.some((line) => /Demo refresh scheduled/.test(line)),
+      'nothing in the production log says the job is running');
+  });
+
+  test('the retention jobs are unaffected either way', () => {
+    for (const enabled of [false, true]) {
+      config.demo.refreshEnabled = enabled;
+      scheduler.scheduleCleanupTasks();
+      assert.ok(scheduler.jobs.has('aiCleanup'));
+      assert.ok(scheduler.jobs.has('accountCleanup'));
+      scheduler.stop();
+    }
+  });
+});

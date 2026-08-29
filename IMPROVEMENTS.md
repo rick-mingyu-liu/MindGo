@@ -1539,6 +1539,84 @@ the frontend copy is not.
 
 ---
 
+## 24. The demo account was frozen in March 2025
+
+**Status:** fixed (round 17)
+**Found by:** the user
+
+Four problems, and the first got worse the moment the dashboard started
+defaulting to the current term:
+
+- The newest seeded transaction was **14 months old**, so `?term=current` — the
+  new default — returned nothing. A visitor logging in saw an empty dashboard.
+- All three savings goals had target dates in the past, so the first thing on
+  screen was three red *Overdue* badges.
+- **`db:seed` could not be re-run to fix it.** It relied on
+  `ON CONFLICT DO NOTHING`, but `transactions`, `savings_goals` and `ai_plans`
+  have no unique constraint on their data columns — there was no conflict to
+  catch, and a second run inserted all 46 transactions again. Only `watchlist`
+  (`UNIQUE(user_id, symbol)`) was ever protected.
+- The persona was a salaried adult saving for a down payment on a $250,000
+  house, in an app built for Waterloo co-op students. Its seeded AI plan cited
+  `$500 in February` income that did not exist in the data — and was deleted 30
+  minutes later by the `ai_plans` retention job regardless, so nobody ever saw
+  it.
+
+### Generated, not hardcoded
+
+`db/demoData.js` builds the account relative to `now`: five terms of a co-op
+student, alternating study and work terms, the current term truncated at today.
+The alternation is the substance, not decoration — a study term is tuition and
+rent against part-time income and runs at a loss, a co-op term earns and saves,
+and that contrast is what makes *This term / Last term* worth clicking.
+
+Amounts vary month to month but come from a generator **seeded on the term and
+category**, not `Math.random()`, so re-seeding on the same day is
+byte-identical. That is what makes a scheduled refresh safe rather than
+something that reshuffles the numbers under a visitor mid-read.
+
+### The scheduled refresh, and why it is opt-in
+
+`DEMO_REFRESH_ENABLED=true` mounts a 30-day job. It is off by default because
+it **deletes every row belonging to the demo account** before rewriting them,
+and a destructive job that mounts itself in whatever environment happens to
+load the config is not something to opt *out* of.
+
+The hazard it is built around: resolving the demo account by
+`email = 'john.doe@example.com'` makes the target a **guessable string**.
+Nothing reserves that address. A timer pointed at it would wipe a real person's
+transactions, goals and watchlist every month with nobody watching. Run by hand
+the exposure is bounded, because a human is present and would notice; on a
+schedule it is not. So migration `007` adds an `is_demo` column with a unique
+partial index, the refresh matches on that, and it **never creates** the
+account — `create: false` from the scheduler, so a job cannot conjure its own
+target. With nothing flagged it logs through `logger.error` (which prints in
+production, unlike `warn`) and does nothing.
+
+The refresh discards anything a visitor added while trying the demo. For a demo
+account that is usually the point, but it means the demo cannot double as a
+scratch account.
+
+### Verified
+
+236 tests, up from 222. The evergreen properties are asserted at nine different
+"todays" — every term, a leap day, a month end, a term's first day, and 2030 —
+and the safety properties are mutation-tested: resolving the target by email
+instead of the flag fails 4 tests, letting a scheduled run create its target
+fails 2, dropping the `user_id` scope from the deletes fails 2, mounting the
+job unconditionally fails 2, and removing the `ROLLBACK` fails 1. Control clean.
+
+Also closes the seed half of item 18: `test/demoData.test.js` parses
+`frontend/pages/transactions/new.tsx` and asserts the backend's category list
+matches, plus that no seeded transaction invents one. The locale files remain
+unguarded.
+
+**Not verified:** the SQL has not run against a live database. The local
+Postgres needs a password, and running it against Neon would rewrite the real
+demo account.
+
+---
+
 ## Operational follow-ups
 
 Not code — carried over from the 2026-08-27 database work.
