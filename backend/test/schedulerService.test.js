@@ -81,15 +81,20 @@ describe('scheduleInterval', () => {
   });
 
   test('logs the row count the task reports', async () => {
-    const infos = [];
-    mock.method(logger, 'info', (msg) => infos.push(msg));
+    // Moved from logger.info to logger.audit by decision D so it survives
+    // NODE_ENV=production; which channel, and why, is asserted in "what the
+    // retention jobs report" below. What this one still pins is that the
+    // number logged is the number the task returned.
+    const logged = [];
+    mock.method(logger, 'audit', (msg) => logged.push(msg));
+    mock.method(logger, 'info', (msg) => logged.push(msg));
 
     scheduler.scheduleInterval('aiCleanup', 1000, async () => 42);
 
     mock.timers.tick(1000);
     await drain();
 
-    assert.ok(infos.some((m) => /aiCleanup: deleted 42 row\(s\)/.test(m)), infos.join(' | '));
+    assert.ok(logged.some((m) => /aiCleanup: deleted 42 row\(s\)/.test(m)), logged.join(' | '));
   });
 
 });
@@ -199,5 +204,80 @@ describe('getStatus', () => {
   test('an interval has no next run to report', () => {
     scheduler.scheduleInterval('test', 1000, async () => 0);
     assert.equal(scheduler.getStatus().test.nextRun, null);
+  });
+});
+
+describe('what the retention jobs report', () => {
+  // Decision D. The counts used to go through logger.info, which is gated on
+  // NODE_ENV === 'development', so in production the record of what these jobs
+  // deleted did not exist. Errors always printed, so a *failing* cleanup was
+  // visible and a *successful* one was not.
+  beforeEach(() => {
+    scheduler.jobs.clear();
+    mock.timers.enable({ apis: ['setInterval'] });
+  });
+
+  afterEach(() => {
+    mock.timers.reset();
+    mock.restoreAll();
+  });
+
+  async function runOnce(rowCount) {
+    const audits = [];
+    const infos = [];
+    mock.method(logger, 'audit', (msg) => audits.push(msg));
+    mock.method(logger, 'info', (msg) => infos.push(msg));
+
+    scheduler.scheduleInterval('accountCleanup', 1000, async () => rowCount);
+    mock.timers.tick(1000);
+    await drain();
+
+    return { audits, infos };
+  }
+
+  test('a real deletion is an audit event', async () => {
+    const { audits, infos } = await runOnce(3);
+    assert.equal(audits.length, 1);
+    assert.match(audits[0], /accountCleanup: deleted 3 row\(s\)/);
+    assert.equal(infos.length, 0);
+  });
+
+  test('a run that deleted nothing is not', async () => {
+    // These two intervals fire 432 times a day between them and almost always
+    // delete nothing. Auditing the zeros would bury the lines that matter.
+    const { audits, infos } = await runOnce(0);
+    assert.equal(audits.length, 0);
+    assert.equal(infos.length, 1);
+    assert.match(infos[0], /deleted 0 row\(s\)/);
+  });
+
+  test('the count reaches the console in production, end to end', async () => {
+    // The point of the whole change, asserted through the real logger rather
+    // than a mock of it: with console logging off, the deletion still prints.
+    const printed = [];
+    const savedEnabled = logger.enabled;
+    logger.enabled = false;
+    mock.method(console, 'log', (...a) => printed.push(a.map(String).join(' ')));
+
+    scheduler.scheduleInterval('accountCleanup', 1000, async () => 7);
+    mock.timers.tick(1000);
+    await drain();
+
+    logger.enabled = savedEnabled;
+    assert.match(printed.join('\n'), /\[AUDIT\].*accountCleanup: deleted 7 row\(s\)/);
+  });
+
+  test('scheduling the jobs is itself audited, so an idle log is not ambiguous', async () => {
+    // With zero-row runs silent, a production log containing no deletion lines
+    // cannot otherwise be told apart from one where the jobs never mounted.
+    const audits = [];
+    mock.method(logger, 'audit', (msg) => audits.push(msg));
+    mock.method(logger, 'info', () => {});
+
+    scheduler.scheduleCleanupTasks();
+
+    assert.equal(audits.length, 1);
+    assert.match(audits[0], /aiCleanup/);
+    assert.match(audits[0], /accountCleanup/);
   });
 });
