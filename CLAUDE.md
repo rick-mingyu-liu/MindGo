@@ -81,6 +81,17 @@ Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wh
 - **API client**: [frontend/utils/api.ts](frontend/utils/api.ts) is a shared axios instance. A request interceptor attaches the JWT from `localStorage`; a response interceptor handles errors globally — `401` triggers `logout()`, and `403/404/500`/generic errors surface a SweetAlert2 dialog. `/auth/*` endpoints are exempted so components can handle those errors themselves. Import this instance rather than calling axios directly.
 - **Auth state** is `localStorage` `token` + `user`; there is no server session.
 - **UI**: Radix primitives wrapped in [frontend/components/ui/](frontend/components/ui/) (shadcn-style), styled with Tailwind + `class-variance-authority`; use the `cn()` helper in [frontend/lib/utils.ts](frontend/lib/utils.ts) for conditional classes.
+- **Transaction categories**: the canonical list is the exported `categories`
+  object in [frontend/pages/transactions/new.tsx](frontend/pages/transactions/new.tsx)
+  — the edit page and the dashboard both import it, and the dashboard uses it to
+  decide whether a category is income or expense (unlisted names default to
+  expense). Adding one means four edits, not one: that list, `CATEGORY_COLORS`
+  in [frontend/pages/index.tsx](frontend/pages/index.tsx) (or it gets a
+  hash-derived colour), and **both** `common.json` files, because the picker
+  renders each name through `t(category)`. The backend does not validate the
+  category against any list, and [backend/db/seed.sql](backend/db/seed.sql)
+  keeps its own copy — nothing checks the two agree (`IMPROVEMENTS.md` items 7
+  and 18).
 - **i18n**: `next-i18next` with `en` and `zh` locales in [frontend/public/locales/](frontend/public/locales/). Add user-facing strings to both `common.json` files.
 - **Theme**: light/dark via [frontend/contexts/ThemeContext.tsx](frontend/contexts/ThemeContext.tsx).
 
