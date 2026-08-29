@@ -33,8 +33,9 @@ can be answered without reading the whole backlog.
 | 17 | Retention deletions are silent in production | ✅ done — round 12 |
 | 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
 | 19 | `utils/logger.js` has no real level hierarchy | open |
-| 20 | The 4-month window is a term, and the feature around it is unfinished | open |
+| 20 | The 4-month window is a term, and the feature around it is unfinished | open — design decided |
 | 21 | `/summary/rolling` returns every transaction, twice | open |
+| 22 | No yearly view, and no way to pick a period | open |
 
 ---
 
@@ -985,9 +986,9 @@ production (errors and deletions) are. It is a trap for whoever next assumes
 
 ---
 
-## 20. The 4-month window is a term, and the retention feature around it is unfinished
+## 20. The 4-month window is a term, and the feature around it is unfinished
 
-**Status:** open — needs a product decision
+**Status:** open — **design decided 2026-08-29**, not yet built
 **Effort:** small for the defect, medium for the feature
 **Found:** by asking whether the 4-month window deletes anything
 
@@ -1098,24 +1099,67 @@ what happens to the feature.**
 round-trips both fields but renders no control bound to them, so nothing lies to
 a user today. It starts lying the moment someone adds the toggle.
 
-### What to do
+### The design — decided 2026-08-29
 
-Three separable pieces, in the order they are worth doing:
+Settled in conversation: **the window is a view concept and is not coupled to
+deletion.** Data is kept for **2 years**, and the app grows a yearly view
+alongside the term view. Three refinements came out of working through it.
 
-1. **Validate `months`** on the auto-delete endpoint — reject anything outside
-   1–60 the way `updateDataRetentionSettings` already does for its own input.
-   A defect fix, no decision needed.
-2. **Make the window term-aware** rather than rolling. This is the feature the
-   4-month number was always about, and it needs no retention policy at all.
-3. **Decide retention separately, and later.** Nothing forces it now. If it is
-   wanted, **a full year is the better number than four months** — three terms,
-   so term-over-term comparison survives — and archiving into a monthly summary
-   table beats deleting, because the charts only need per-month totals anyway
-   (see item 21).
+**1. Retain by terms, not by months.** A rolling 24-month cutoff slices a term
+in half. In April 2027, Winter 2025 (Jan–Apr 2025) is 27 months back, so January
+and February fall off while March and April survive — and the chart shows a
+Winter term with 60% of its real spending. A partial term in a comparison is
+worse than a missing one. **Keep the last 6 complete terms; delete only whole
+terms.** Same principle as the view fix: snap to the boundary.
 
-**Not recommended: deleting user data to save space.** At the measured
-~330 bytes per row it buys almost nothing, it is irreversible, and it removes
-the comparison that makes term budgeting useful.
+**2. The justification is data hygiene, not scale.** At the measured ~330 bytes
+per row, 10,000 users over 4 years is ~13 GB and over 2 years is ~6.5 GB —
+halving a number that was never the problem (Finding 2). The real case is that
+this is financial history, and holding less of it is a smaller breach surface.
+That reason stands on its own and does not depend on a scaling claim the
+measurements do not support.
+
+**3. Archive to monthly totals before deleting, so the yearly view survives the
+retention edge.** The charts need per-month, per-category totals and nothing
+else — they do not read the transaction rows at all (item 21). So: **2 years of
+rows, monthly aggregates kept indefinitely.**
+
+Measured on the live database, aggregating at `(month, category, type)`:
+
+| user | transactions | aggregate rows | ratio |
+|---|---|---|---|
+| 6 (heaviest) | 348 | 105 | 3.3× |
+| 1 | 43 | 39 | 1.1× |
+
+The ratio is not the point, and it is deliberately recorded here so nobody
+oversells it later. **The point is that aggregate rows are bounded by
+time × categories — roughly 180 per user-year, a hard ceiling — regardless of
+how much a user logs.** Someone recording 500 transactions a month costs the
+same in the summary table as someone recording 20. That decouples storage from
+activity, which rolling deletion never does.
+
+### Order of work
+
+1. **Validate `months`** on the auto-delete endpoint (Finding 3). A defect fix,
+   no decision, do it whenever.
+2. **Make the term view term-aligned** (Finding 1). Needs no retention policy
+   and fixes the bug that actually affects users today.
+3. **Add the yearly view** — item 22.
+4. **Fix `/summary/rolling`** — item 21. It has to land before a longer window
+   is affordable.
+5. **Make retention settings actually persist.** `updateDataRetentionSettings`
+   validates its input and returns *"updated successfully"* while writing
+   nothing (Finding 4). If a retention toggle ships on top of that, the user
+   gets a switch that silently does not govern the deletion of their own
+   financial records. **This is a prerequisite for any of the rest**, not a
+   follow-up.
+6. **Then the monthly summary table and the 6-term retention job**, in that
+   order — the archive has to exist before the first deletion, or the first
+   deletion is the one that loses data with no aggregate behind it.
+
+**Still not recommended: deleting to save space.** Deleting for hygiene, with an
+archive behind it and a real setting in front of it, is a different thing and is
+what this design does.
 
 ---
 
@@ -1153,6 +1197,34 @@ dropping the duplicated array would cut the response by an order of magnitude
 and move the work to the database, which is what the existing
 `(user_id, date)` index is for. That is the change that makes a longer window —
 a year, or all of history — cheap.
+
+---
+
+## 22. No yearly view, and no way to pick a period
+
+**Status:** open
+**Effort:** small once item 21 lands
+**Comes from:** the item 20 design
+
+The dashboard offers exactly one period: whatever
+`/summary/rolling?months=4` returns, with `4` hardcoded at
+[frontend/pages/index.tsx](frontend/pages/index.tsx). The API already accepts
+`?months=`, so the backend is most of the way there — what is missing is
+term-aligned endpoints and a control.
+
+The selector this needs, for an audience whose year is three four-month terms:
+
+- **This term** — term-aligned, the default (item 20, Finding 1)
+- **Last term** — the comparison that makes a co-op budget mean something
+- **This year** — and *which* year is a real choice: calendar (Jan–Dec),
+  academic (Sep–Aug), or rolling 12 months. Rolling 12 is the least surprising
+  mid-term; academic matches how the audience already thinks. Worth deciding
+  deliberately rather than defaulting to calendar because it is easiest.
+- **All time** — cheap once the monthly summary table exists (item 20), since
+  it reads aggregates rather than rows.
+
+Blocked in practice on item 21: a yearly window at today's response shape is
+~335 kB for a heavy user, and all-time is worse.
 
 ---
 
@@ -1221,10 +1293,12 @@ Three items remain:
 - **21** — `/summary/rolling` serialises every transaction in the window twice
   and aggregates in Node rather than SQL. This, not row count, is the real
   per-request cost — and it is per user, so deleting old data does not help it.
+- **22** — no yearly view and no period selector; `months=4` is hardcoded in the
+  dashboard. Comes out of the item 20 design.
 
 Item 18 is the one with a repeat offence behind it; item 20 has the live
-footgun; item 21 is the one that has to land before any longer window is
-affordable.
+footgun and now carries a decided design; item 21 has to land before any longer
+window is affordable, which makes it the gate on 22.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
