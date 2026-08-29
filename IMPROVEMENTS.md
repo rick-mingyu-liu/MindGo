@@ -33,7 +33,8 @@ can be answered without reading the whole backlog.
 | 17 | Retention deletions are silent in production | ✅ done — round 12 |
 | 18 | Nothing keeps `db/seed.sql` and the category list in step | open |
 | 19 | `utils/logger.js` has no real level hierarchy | open |
-| 20 | The 4-month transaction retention feature was never finished | open |
+| 20 | The 4-month window is a term, and the feature around it is unfinished | open |
+| 21 | `/summary/rolling` returns every transaction, twice | open |
 
 ---
 
@@ -984,94 +985,174 @@ production (errors and deletions) are. It is a trap for whoever next assumes
 
 ---
 
-## 20. The 4-month transaction retention feature was never finished
+## 20. The 4-month window is a term, and the retention feature around it is unfinished
 
-**Status:** open
-**Effort:** small to remove, medium to finish
-**Found:** by asking whether the dashboard's 4-month window deletes anything
+**Status:** open — needs a product decision
+**Effort:** small for the defect, medium for the feature
+**Found:** by asking whether the 4-month window deletes anything
 
-**It does not, and that is the first thing to say.** The "4-Month Income vs
-Expenses" window is a `WHERE` clause, nothing more. `frontend/pages/index.tsx`
-calls `/summary/rolling?months=4`, and `getRollingSummary`
-([controllers/summaryController.js](backend/controllers/summaryController.js))
-runs one **SELECT**:
+### First, the correction
 
-```sql
-SELECT * FROM transactions
- WHERE user_id = $1 AND date >= $2 AND date < $3
-```
+An earlier draft of this item recommended **deleting** the auto-delete endpoint
+as an unfinished feature nobody wanted. That was wrong, and wrong in an
+instructive way: I read "no caller" as "no intent". The 4-month figure is not
+arbitrary — **it is a Waterloo term.** Study terms and co-op terms are both four
+months, and budgeting across one co-op term is the thing this app is for. The
+feature has a motivation; it is the implementation that is unfinished.
 
-Rows outside the range are not returned to the dashboard. They are untouched in
-the table. Checked against the live database: **282 of 397 transactions are
-older than four months and still present**, the oldest dated 2025-03-01, about
-eighteen months back. If anything purged on this window, none of them would
-exist.
+### The window does not delete anything, and that part is fine
 
-The scheduler's only two jobs are `deleteOldAIPlans` and
-`deleteUnverifiedAccounts` (item 8). Neither touches `transactions`.
+`/summary/rolling?months=4` is a `WHERE` clause on a `SELECT`. Checked against
+the live database: **282 of 397 transactions are older than four months and
+still present**, the oldest dated 2025-03-01. The scheduler's only two jobs
+touch `ai_plans` and `users`, never `transactions`.
 
-### What is actually there
+### Finding 1 — a *rolling* four months is not a *term*
 
-Commit `0bfc252`, 2025-06-28, *"data auto deleting after 4 months"*, added a
-controller method, a route, and a settings page — and **no caller**. Three
-pieces of an unfinished feature are live today:
+This is the substantive bug, and it is in the feature that works, not the one
+that is missing. `getRollingSummary` counts back four months from *today*, so
+the window equals the term **only in the last month of each term**:
 
-**1. `DELETE /transactions/auto-delete` is mounted, reachable and manual-only.**
-`routes/transactions.js:26` → `autoDeleteOldTransactions`, which runs
-`DELETE FROM transactions WHERE user_id = $1 AND date < $2`. Nothing calls it:
-not the scheduler, not the frontend (grepped), not its own origin commit. The
-name describes an intention, not a behaviour.
+| Viewing in | Window covers | Term | |
+|---|---|---|---|
+| Jan | Oct, Nov, Dec, Jan | Winter (Jan–Apr) | straddles |
+| Feb | Nov, Dec, Jan, Feb | Winter | straddles |
+| Mar | Dec, Jan, Feb, Mar | Winter | straddles |
+| **Apr** | **Jan, Feb, Mar, Apr** | **Winter** | **= the term** |
+| May | Feb, Mar, Apr, May | Spring (May–Aug) | straddles |
+| … | | | |
+| **Aug** | **May, Jun, Jul, Aug** | **Spring** | **= the term** |
+| **Dec** | **Sep, Oct, Nov, Dec** | **Fall** | **= the term** |
 
-**2. Its `months` parameter is unvalidated, on an irreversible delete.**
-Verified by running the arithmetic:
+Three months out of twelve — and precisely when the term is already over. In
+the **first** month of a co-op term, which is when someone actually sets a
+budget, three quarters of the window is the previous term's money: a student
+starting co-op in May sees February–April, most of it a school term with
+different income and different spending.
+
+Fixing this does not need new storage. It needs the window to snap to term
+boundaries (Jan–Apr, May–Aug, Sep–Dec) instead of counting back from today —
+the same `WHERE date >= $2 AND date < $3` query with different endpoints, plus
+a way to pick *which* term. That is the feature the 4-month number was reaching
+for.
+
+### Finding 2 — deleting old data is the wrong lever for the scaling worry
+
+The concern behind the sliding window was memory: more users, more rows, the
+app falls over. Measured rather than assumed, on the live database:
+
+| | |
+|---|---|
+| 397 transactions | **128 kB** total (48 kB heap + 80 kB indexes) |
+| per row, including indexes | **~330 bytes** (124 B heap; the rest is index and page overhead that amortises) |
+| whole database, 12 users | 7.8 MB, most of it Postgres catalogue |
+
+Extrapolating at a generous 1,000 transactions per user per year:
+
+| Scale | Rows | Storage |
+|---|---|---|
+| 1,000 users × 4 years | 4M | **~1.3 GB** |
+| 10,000 users × 4 years | 40M | **~13 GB** |
+
+40M rows in one Postgres table is unremarkable, and the index this app needs
+already exists — `idx_transactions_user_date` on
+`(user_id, date DESC, created_at DESC)` (migration 006). Every summary query is
+`WHERE user_id = $1 AND date >= … AND date <  …`, which that index answers as a
+range scan over one user's rows. **How many other users exist does not affect
+it.** Storage becomes a bill before it becomes a crash, and a bill is answered
+by archiving to a summary table, not by destroying the data.
+
+There is also a product cost to deleting: term-over-term comparison — *this
+co-op term versus last year's* — is exactly what this audience wants, and it is
+impossible if the data is gone.
+
+### Finding 3 — the endpoint that exists is a footgun
+
+`DELETE /transactions/auto-delete` is mounted (`routes/transactions.js:26`) and
+runs `DELETE FROM transactions WHERE user_id = $1 AND date < $2`. Nothing calls
+it — not the scheduler, not the frontend, not its own origin commit `0bfc252`.
+Its `months` parameter is unvalidated; verified by running the arithmetic:
 
 | `?months=` | cutoff | effect |
 |---|---|---|
-| `4` (or absent) | 4 months back | intended |
-| `0` | **today** | deletes every transaction dated before today |
-| `-6` | **6 months in the future** | deletes everything, future-dated rows included |
-| `abc`, empty, or a huge number | — | `toISOString()` throws → 500 |
+| `4` / absent | 4 months back | intended |
+| `0` | **today** | deletes every transaction before today |
+| `-6` | **6 months ahead** | deletes everything, future-dated rows included |
+| `abc`, empty, huge | — | `toISOString()` throws → 500 |
 
-The empty case is worth noting because it looks safe: `const { months = 4 }`
-only defaults on `undefined`, so `?months=` is `''`, not `4`, and 500s.
+The empty case looks safe and is not: `const { months = 4 }` defaults only on
+`undefined`, so `?months=` is `''`.
 
-This is scoped to the caller's own `user_id` and needs their JWT, so it is not
-a cross-user risk. It is a live, irreversible, unvalidated delete that no part
-of the product exposes — which is exactly the kind of thing that gets called
-once by accident.
+Scoped to the caller's own `user_id` and requires their JWT, so it is not a
+cross-user risk — but it is a live, irreversible, unvalidated delete that no
+part of the product exposes. **Validating `months` is a defect fix regardless of
+what happens to the feature.**
 
-**3. The retention settings API reports persistence it does not do.**
+### Finding 4 — the retention settings API reports persistence it does not do
+
 `getDataRetentionSettings` returns a hardcoded
-`{ autoDeleteEnabled: false, retentionMonths: 4, lastCleanup: null }`.
-`updateDataRetentionSettings` validates `retentionMonths` (1–60), then returns
-`"Data retention settings updated successfully"` **without writing anything** —
-its own comment says *"In a real app, you'd save these to a user_preferences
-table"*. `settings.tsx` fetches and PUTs both fields but renders no control
-bound to either, so nothing lies to a user today; the fields just round-trip.
-The moment someone adds the toggle the UI starts lying, which is the trap.
+`{ autoDeleteEnabled: false, retentionMonths: 4, lastCleanup: null }`, and
+`updateDataRetentionSettings` validates `retentionMonths` (1–60) then returns
+`"updated successfully"` **without writing anything** — its own comment says
+*"In a real app, you'd save these to a user_preferences table"*. `settings.tsx`
+round-trips both fields but renders no control bound to them, so nothing lies to
+a user today. It starts lying the moment someone adds the toggle.
 
-### The decision
+### What to do
 
-**Finish it or remove it — the middle state is the problem.**
+Three separable pieces, in the order they are worth doing:
 
-| Option | Consequence |
-|---|---|
-| **Remove** | Delete the route, the controller method and the two settings handlers; drop the vestigial fields from `settings.tsx`. Smallest diff, removes the footgun, and matches what the product actually does today — nothing auto-deletes. |
-| **Finish** | A `user_preferences` table, real persistence, validation on `months`, and a scheduler job reading each user's setting. It is a genuine feature — a finance app offering "keep only N months" is reasonable — but it is a feature, not a fix. |
+1. **Validate `months`** on the auto-delete endpoint — reject anything outside
+   1–60 the way `updateDataRetentionSettings` already does for its own input.
+   A defect fix, no decision needed.
+2. **Make the window term-aware** rather than rolling. This is the feature the
+   4-month number was always about, and it needs no retention policy at all.
+3. **Decide retention separately, and later.** Nothing forces it now. If it is
+   wanted, **a full year is the better number than four months** — three terms,
+   so term-over-term comparison survives — and archiving into a monthly summary
+   table beats deleting, because the charts only need per-month totals anyway
+   (see item 21).
 
-**Recommendation: remove it**, and open a fresh item if the feature is wanted.
-Nothing depends on it, the settings page renders no control for it, and it has
-sat unfinished for fourteen months. Whichever way it goes, **validate `months`
-first** if the endpoint survives at all — that part is a defect regardless.
+**Not recommended: deleting user data to save space.** At the measured
+~330 bytes per row it buys almost nothing, it is irreversible, and it removes
+the comparison that makes term budgeting useful.
 
-### One real automatic path, for completeness
+---
 
-`transactions.user_id` is `ON DELETE CASCADE`
-([db/schema.sql](backend/db/schema.sql)), so `deleteUnverifiedAccounts` removes
-an unverified account's transactions along with it. Those accounts are under 30
-minutes old, so in practice there is nothing to lose — but it is the one
-scheduled job that can reach the table, and worth knowing before anyone widens
-that retention window.
+## 21. `/summary/rolling` returns every transaction, twice
+
+**Status:** open
+**Effort:** medium
+**Found:** while testing the scaling premise behind item 20
+
+The real per-request cost, and the thing that will actually strain under load —
+unlike total row count, which item 20 measures as a non-issue.
+
+`getRollingSummary` ([controllers/summaryController.js](backend/controllers/summaryController.js))
+does `SELECT *`, loads every row in the window into Node, converts each one, and
+then puts the full list into the response **twice**: once as `transactions`, and
+again inside each `monthlyBreakdown[].transactions`. All aggregation — totals,
+per-category, per-month — happens in JavaScript over that array.
+
+Measured from real rows (286 bytes per converted transaction as JSON, doubled):
+
+| Window | Transactions | Response |
+|---|---|---|
+| 4 months, light user | 60 | ~34 kB |
+| 4 months, heavy user | 200 | ~112 kB |
+| 12 months, heavy | 600 | ~335 kB |
+| 4 years, heavy | 2,400 | ~1.3 MB |
+
+The dashboard uses the totals and the per-month figures. It does not need the
+transaction list at all — `pages/transactions/index.tsx` fetches that
+separately.
+
+**Why this matters for item 20:** this cost is *per user, per request*. Deleting
+other users' old data does nothing for it. A `SUM(...) GROUP BY` in SQL and
+dropping the duplicated array would cut the response by an order of magnitude
+and move the work to the database, which is what the existing
+`(user_id, date)` index is for. That is the change that makes a longer window —
+a year, or all of history — cheap.
 
 ---
 
@@ -1130,13 +1211,20 @@ Three items remain:
   Needs no decision.
 - **19** — `utils/logger.js` has no real level hierarchy, so `LOG_LEVEL` is
   inert except for `debug`. A trap rather than a bug. Needs no decision.
-- **20** — the 4-month transaction retention feature was never finished: a live,
-  unvalidated, irreversible delete endpoint nothing calls, and a settings API
-  that reports saving what it discards. **Does need a decision** — finish it or
-  remove it — written up in the item, recommendation: remove.
+- **20** — the 4-month window is a **Waterloo term**, and the feature built
+  around it is unfinished. The window rolls back from today, so it equals the
+  term only in April, August and December — in the *first* month of a co-op
+  term, when a budget actually gets set, three quarters of it is the previous
+  term. Also holds a live, unvalidated, irreversible delete endpoint nothing
+  calls. **Needs a product decision**; the `months` validation is a defect fix
+  either way.
+- **21** — `/summary/rolling` serialises every transaction in the window twice
+  and aggregates in Node rather than SQL. This, not row count, is the real
+  per-request cost — and it is per user, so deleting old data does not help it.
 
-Item 18 is the one with a repeat offence behind it; item 20 is the one with a
-live footgun in it.
+Item 18 is the one with a repeat offence behind it; item 20 has the live
+footgun; item 21 is the one that has to land before any longer window is
+affordable.
 
 **Worth a second pair of eyes:** the 59 Chinese strings in round 4 were written
 to match the conventions already in `zh/common.json` — full-width `（）` around
