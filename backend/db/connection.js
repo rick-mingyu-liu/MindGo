@@ -19,7 +19,6 @@ const config = require('../config');
 //
 // Handing back the raw 'YYYY-MM-DD' makes the wire format identical on every
 // host, and leaves the value the only thing it ever was: a day.
-// See IMPROVEMENTS.md item 23.
 types.setTypeParser(types.builtins.DATE, (value) => value);
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes

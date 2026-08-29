@@ -10,8 +10,8 @@
  * show a term, and the retention job, which deletes whole terms. If each
  * computed its own boundaries the two would drift silently, and the drift would
  * only surface when a chart and a deletion disagreed about where Spring began.
- * `IMPROVEMENTS.md` item 18 is the same failure in a different place — a seed
- * file and a category list that nothing kept in step.
+ * The same failure exists in a different place — a seed file and a category
+ * list that nothing kept in step.
  *
  * ## Two design points worth not undoing
  *
@@ -205,7 +205,6 @@ function shiftYear(yearId, by) {
 }
 
 const previousYear = (yearId) => shiftYear(yearId, -1);
-const nextYear = (yearId) => shiftYear(yearId, 1);
 
 module.exports = {
   TERMS,
@@ -225,5 +224,4 @@ module.exports = {
   termsOfYear,
   currentYear,
   previousYear,
-  nextYear,
 };

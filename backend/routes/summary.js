@@ -20,7 +20,7 @@ router.use(auth);
  *
  * They are mutually exclusive rather than one silently winning: a request
  * carrying more than one is a client bug, and answering it with any single
- * interpretation would hide that. See IMPROVEMENTS.md items 20 and 22.
+ * interpretation would hide that.
  */
 const RELATIVE = ['current', 'previous'];
 

@@ -7,7 +7,7 @@ const config = require('../config');
  * These used to live on `aiController` and `authController`, and
  * `schedulerService` reached *up* into the controller layer to call them. That
  * inversion is the reason this file exists: a service must not depend on the
- * layer above it. Despite what CLAUDE.md and IMPROVEMENTS.md both claimed, no
+ * layer above it. Despite what CLAUDE.md claimed, no
  * HTTP route ever mounted them — the scheduler was the only caller, so the move
  * is a move, not a split.
  *

@@ -35,7 +35,7 @@
  * Every category here appears in `CATEGORIES`, which mirrors the canonical
  * list exported from `frontend/pages/transactions/new.tsx`. A demo transaction
  * in an unlisted category renders with a hash-derived colour and an
- * untranslated name — `IMPROVEMENTS.md` item 18. `test/demoData.test.js`
+ * untranslated name. `test/demoData.test.js`
  * asserts the seed never invents one.
  */
 

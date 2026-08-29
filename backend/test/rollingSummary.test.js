@@ -14,7 +14,7 @@ const {
  * today, the window equals the term only in April, August and December — the
  * last month of each, when it is already over. In the *first* month of a co-op
  * term, which is when someone actually sets a budget, three quarters of the
- * window is the previous term's money. See IMPROVEMENTS.md item 20.
+ * window is the previous term's money.
  *
  * Runs the real router on a real server, like autoDeleteValidation.test.js: the
  * assertions are about which SQL bounds the request produces, and a test of the

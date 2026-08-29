@@ -114,8 +114,7 @@ These are minor and common in Express apps, but worth noting:
   An earlier draft of this document said that cleanup logic was *"reused by
   both HTTP routes and the scheduler"*. That was wrong — no route ever mounted
   either function; they took no `(req, res)` and never sent a response. The fix
-  was a move, not a split. `IMPROVEMENTS.md` item 8 has the detail, including
-  three timer bugs found alongside it.
+  was a move, not a split; three timer bugs were found alongside it.
 
 - **Address validation lived in the controller.** `authController` held a
   30-domain disposable list, an apilayer client and the verdict logic, ~60
@@ -127,9 +126,9 @@ These are minor and common in Express apps, but worth noting:
   services use: MailboxLayer is the primary, the domain list is the fallback,
   and the caller sees one function and one result shape (`{ valid, reason?,
   source }`). The rule it encodes — **a validator that cannot reach its service
-  must not become a gate** — is what `IMPROVEMENTS.md` item 13 is about: the
-  previous version turned a missing key, an outage, an expired key and an
-  exhausted quota all into a blocked registration, three of them silently.
+  must not become a gate** — matters because the previous version turned a
+  missing key, an outage, an expired key and an exhausted quota all into a
+  blocked registration, three of them silently.
 
 ## Bottom line
 
