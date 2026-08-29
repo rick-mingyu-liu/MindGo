@@ -988,7 +988,8 @@ production (errors and deletions) are. It is a trap for whoever next assumes
 
 ## 20. The 4-month window is a term, and the feature around it is unfinished
 
-**Status:** open — **design decided 2026-08-29**, not yet built
+**Status:** open — design decided 2026-08-29; **steps 1 and part of 2 built in
+round 14**
 **Effort:** small for the defect, medium for the feature
 **Found:** by asking whether the 4-month window deletes anything
 
@@ -1233,12 +1234,50 @@ Term ids sort by year then need a term order, so store a term index (0/1/2)
 alongside the key if a sort ever matters — `'2026-fall' < '2026-spring' <
 '2026-winter'` lexically, which is wrong three ways.
 
+### What round 14 built
+
+**[utils/terms.js](backend/utils/terms.js)** — the calendar described above,
+with 26 tests. Two things in it are worth not undoing:
+
+- **Bounds are half-open**, so consecutive terms share a boundary and there is
+  no end-of-month or leap-day arithmetic anywhere. A test walks eight
+  consecutive terms asserting `boundsOf(t).end === boundsOf(next(t)).start`, and
+  another checks that every day of three years — including a leap day — lands in
+  exactly one term and inside that term's own bounds.
+- **No date is built with `new Date(y, m, d).toISOString()`.** That pattern is a
+  latent off-by-one: under `TZ=Asia/Shanghai`, `new Date(2026, 4, 1)` is local
+  midnight on May 1, which is `2026-04-30T16:00Z`, so `toISOString()` returns
+  **`2026-04-30`**. `getRollingSummary` builds its window exactly that way today
+  and escapes only because the server runs UTC — see item 21. `terms.js` uses
+  integer arithmetic formatted into a string, and the test file sweeps four
+  timezones in-process (Node applies a `process.env.TZ` change to Dates created
+  after it) including UTC+14, with one test asserting the sweep is actually
+  taking effect so it cannot silently stop proving anything.
+
+**`months` validation**, with 10 tests that run the **real router on a real
+server** rather than the validation chain alone — the failure worth guarding
+against is "the validator exists but is not mounted", which a unit test of the
+chain would pass. Removing it from the route fails 7 of them. Every rejection
+case also asserts `db.query` was never called: a 400 that still deleted the rows
+would be worse than the bug.
+
+**`terms.js` has no production caller yet, and that is deliberate.** This repo
+deleted two dead symbols in round 11, so it is worth saying why this is not a
+third: it is the foundation step 2 needs, its consumers are named above, and its
+tests exercise it. If step 2 does not follow reasonably soon, delete it rather
+than let it sit — the argument for keeping unused code does not improve with
+age.
+
 ### Order of work
 
-1. **Validate `months`** on the auto-delete endpoint (Finding 3). A defect fix,
-   no decision, do it whenever.
-2. **Make the term view term-aligned** (Finding 1). Needs no retention policy
-   and fixes the bug that actually affects users today.
+1. ~~**Validate `months`** on the auto-delete endpoint (Finding 3)~~ — ✅ done
+   round 14. `query('months').optional().isInt({ min: 1, max: 60 })` in the
+   route file, plus the `validationResult` check the controller was missing.
+   The first query-parameter validation in this backend; every other validated
+   handler checks a body.
+2. **Make the term view term-aligned** (Finding 1). ✅ **`utils/terms.js` exists
+   as of round 14**; what remains is wiring it into `/summary/rolling` and the
+   dashboard.
 3. **Add the yearly view** — item 22.
 4. **Fix `/summary/rolling`** — item 21. It has to land before a longer window
    is affordable.
@@ -1285,6 +1324,16 @@ Measured from real rows (286 bytes per converted transaction as JSON, doubled):
 The dashboard uses the totals and the per-month figures. It does not need the
 transaction list at all — `pages/transactions/index.tsx` fetches that
 separately.
+
+**A second bug in the same function.** The window is built with
+`new Date(y, m, 1).toISOString().split('T')[0]`, which is off by a day in any
+timezone east of UTC — under `TZ=Asia/Shanghai` that expression yields
+`2026-04-30` for May 1st, so every window boundary shifts back a day and one
+day's transactions land in the wrong month. It does not bite today only because
+the server runs UTC; it would the moment anyone ran the backend locally in
+Europe or Asia, which the `zh` locale suggests someone might.
+[utils/terms.js](backend/utils/terms.js) (item 20) shows the shape that avoids
+it, and rewriting this function is the natural time to adopt it.
 
 **Why this matters for item 20:** this cost is *per user, per request*. Deleting
 other users' old data does nothing for it. A `SUM(...) GROUP BY` in SQL and
