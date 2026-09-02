@@ -2,9 +2,12 @@ const { test, describe, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../db/connection');
 const logger = require('../utils/logger');
+const bcrypt = require('bcryptjs');
 const {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
+  DEMO_PASSWORD,
+  DEMO_PASSWORD_HASH,
   OWNED_TABLES,
 } = require('../services/demoAccountService');
 
@@ -153,5 +156,40 @@ describe('what the scheduler logs', () => {
     mock.method(logger, 'info', () => {});
     const deleted = await refreshDemoAccountOnSchedule();
     assert.equal(deleted, OWNED_TABLES.length * 7);
+  });
+});
+
+
+/**
+ * The demo credential is the one piece of this file a user types by hand, and
+ * it is advertised in five places — the login page, the README, CLAUDE.md, the
+ * line `db:seed` prints, and the comment on the constant itself.
+ *
+ * All five said `password123`. The hash was bcrypt('password'). The two had
+ * disagreed since the first commit, so the demo login on the deployed site had
+ * never once worked, and nothing anywhere compared them: a comment is not
+ * executable, and no test hashed anything. The check below is the whole fix —
+ * everything else was a consequence.
+ */
+describe('the advertised demo password', () => {
+  test('actually verifies against the stored hash', async () => {
+    assert.ok(await bcrypt.compare(DEMO_PASSWORD, DEMO_PASSWORD_HASH),
+      `DEMO_PASSWORD_HASH is not a hash of ${JSON.stringify(DEMO_PASSWORD)} — ` +
+      'the demo login is broken for everyone reading the README or the login page');
+  });
+
+  test('is the string the docs and the login page tell people to type', () => {
+    // Pinned deliberately. Changing the demo password means changing README.md,
+    // CLAUDE.md and frontend/pages/login.tsx in the same commit, and this
+    // failing is the reminder.
+    assert.equal(DEMO_PASSWORD, 'password123');
+  });
+
+  test('is not left as some other common password the hash happens to match', async () => {
+    // The original hash was the well-known tutorial hash of 'password'. If it
+    // ever comes back, this says so in one line instead of an "Invalid
+    // credentials" a user has to debug from the outside.
+    assert.ok(!(await bcrypt.compare('password', DEMO_PASSWORD_HASH)),
+      "the hash is bcrypt('password') again — this is the original bug");
   });
 });

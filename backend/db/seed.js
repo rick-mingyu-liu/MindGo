@@ -1,4 +1,4 @@
-const { refreshDemoAccount, DEMO_EMAIL } = require('../services/demoAccountService');
+const { refreshDemoAccount, DEMO_EMAIL, DEMO_PASSWORD } = require('../services/demoAccountService');
 const { buildDemoData } = require('./demoData');
 const { labelOf } = require('../utils/terms');
 
@@ -29,7 +29,7 @@ async function seedDatabase(now = new Date()) {
     console.log(`   ${data.goals.length} goals, ${data.watchlist.length} watchlist symbols`);
     console.log('\n📋 Demo login:');
     console.log(`   Email: ${DEMO_EMAIL}`);
-    console.log('   Password: password123');
+    console.log(`   Password: ${DEMO_PASSWORD}`);
   } catch (error) {
     console.error('❌ Error seeding database:', error);
     throw error;

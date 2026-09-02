@@ -31,8 +31,18 @@ const logger = require('../utils/logger');
  */
 
 const DEMO_EMAIL = 'john.doe@example.com';
-// bcrypt hash of 'password123', carried over from the original seed.
-const DEMO_PASSWORD_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+// The credential every surface advertises — the login page, the README and the
+// line `db:seed` prints — and the hash it has to verify against. Both are
+// exported, and `test/demoAccountService.test.js` pins them to each other with
+// a real bcrypt.compare.
+//
+// That test exists because the pair silently disagreed for the entire life of
+// the repo: the hash below was carried over from the first commit's seed.sql
+// labelled "bcrypt hash of 'password123'", but it is bcrypt('password'). Every
+// documented demo login was rejected and nothing failed loudly enough to say
+// so. A comment cannot be wrong about this any more.
+const DEMO_PASSWORD = 'password123';
+const DEMO_PASSWORD_HASH = '$2a$10$Cz3uqiIWcKlJ1dCUqe2AkuYXGscpq9wwBNMDuTXqtCSbIzyPDMuQ.';
 
 const OWNED_TABLES = ['transactions', 'savings_goals', 'watchlist', 'ai_plans'];
 
@@ -163,5 +173,7 @@ module.exports = {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
   DEMO_EMAIL,
+  DEMO_PASSWORD,
+  DEMO_PASSWORD_HASH,
   OWNED_TABLES,
 };
