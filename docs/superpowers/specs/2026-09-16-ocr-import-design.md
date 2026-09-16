@@ -6,14 +6,16 @@
 
 A new **Import** tab where a user drops in screenshots of Canadian bank-app
 transaction lists or photos of paper receipts, reviews the transactions that
-open-source OCR (PaddleOCR PP-OCRv5) extracted, and saves them in one step.
+open-source OCR (PaddleOCR PP-OCRv5, running **on the user's device**)
+extracted, and saves them in one step.
 
 The feature has to hold up as three things at once:
 
 - **Product** — a drop-and-review flow that is faster than typing.
-- **Open source** — the text is read by a self-hosted PaddleOCR service and
-  structured by a parser written for this project; an LLM is a fallback, never
-  the default, and never sees the image.
+- **Open source, on-device** — the text is read in the browser by PaddleOCR
+  models through `ppu-paddle-ocr` and `onnxruntime-web`, and structured by a
+  parser written for this project. **The image never leaves the device.** An
+  LLM is a fallback, never the default, and only ever sees OCR text.
 - **ML systems** — a benchmark with per-field accuracy and a headline
   *silent-error rate*, so every claim about accuracy is measured.
 
@@ -21,94 +23,98 @@ The governing rule is **checked, not trusted**: nothing the pipeline reads is
 saved until a human confirms it, and every value that failed or skipped a check
 is visibly flagged.
 
+The whole feature is JavaScript/TypeScript. There is no Python and no
+separately deployed OCR service.
+
 ### Success criteria
 
 1. On the benchmark, the **silent-error rate** (rows whose amount is wrong *and*
    carry no warning flag) is reported per layout and per source, and is the
    number tracked across changes.
-2. A screenshot that yields no usable rows, or an OCR service that is down,
-   produces a clear message — never a 500 and never a partial save.
-3. No image bytes, OCR text, or extracted values appear in server logs
-   (asserted by a test).
+2. A screenshot that yields no usable rows, a device that cannot run the model,
+   or a failed model download produces a clear message — never a crash and
+   never a partial save.
+3. No image bytes reach the server. No OCR text or extracted values appear in
+   server logs (asserted by a test).
 4. Import of up to 100 confirmed rows is atomic.
 
 ### Non-goals (v1)
 
-WeChat Pay / Alipay bills, credit-card statement pages, PDFs, storing uploaded
-images, server-side draft persistence, a native mobile app, learned
-categorisation. The PP-OCRv5 recogniser reads Chinese, so WeChat/Alipay is a
+WeChat Pay / Alipay bills, credit-card statement pages, PDFs, a native mobile
+app, learned categorisation, server-side draft persistence, a server-side OCR
+path. The PP-OCRv5 multilingual recogniser reads Chinese, so WeChat/Alipay is a
 natural v2 layout, not a model change.
 
 ## 2. Architecture
 
 ```
-Browser (/import)                    Node API (Render)                  ocr-service (Render free tier, Python)
-  drop / paste screenshot ─POST /import/ocr─▶ auth, importLimiter, multer (memory, 5 MB, magic bytes)
-                                           ─POST /ocr + X-OCR-Secret─▶ RapidOCR, PP-OCRv5 mobile det+rec
-                                           ◀── { lines:[{text, box, conf}], model_versions, duration_ms }
-                                           parser: rows → tokens → classify → bankList | receipt
-                                           low confidence → OCR *text* → gpt-4o-mini → same validators
-  review table ◀── draft rows + flags ─────┘   (nothing persisted)
+Browser (/import)                                          Node API (Render)
+  drop / paste screenshot
+  Web Worker: ppu-paddle-ocr + onnxruntime-web
+    PP-OCRv5 det + rec  → lines [{text, box, conf}]
+  ── POST /import/parse { today, image:{w,h}, model, lines } ──▶ auth, importLimiter, validate payload
+                                                                 parser: rows → tokens → classify → bankList | receipt
+                                                                 low confidence → row text → gpt-4o-mini → same validators
+                                                                 possible_duplicate lookup
+  review table ◀──────────── draft rows + flags ────────────────┘   (nothing persisted)
   edit / untick
-  confirm ────POST /transactions/import───▶ re-validate every row → single DB transaction
+  confirm ─────── POST /transactions/import ────────────────────▶ re-validate every row → single DB transaction
 ```
 
 Decisions:
 
-- **Drafts are stateless.** `POST /import/ocr` returns drafts and stores
-  nothing. The image lives in request memory only.
-- **The server never trusts the client's confirmed rows.** `POST
-  /transactions/import` validates each row with the same rules as `POST
-  /transactions`.
-- **The OCR service is publicly reachable** (Render's free tier has no private
-  network), so `POST /ocr` requires a shared secret known only to Node. Browsers
-  never call it.
-- **Cold starts are a designed state.** The free tier sleeps after ~15 minutes
-  idle. Opening `/import` calls `GET /import/status`, which pings the service's
-  `/health` to wake it; the UI shows a warming state. Node's OCR call times out
-  at `OCR_TIMEOUT_MS` (default 90 000).
-- **Parser in Node, model in Python.** The parser consumes recorded OCR JSON,
-  so it is tested with `node --test` and no model.
+- **OCR runs in a Web Worker** so inference never blocks the UI thread. The
+  worker is created only on `/import` and loads the library with a dynamic,
+  client-only import (Pages Router, no SSR).
+- **The image stays on the device.** Only the OCR lines (text, box, confidence)
+  and the image dimensions are sent to the server. The screenshot is shown back
+  to the user from a local object URL.
+- **The parser runs on the server**, not in the browser: the backend has the
+  test runner (the frontend has none), the LLM key, and the duplicate lookup.
+  The OCR text therefore does reach the server, which is stated plainly in the
+  UI; the logging rules in §5 cover it.
+- **Drafts are stateless.** `POST /import/parse` stores nothing.
+- **The server never trusts the client.** It validates the OCR payload's shape
+  and size, and `POST /transactions/import` validates each confirmed row with
+  the same rules as `POST /transactions`.
 - **Decimal strings end to end.** Amounts are never parsed to floats in the
   pipeline; they are `^\d+\.\d{2}$` strings until the INSERT.
 - **Days, not instants.** The browser sends `today` (its local
   `YYYY-MM-DD`); all date inference is relative to it. Dates are built with
   integer arithmetic or `toDay()` — never `new Date(y, m, d).toISOString()`.
 
-## 3. OCR service (`ocr-service/`)
+## 3. On-device OCR (`frontend/lib/ocr/`)
 
-New top-level directory, deployed as its own Render web service.
-
-- **Stack:** Python 3.12, FastAPI, uvicorn, `rapidocr` + `onnxruntime`,
-  PP-OCRv5 **mobile** detection and recognition models (fit in 512 MB).
-- **`GET /health`** — unauthenticated; returns `{ status: "ok", model_versions }`.
-- **`POST /ocr`** — requires header `X-OCR-Secret`, compared with
-  `hmac.compare_digest`; missing or wrong → 401. Body: the image bytes
-  (`multipart/form-data`, field `image`). Downscales so the longest side is at
-  most 2000 px before inference. Response:
-
-  ```json
-  {
-    "image": { "width": 1170, "height": 2532, "scale": 0.79 },
-    "model_versions": { "det": "PP-OCRv5_mobile_det", "rec": "PP-OCRv5_mobile_rec" },
-    "duration_ms": 842,
-    "lines": [
-      { "text": "Sobeys #1234", "conf": 0.97,
-        "box": [[12, 40], [310, 40], [310, 78], [12, 78]] }
-    ]
-  }
-  ```
-
-  Box coordinates are in the **original** image's pixel space, so the browser
-  can overlay them on the image it already holds.
-- Logs contain request duration and line count only — never text.
-- **Dockerfile** with models baked into the image, so a cold start does not
-  download them.
-- **Verify first (plan step 1):** that the current `rapidocr` release ships
-  PP-OCRv5 models and how they are selected; pin the version in
-  `requirements.txt`.
-- **Tests:** `pytest` against one committed synthetic image (auth rejected
-  without the secret; known text recovered; boxes rescaled correctly).
+- **Library:** `ppu-paddle-ocr` (MIT, TypeScript) with the `onnxruntime-web`
+  peer, imported from its `/web` subpath.
+- **Model:** a PP-OCRv5 mobile preset. The candidates are
+  `V5_EN_MOBILE_MODEL`, its int8 variant, and `V5_MOBILE_MODEL` (Chinese +
+  English); the benchmark (§8) chooses between them on accuracy, download size,
+  and time. PP-OCRv6 presets are also shipped by the library and are measured
+  as a comparison, not adopted by default.
+- **Model hosting:** model files are served from `frontend/public/models/`
+  (self-hosted, same origin) rather than fetched from a third-party URL at
+  runtime, so a first import does not depend on another site and the exact
+  files are pinned in the repo or fetched by a pinned script at build time.
+- **`ocrWorker.ts`** — owns the `PaddleOcrService` instance; initialises on the
+  first message and keeps the session for later images. Messages:
+  `init` → progress events → `ready`; `recognize(ImageBitmap)` →
+  `{ lines, image: { width, height }, model, durationMs }`; `error`.
+- **`useOcr.ts`** — a hook that wraps the worker: state
+  `idle | downloading(progress) | ready | recognizing | unsupported | failed`,
+  and a `recognize(file)` that queues calls one at a time.
+- **Preprocessing** — decode with `createImageBitmap`; downscale so the longest
+  side is at most 2000 px; box coordinates are mapped back to the original
+  image's pixel space before leaving the worker, so the review screen can
+  overlay them directly.
+- **Unsupported devices** — if WebAssembly is unavailable or initialisation
+  fails, the page shows a message and a link to manual entry. There is no
+  server-side OCR fallback in v1.
+- **Verify first (plan step 1):** the library's exact API and model-path
+  options, whether it runs inside a Worker under Next.js, multi-threaded WASM
+  requirements (`SharedArrayBuffer` needs cross-origin isolation headers; the
+  single-threaded path must work without them), total download size, and
+  recognition time on a laptop and a mid-range phone.
 
 ## 4. Parser (`backend/services/import/`)
 
@@ -125,10 +131,10 @@ lines, bounding box, and minimum `conf`.
 - **`parseAmount(text)`** → `{ value: "1234.56", sign: -1|1|null, corrected: bool } | null`.
   Accepts `$1,234.56`, `-$12.50`, `−12.50` (U+2212), `(12.50)`, `12.50 CR`,
   `+12.50`. Rejects comma-decimal forms such as `1 234,56`: Canadian English
-  bank apps do not use them, and rejecting beats misreading. Character repairs `O→0`, `o→0`, `l→1`, `I→1`, `S→5`,
-  `B→8` apply only inside a token that already has an amount shape
-  (digits, separators, exactly two decimals after repair) and set
-  `corrected: true`.
+  bank apps do not use them, and rejecting beats misreading. Character repairs
+  `O→0`, `o→0`, `l→1`, `I→1`, `S→5`, `B→8` apply only inside a token that
+  already has an amount shape (digits, separators, exactly two decimals after
+  repair) and set `corrected: true`.
 - **`parseDate(text, today)`** → `'YYYY-MM-DD' | null`. Accepts `Sep 14`,
   `September 14`, `Sep 14, 2026`, `2026-09-14`, `09/14/2026`, `14/09/2026` only
   when the day is > 12 (otherwise ambiguous → null), `Today`, `Yesterday`.
@@ -202,7 +208,7 @@ Scores `receipt` vs `bank-list` and returns `{ layout, confidence }`.
 {
   "layout": "bank-list",
   "layoutConfidence": 0.91,
-  "model_versions": { "det": "…", "rec": "…" },
+  "model": "PP-OCRv5_en_mobile",
   "warnings": ["ai_fallback_unavailable"],
   "rows": [{
     "date": "2026-09-14",
@@ -224,32 +230,62 @@ row sets `USD`. `flags` values: `arithmetic_verified`, `arithmetic_failed`,
 `balance_mismatch`, `corrected_chars`, `low_confidence`, `missing_date`,
 `type_guessed`, `pending`, `possible_duplicate`.
 
-## 5. API (`backend/routes/import.js`, mounted at `/import`)
+## 5. API
 
-`router.use(auth)` at the top, per repo convention.
+### `POST /import/parse` (`backend/routes/import.js`, mounted at `/import`)
 
-| Endpoint | Behaviour |
-|---|---|
-| `GET /import/status` | Pings `ocr-service /health` with a short timeout. Returns `{ ocr: "ready" \| "warming" \| "down" \| "disabled" }`. `disabled` when `OCR_SERVICE_URL` is unset. |
-| `POST /import/ocr` | `importLimiter` (30 per 15 min, keyed on `req.user.userId`), multer memory storage, 5 MB, single field `image`, type confirmed by magic bytes (PNG, JPEG, WebP). `today` is a multipart form field, validated with `body('today')` as `YYYY-MM-DD` after multer parses it. Calls the OCR client, runs the parser, marks `possible_duplicate` by querying the user's transactions for matching `(date, amount, currency)`. |
-| `POST /transactions/import` | Body `{ rows: [{ date, amount, description, category, type, currency, source, edited }] }`, 1–100 rows. Each row validated with the existing `transactionValidation` rules via wildcard paths (`rows.*.amount`, …); `source ∈ {ocr, ocr_llm}`; `edited` boolean. The client maps draft `source` `parser` → `ocr` and `llm` → `ocr_llm`. Inserts all rows in one transaction on a dedicated client (`db.getPool().connect()`), returns `{ ids }`. On any invalid row → 400 with the failing indices and no insert. Audit-logs counts only: rows imported, rows edited, rows by source. |
+`router.use(auth)` at the top, per repo convention. `importLimiter`
+(30 per 15 min, keyed on `req.user.userId`) because each call may reach the
+LLM and always queries the database.
 
-Errors:
+Body, parsed with a route-level `express.json({ limit: '1mb' })` (the app-wide
+parser keeps its default):
+
+```json
+{
+  "today": "2026-09-16",
+  "model": "PP-OCRv5_en_mobile",
+  "image": { "width": 1170, "height": 2532 },
+  "lines": [{ "text": "Sobeys #1234", "conf": 0.97,
+              "box": [[12, 40], [310, 40], [310, 78], [12, 78]] }]
+}
+```
+
+Validation (`body([...])`): `today` is `YYYY-MM-DD`; `model` a short string;
+`image.width`/`height` integers 1–10 000; `lines` an array of at most 2 000;
+each `text` a string of at most 500 characters; `conf` in [0, 1]; `box` four
+numeric points. Then: parser → fallback → `possible_duplicate` by querying the
+user's transactions for matching `(date, amount, currency)`.
+
+### `POST /transactions/import`
+
+Body `{ rows: [{ date, amount, description, category, type, currency, source, edited }] }`,
+1–100 rows. Each row validated with the existing `transactionValidation` rules
+via wildcard paths (`rows.*.amount`, …); `source ∈ {ocr, ocr_llm}`; `edited`
+boolean. The client maps draft `source` `parser` → `ocr` and `llm` → `ocr_llm`.
+Inserts all rows in one transaction on a dedicated client
+(`db.getPool().connect()`), returns `{ ids }`. On any invalid row → 400 with the
+failing indices and no insert. Audit-logs counts only: rows imported, rows
+edited, rows by source.
+
+### Errors
 
 | Condition | Response |
 |---|---|
-| OCR unreachable or timed out | `503 { code: "OCR_UNAVAILABLE" }` |
-| OCR returns 401 (secret mismatch) | `503 { code: "OCR_UNAVAILABLE" }`, `console.error` names the misconfiguration |
-| Not an accepted image | `400 { code: "UNSUPPORTED_IMAGE" }` |
-| Over 5 MB | `413` |
-| No text | `200` with `rows: []`, `warnings: ["no_text_found"]` |
-| No rows parsed and fallback unavailable | `200` with `rows: []` and the raw row text in `unparsedLines`, for manual entry |
+| Malformed or oversized OCR payload | `400` with validation errors / `413` |
+| `lines` empty | `200` with `rows: []`, `warnings: ["no_text_found"]` |
+| No rows parsed and fallback unavailable | `200` with `rows: []` and the reconstructed row text in `unparsedLines`, for manual entry |
+| Any confirmed row invalid | `400` with the failing indices; nothing saved |
 
-New config in `backend/config/index.js`: `OCR_SERVICE_URL`,
-`OCR_SERVICE_SECRET`, `OCR_TIMEOUT_MS`, `IMPORT_CONFIDENCE_THRESHOLD`.
-Startup validation warns (does not exit) when the URL is set without the secret.
+### Logging
 
-New dependency: `multer`.
+Neither route logs `lines`, row values, or request bodies. Errors are logged
+with a user id and an error code only.
+
+### Config
+
+`IMPORT_CONFIDENCE_THRESHOLD` in `backend/config/index.js`. No new backend
+dependency.
 
 ## 6. Database
 
@@ -269,14 +305,17 @@ keeps its source.
 ## 7. Frontend (`frontend/pages/import.tsx`)
 
 Entry points: an **Import from screenshot** button on the dashboard
-(`pages/index.tsx`) and on `pages/transactions/index.tsx`, both hidden when
-status is `disabled`.
+(`pages/index.tsx`) and on `pages/transactions/index.tsx`.
 
-1. **Status banner** from `GET /import/status`: Ready / Warming up (poll every
-   5 s, up to 2 min) / Unavailable.
-2. **Drop zone** — drag-and-drop, file picker, and clipboard paste. Up to 5
-   images per batch, processed sequentially; each shows queued / reading /
-   parsed / failed, with retry on failure. Files may be dropped while warming.
+1. **Engine banner** from `useOcr`: *Downloading the reading model (n %)* on
+   first use, then *Ready*; *This device can't run on-device reading* with a
+   link to manual entry when unsupported; retry on a failed download. One line
+   of copy states that screenshots stay on the device and only the recognised
+   text is sent to MindGo.
+2. **Drop zone** — drag-and-drop, file picker, and clipboard paste (PNG, JPEG,
+   WebP). Up to 5 images per batch, processed one at a time; each shows
+   queued / reading / parsing / done / failed, with retry. Files may be dropped
+   while the model downloads.
 3. **Review table** (`components/ui/table`): checkbox, date, description,
    category (same picker as `new.tsx`, rendered through `t()`), type, amount,
    currency, source. All cells editable; editing sets `edited: true` on the row.
@@ -294,11 +333,16 @@ status is `disabled`.
 
 All user-facing strings go into both `public/locales/en/common.json` and
 `public/locales/zh/common.json`; `npm run check:locales` must pass. Dates are
-rendered with `lib/date.ts`.
+rendered with `lib/date.ts`. New frontend dependencies: `ppu-paddle-ocr`,
+`onnxruntime-web`.
 
-## 8. Evaluation (`backend/eval/`)
+## 8. Evaluation (`eval/`, its own npm project)
 
-`npm run eval` (backend).
+A top-level `eval/` directory with its own `package.json`, so
+`onnxruntime-node` (about 258 MB of native binaries) never enters the backend's
+or frontend's install or deploy. It runs the **same library and model files**
+as the browser, through `onnxruntime-node`, and requires the backend parser by
+relative path. `npm run eval` from `eval/`.
 
 - **Datasets**
   - `eval/synthetic/` (committed): a generator script renders HTML templates
@@ -306,58 +350,71 @@ rendered with `lib/date.ts`.
     writes the ground truth alongside. Rendering needs a headless browser; it
     runs only when regenerating, and the PNGs plus labels are committed.
   - `eval/private/` (gitignored): 20–30 real screenshots with hand-written
-    `*.label.json`. Never committed, never uploaded anywhere but the OCR
-    service.
-- **OCR cache** — `eval/.cache/<sha256>-<model_versions>.json` so parser
-  iterations don't re-run OCR. Synthetic cache files are committed as
-  `backend/test/fixtures/ocr/` and double as parser test fixtures.
+    `*.label.json`. Never committed and never uploaded anywhere; OCR runs
+    locally.
+- **OCR cache** — `eval/.cache/<sha256>-<model>.json` so parser iterations
+  don't re-run OCR. Synthetic cache files are committed as
+  `backend/test/fixtures/ocr/` and double as parser test fixtures, so backend
+  tests and CI never need the model.
+- **Browser parity** — native and WASM inference can differ slightly. Plan
+  step 1 records the browser's output for three synthetic images and the eval
+  compares it with the Node output; any text difference is reported.
 - **Matching** — predicted rows are matched to labelled rows by date +
   amount, then by description similarity.
-- **Metrics**, per layout and per source (`parser` / `llm`):
+- **Metrics**, per layout, per source (`parser` / `llm`), and per model:
   row precision and recall; exact-match rate for amount, date, type;
   normalised-description match; category accuracy where labelled;
-  fallback rate; OCR `duration_ms` p50/p95.
+  fallback rate; OCR time p50/p95; model download size.
 - **Headline:** **silent-error rate** = rows with a wrong amount and none of
   the warning flags, divided by matched rows.
-- **Output:** `eval/reports/<date>-<model_versions>.md` (synthetic reports
-  committed; private-set reports gitignored).
+- **Output:** `eval/reports/<date>-<model>.md` (synthetic reports committed;
+  private-set reports gitignored).
 
 ## 9. Testing
 
-- **Parser** (`test/importParser.test.js`): amount formats and rejections,
-  character repair only inside amount shapes, year inference swept across four
-  timezones (as `terms.test.js` does), date headers, running-balance
-  verification and mismatch, receipt total ranking and arithmetic, category
-  mapping against the list parsed from `new.tsx` (as `demoData.test.js` does).
-- **Routes** (`test/importRoutes.test.js`): real router on an ephemeral port
-  with the OCR client and `db.query` stubbed — magic-byte rejection, size
-  limit, 503 mapping, `disabled` status, fallback-unavailable degradation, and
+- **Parser** (`backend/test/importParser.test.js`): amount formats and
+  rejections, character repair only inside amount shapes, year inference swept
+  across four timezones (as `terms.test.js` does), date headers,
+  running-balance verification and mismatch, receipt total ranking and
+  arithmetic, category mapping against the list parsed from `new.tsx` (as
+  `demoData.test.js` does).
+- **Routes** (`backend/test/importRoutes.test.js`): real router on an ephemeral
+  port with `db.query` and the LLM client stubbed — payload validation and size
+  limit, empty lines, fallback-unavailable degradation, duplicate flagging, and
   that nothing printed contains OCR text or row values (as
   `registerLogging.test.js` does).
 - **Import endpoint** (`api.test.js`, needs `TEST_DATABASE_URL`): atomicity on
   one bad row, `source` persisted, 100-row cap.
-- **OCR service:** `pytest`.
-- **CI:** add an `ocr-service` job (install, pytest). Backend job unchanged
-  apart from new tests.
-- **Frontend:** no runner; verify by running the app and walking the flow in
-  light and dark themes and at phone width.
+- **CI:** backend job picks up the new tests. The frontend job's `build`
+  covers the worker and dynamic import compiling. `eval/` is not run in CI.
+- **Frontend:** no runner; verify by running the app and walking the flow —
+  first-use download, a bank screenshot, a receipt photo, an unsupported
+  browser path — in light and dark themes and at phone width.
 
 ## 10. Build order
 
-1. `ocr-service` running locally and on Render; `rapidocr`/PP-OCRv5 pinned.
-2. Parser, synthetic dataset, fixtures, `npm run eval` — first real numbers.
-3. Migration, `/import` routes, `POST /transactions/import`.
-4. `/import` page and entry buttons.
+1. **Spike:** `ppu-paddle-ocr` recognising a sample screenshot in Node and in a
+   Worker on a throwaway Next.js page; settle model hosting, WASM threading,
+   download size, and timing. Spike code is discarded.
+2. `eval/` project, synthetic dataset, fixtures, parser, `npm run eval` —
+   first real numbers, and the model choice.
+3. Migration, `POST /import/parse`, `POST /transactions/import`.
+4. `lib/ocr/` worker and hook, `/import` page, entry buttons.
 5. LLM fallback — built only if step 2's numbers show the parser needs it, and
    measured with the same benchmark.
 
 ## 11. Risks
 
-- **Free-tier cold start** can exceed a minute; the warming UI and the 90 s
-  timeout are the mitigation. Upgrading to a paid instance is a config change.
-- **512 MB memory** with mobile models and a 2000 px cap is expected to fit;
-  step 1 measures it.
+- **First-use download** (models plus the WASM runtime) is tens of megabytes;
+  the progress banner and browser caching are the mitigation, and step 1
+  measures the size.
+- **Slow or unsupported devices** — older phones may take several seconds per
+  image; step 1 measures it, and unsupported devices get manual entry.
+- **Multi-threaded WASM** needs cross-origin isolation headers, which can break
+  third-party embeds; v1 ships the single-threaded path unless step 1 shows it
+  is too slow.
+- **Library dependence** — `ppu-paddle-ocr` is a young, fast-moving package;
+  its version is pinned, and the model files are self-hosted so an upstream
+  change cannot silently swap the model.
 - **Bank-app layouts vary**; the benchmark's per-layout numbers show where the
   parser falls short, and the fallback covers it.
-- **The public OCR endpoint** is protected by the shared secret only; it
-  holds no user data and stores nothing.
