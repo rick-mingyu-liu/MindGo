@@ -103,16 +103,36 @@ Decisions:
 - **`useOcr.ts`** — a hook that wraps the worker: state
   `idle | downloading(progress) | ready | recognizing | unsupported | failed`,
   and a `recognize(file)` that queues calls one at a time.
-- **Preprocessing** — decode with `createImageBitmap`; downscale so the longest
-  side is at most 2000 px; box coordinates are mapped back to the original
-  image's pixel space before leaving the worker, so the review screen can
-  overlay them directly.
+- **Recognition options** — `flatten: true` and `minimumConfidence: 0`: the
+  library's default of 0.5 silently drops low-confidence text, and this design
+  flags low confidence rather than discarding it. The library returns boxes as
+  `{ x, y, width, height }` in original-image pixels, which is the wire format
+  as-is, so the review screen can overlay them directly. The library's own
+  `detection.maxSideLength: "auto"` handles downscaling.
+- **Recognition strategy** is chosen by the benchmark, not assumed. Measured
+  on 2026-09-16 with `V5_EN_MOBILE_MODEL` in Node: `per-line` (the default)
+  read `-$23.47` correctly but gave every word on a line one shared confidence
+  and dropped a `TOTAL 0.07` line; `per-box` kept that line and gave
+  per-word confidences but read `-$23.47` as **`$23.47`** — the minus sign
+  lost with high confidence. Minus signs are therefore never the only evidence
+  for a transaction's type (see §4.4).
+- **Processing engine** — the library's default `opencv` engine bundles
+  OpenCV.js; `canvas-native` avoids it. The spike measures the download cost
+  of each and the benchmark measures accuracy; eval and browser always use the
+  same engine.
+- **Self-hosted runtime** — `onnxruntime-web` fetches its WASM from jsDelivr
+  unless `ort.env.wasm.wasmPaths` is set; the worker sets it to `/ort/`, and
+  the WASM files are copied from `node_modules/onnxruntime-web/dist` into
+  `public/ort/` by the same script that fetches the models.
 - **Unsupported devices** — if WebAssembly is unavailable or initialisation
   fails, the page shows a message and a link to manual entry. There is no
   server-side OCR fallback in v1.
-- **Verify first (plan step 1):** the library's exact API and model-path
-  options, whether it runs inside a Worker under Next.js, multi-threaded WASM
-  requirements (`SharedArrayBuffer` needs cross-origin isolation headers; the
+- **Verified 2026-09-16 (Node):** `new PaddleOcrService({ model })`,
+  `await initialize()`, `recognize(arrayBuffer, options)`; the v5 English
+  mobile model files total 12 MB; first initialise about 1 s, recognition
+  about 70 ms for a small image; process RSS about 400 MB.
+- **Verify first (plan step 1):** whether it runs inside a Worker under
+  Next.js, multi-threaded WASM requirements (`SharedArrayBuffer` needs cross-origin isolation headers; the
   single-threaded path must work without them), total download size, and
   recognition time on a laptop and a mid-range phone.
 
@@ -160,7 +180,9 @@ Scores `receipt` vs `bank-list` and returns `{ layout, confidence }`.
 - `type` = `expense` when the sign is negative; `income` when positive-signed or
   the description matches income words (`Payroll`, `Deposit`,
   `e-Transfer received`, `Refund`, `Interest`); otherwise `expense` with flag
-  `type_guessed`.
+  `type_guessed`. Because OCR can drop a minus sign (§3), an unsigned amount is
+  never treated as a confirmed expense: it always carries `type_guessed`
+  unless the running-balance check confirms the direction.
 - **Running balance:** a row with two amounts treats the right-most as a
   balance candidate. If consecutive balances differ by exactly the row amount
   (with the sign implied by `type`), mark the rows `arithmetic_verified` and
@@ -220,7 +242,7 @@ Scores `receipt` vs `bank-list` and returns `{ layout, confidence }`.
     "confidence": 0.93,
     "flags": ["arithmetic_verified"],
     "source": "parser",
-    "boxes": [[[12, 40], [310, 40], [310, 78], [12, 78]]]
+    "boxes": [{ "x": 12, "y": 40, "width": 298, "height": 38 }]
   }]
 }
 ```
@@ -247,14 +269,14 @@ parser keeps its default):
   "model": "PP-OCRv5_en_mobile",
   "image": { "width": 1170, "height": 2532 },
   "lines": [{ "text": "Sobeys #1234", "conf": 0.97,
-              "box": [[12, 40], [310, 40], [310, 78], [12, 78]] }]
+              "box": { "x": 12, "y": 40, "width": 298, "height": 38 } }]
 }
 ```
 
 Validation (`body([...])`): `today` is `YYYY-MM-DD`; `model` a short string;
 `image.width`/`height` integers 1–10 000; `lines` an array of at most 2 000;
-each `text` a string of at most 500 characters; `conf` in [0, 1]; `box` four
-numeric points. Then: parser → fallback → `possible_duplicate` by querying the
+each `text` a string of at most 500 characters; `conf` in [0, 1]; `box` an object of four
+non-negative numbers `x`, `y`, `width`, `height`. Then: parser → fallback → `possible_duplicate` by querying the
 user's transactions for matching `(date, amount, currency)`.
 
 ### `POST /transactions/import`
@@ -345,10 +367,10 @@ as the browser, through `onnxruntime-node`, and requires the backend parser by
 relative path. `npm run eval` from `eval/`.
 
 - **Datasets**
-  - `eval/synthetic/` (committed): a generator script renders HTML templates
-    of bank-app lists and receipts from randomised, seeded values to PNG, and
-    writes the ground truth alongside. Rendering needs a headless browser; it
-    runs only when regenerating, and the PNGs plus labels are committed.
+  - `eval/synthetic/` (committed): a generator script draws bank-app lists
+    and receipts from seeded random values onto `@napi-rs/canvas` (already a
+    dependency of the OCR library, so no headless browser), writes each PNG
+    with its ground truth alongside, and is re-run only to regenerate.
   - `eval/private/` (gitignored): 20–30 real screenshots with hand-written
     `*.label.json`. Never committed and never uploaded anywhere; OCR runs
     locally.
