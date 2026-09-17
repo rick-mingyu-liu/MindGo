@@ -1,10 +1,17 @@
-const cron = require('node-cron');
-const config = require('../config');
-const logger = require('../utils/logger');
-const db = require('../db/connection');
-const { sendWeeklyReport, generateWeeklyReport } = require('./emailService');
-const cleanupService = require('./cleanupService');
-const demoAccountService = require('./demoAccountService');
+import cron from 'node-cron';
+import type { ScheduledTask } from 'node-cron';
+import config = require('../config');
+import logger = require('../utils/logger');
+import { query } from '../db/connection';
+import { sendWeeklyReport, generateWeeklyReport } from './emailService';
+import * as cleanupService from './cleanupService';
+import * as demoAccountService from './demoAccountService';
+
+// name -> { job, kind }. `kind` is what tells stop() and getStatus() which
+// API they are holding; the two types share no methods worth guessing at.
+type Job =
+  | { job: NodeJS.Timeout; kind: 'interval' }
+  | { job: ScheduledTask; kind: 'cron' };
 
 /**
  * Owns the two kinds of recurring work: a node-cron job for weekly reports, and
@@ -14,14 +21,14 @@ const demoAccountService = require('./demoAccountService');
  * see the comment there.
  */
 class SchedulerService {
+  jobs: Map<string, Job>;
+
   constructor() {
-    // name -> { job, kind }. `kind` is what tells stop() and getStatus() which
-    // API they are holding; the two types share no methods worth guessing at.
     this.jobs = new Map();
   }
 
   // Initialize all scheduled jobs
-  init() {
+  init(): void {
     this.scheduleWeeklyReports();
     this.scheduleCleanupTasks();
     logger.info('Scheduler service initialized');
@@ -47,7 +54,7 @@ class SchedulerService {
    * pool's inactivity timer in db/connection.js had exactly this problem, where
    * it silently held the test runner open.
    */
-  scheduleInterval(name, intervalMs, task) {
+  scheduleInterval(name: string, intervalMs: number, task: () => Promise<number>): void {
     const timer = setInterval(async () => {
       try {
         const deleted = await task();
@@ -72,16 +79,18 @@ class SchedulerService {
   }
 
   // Schedule weekly report emails
-  scheduleWeeklyReports() {
+  scheduleWeeklyReports(): void {
     // node-cron must be 4.6 or later: 4.2 computed the next Sunday as 2034 and
     // slept until then (test/schedulerService.test.js).
     const job = cron.schedule(config.cron.weeklyReports, async () => {
       try {
         logger.info('Starting weekly report generation...');
 
-        const users = await db.query(
+        // db/connection.js is not yet converted (a later step), so query()'s
+        // result is untyped; this lists only the columns the SELECT names.
+        const users = await query(
           'SELECT id, email FROM users WHERE email_notifications_enabled = true AND weekly_reports_enabled = true'
-        );
+        ) as { rows: Array<{ id: number; email: string }> };
 
         let successCount = 0;
         let errorCount = 0;
@@ -111,17 +120,22 @@ class SchedulerService {
   }
 
   // Schedule cleanup tasks
-  scheduleCleanupTasks() {
+  scheduleCleanupTasks(): void {
     this.scheduleInterval(
       'aiCleanup',
       config.cron.aiPlanCleanup,
-      () => cleanupService.deleteOldAIPlans()
+      // cleanupService returns the row count pg's DELETE reports, typed
+      // number | null because that is how @types/pg types it in general; a
+      // DELETE always reports one, so this is a no-op coercion in practice,
+      // same as `deleted += null` coercing to a no-op in the pre-TypeScript
+      // version of this arithmetic.
+      () => cleanupService.deleteOldAIPlans().then((count) => count ?? 0)
     );
 
     this.scheduleInterval(
       'accountCleanup',
       config.cron.unverifiedAccountCleanup,
-      () => cleanupService.deleteUnverifiedAccounts()
+      () => cleanupService.deleteUnverifiedAccounts().then((count) => count ?? 0)
     );
 
     // The demo refresh is opt-in. It deletes every row of the demo account
@@ -158,12 +172,12 @@ class SchedulerService {
    * running. Only `process.exit(0)` on the line after the SIGTERM handler's
    * call kept that from mattering.
    */
-  stop() {
-    for (const [name, { job, kind }] of this.jobs) {
-      if (kind === 'interval') {
-        clearInterval(job);
+  stop(): void {
+    for (const [name, entry] of this.jobs) {
+      if (entry.kind === 'interval') {
+        clearInterval(entry.job);
       } else {
-        job.stop();
+        entry.job.stop();
       }
       logger.info(`Stopped scheduled job: ${name}`);
     }
@@ -178,17 +192,17 @@ class SchedulerService {
    *
    * `stop()` clears the map, so presence in it is what "scheduled" means.
    */
-  getStatus() {
-    const status = {};
-    for (const [name, { job, kind }] of this.jobs) {
+  getStatus(): Record<string, { kind: 'interval' | 'cron'; scheduled: true; nextRun: string | null }> {
+    const status: Record<string, { kind: 'interval' | 'cron'; scheduled: true; nextRun: string | null }> = {};
+    for (const [name, entry] of this.jobs) {
       status[name] = {
-        kind,
+        kind: entry.kind,
         scheduled: true,
-        nextRun: kind === 'cron' ? (job.getNextRun()?.toISOString() ?? null) : null,
+        nextRun: entry.kind === 'cron' ? (entry.job.getNextRun()?.toISOString() ?? null) : null,
       };
     }
     return status;
   }
 }
 
-module.exports = new SchedulerService();
+export = new SchedulerService();
