@@ -3,8 +3,9 @@ const { groupRows } = require('../../services/import/rows');
 /**
  * Hand-built OCR output for the screenshot-parser tests.
  *
- * Lives under test/ so `node --test` loads it as a file with no tests of its
- * own; that is harmless and keeps the helpers next to their only users.
+ * Lives under test/ so it sits next to its only users; `npm test` only runs
+ * files matching `*.test.js` under `dist/test`, so this file is never run on
+ * its own.
  */
 
 const TODAY = '2026-09-16';
