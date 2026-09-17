@@ -23,9 +23,24 @@
  * quota-exhausted response (200, `success: false`, no `format_valid`) was read
  * as "Invalid email format" and rejected too.
  */
-const axios = require('axios');
-const config = require('../config');
-const { maskEmail } = require('../utils/privacy');
+import axios from 'axios';
+import config = require('../config');
+import { maskEmail } from '../utils/privacy';
+
+/** The MailboxLayer fields `interpretMailboxLayer` reads, and nothing else. */
+interface MailboxLayerResponse {
+  success: boolean;
+  format_valid: boolean;
+  disposable: boolean;
+  mx_found: boolean;
+  smtp_check: boolean;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  reason?: string;
+  source: string;
+}
 
 /**
  * Known disposable providers. Not close to exhaustive — that is the point of
@@ -56,7 +71,7 @@ const MAJOR_DOMAINS = new Set([
   '163.com', 'qq.com', 'sina.com', '126.com', '139.com', 'sohu.com',
 ]);
 
-function domainOf(email) {
+function domainOf(email: unknown): string | undefined {
   if (typeof email !== 'string') return undefined;
   const at = email.lastIndexOf('@');
   return at < 0 ? undefined : email.slice(at + 1).toLowerCase();
@@ -69,7 +84,7 @@ function domainOf(email) {
  * malformed addresses before the controller runs — and cannot check
  * deliverability, which is the part that needs a service.
  */
-function validateAgainstDomainList(email) {
+function validateAgainstDomainList(email: string): ValidationResult {
   const domain = domainOf(email);
   if (domain && DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
     return { valid: false, reason: 'Disposable email addresses are not allowed', source: 'domain-list' };
@@ -87,18 +102,21 @@ function validateAgainstDomainList(email) {
  * user with a perfectly good address that it is malformed, which is what the
  * previous version did.
  */
-function isUsableResponse(data) {
-  return Boolean(data) && data.success !== false && typeof data.format_valid === 'boolean';
+function isUsableResponse(data: unknown): data is MailboxLayerResponse {
+  // Narrows off `unknown` to read the two fields the check needs; the guard
+  // itself — not this cast — is what proves the shape is usable.
+  const candidate = data as Partial<MailboxLayerResponse>;
+  return Boolean(data) && candidate.success !== false && typeof candidate.format_valid === 'boolean';
 }
 
-function interpretMailboxLayer(data, email) {
+function interpretMailboxLayer(data: MailboxLayerResponse, email: string): ValidationResult {
   if (!data.format_valid) {
     return { valid: false, reason: 'Invalid email format', source: 'mailboxlayer' };
   }
   if (data.disposable) {
     return { valid: false, reason: 'Disposable email addresses are not allowed', source: 'mailboxlayer' };
   }
-  if ((!data.mx_found || !data.smtp_check) && MAJOR_DOMAINS.has(domainOf(email))) {
+  if ((!data.mx_found || !data.smtp_check) && MAJOR_DOMAINS.has(domainOf(email) ?? '')) {
     return { valid: true, source: 'mailboxlayer' };
   }
   if (!data.mx_found) {
@@ -122,7 +140,7 @@ let warnedNoKey = false;
  * Never throws: the caller is a request handler, and this used to be the one
  * thing in `register` that could fail before the try block it belonged in.
  */
-async function validateEmail(email) {
+async function validateEmail(email: string): Promise<ValidationResult> {
   const apiKey = config.apiKeys.mailboxLayer;
 
   if (!apiKey) {
@@ -135,20 +153,30 @@ async function validateEmail(email) {
 
   const url = `https://apilayer.net/api/check?access_key=${apiKey}&email=${encodeURIComponent(email)}`;
 
-  let data;
+  let data: unknown;
   try {
     ({ data } = await axios.get(url));
   } catch (error) {
     // console.error, not logger.error: this must print in production, where
     // it means registrations are being waved through on the weaker check.
+    // error is unknown here; the original duck-typed `.response?.status`,
+    // `.code` and `.message` off whatever was thrown rather than requiring an
+    // axios error specifically (test/emailValidation.test.js throws a plain
+    // Error with a bolted-on `.code`), so narrow the same way.
+    const e = error as { response?: { status?: unknown }; code?: unknown; message?: unknown };
     console.error('[EmailValidation] MailboxLayer request failed, falling back to the domain list:',
-      error?.response?.status || error.code || error.message);
+      e.response?.status || e.code || e.message);
     return validateAgainstDomainList(email);
   }
 
   if (!isUsableResponse(data)) {
+    // data failed the usability guard, so it may be anything apilayer sent —
+    // including its own error payload ({ error: { info, type } }). Nothing
+    // has validated that shape, so read it the same defensive way the
+    // original did.
+    const errorPayload = data as { error?: { info?: unknown; type?: unknown } } | undefined;
     console.error('[EmailValidation] MailboxLayer returned no usable verdict, falling back to the domain list:',
-      data?.error?.info || data?.error?.type || 'unrecognised response shape');
+      errorPayload?.error?.info || errorPayload?.error?.type || 'unrecognised response shape');
     return validateAgainstDomainList(email);
   }
 
@@ -165,7 +193,7 @@ async function validateEmail(email) {
   return interpretMailboxLayer(data, email);
 }
 
-module.exports = {
+export {
   validateEmail,
   validateAgainstDomainList,
   DISPOSABLE_EMAIL_DOMAINS,
