@@ -18,17 +18,17 @@ const DAY = /^(\d{4})-(\d{2})-(\d{2})/;
  * The 'YYYY-MM-DD' day of a value, or null if it does not carry one.
  * Accepts a day string, an ISO timestamp, or a Date.
  */
-function toDay(value) {
+export function toDay(value: unknown): string | null {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
     return isoDay(value.getFullYear(), value.getMonth(), value.getDate());
   }
   const match = DAY.exec(String(value ?? ''));
-  return match ? match[0] : null;
+  return match?.[0] ?? null;
 }
 
 /** The 'YYYY-MM' a day falls in — the month key used by the summary views. */
-function monthOf(value) {
+export function monthOf(value: unknown): string | null {
   const day = toDay(value);
   return day ? day.slice(0, 7) : null;
 }
@@ -37,7 +37,7 @@ function monthOf(value) {
  * A day rendered the way `toLocaleDateString()` renders one under en-US, which
  * is what the report emails used to print, minus the day it used to lose.
  */
-function formatDay(value, fallback = '-') {
+export function formatDay(value: unknown, fallback: string = '-'): string {
   const day = toDay(value);
   if (!day) return fallback;
   const [year, month, date] = day.split('-');
@@ -45,15 +45,14 @@ function formatDay(value, fallback = '-') {
 }
 
 /** Whole months between two 'YYYY-MM' keys, counting both ends. */
-function monthSpan(fromMonth, toMonth) {
-  const absolute = (key) => {
-    const [year, month] = key.split('-').map(Number);
-    return year * 12 + (month - 1);
+export function monthSpan(fromMonth: string, toMonth: string): number {
+  const absolute = (key: string): number => {
+    const [yearPart, monthPart] = key.split('-');
+    return Number(yearPart) * 12 + (Number(monthPart) - 1);
   };
   return absolute(toMonth) - absolute(fromMonth) + 1;
 }
 
-const pad2 = (n) => String(n).padStart(2, '0');
-const isoDay = (year, monthIndex, date) => `${year}-${pad2(monthIndex + 1)}-${pad2(date)}`;
-
-module.exports = { toDay, monthOf, formatDay, monthSpan };
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+const isoDay = (year: number, monthIndex: number, date: number): string =>
+  `${year}-${pad2(monthIndex + 1)}-${pad2(date)}`;
