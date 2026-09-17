@@ -1,11 +1,13 @@
 # Screenshot Import (OCR) — Design
 
-**Date:** 2026-09-16 · **Status:** implemented 2026-09-16 on feat/ocr-import (Task 16, the LLM fallback, not built) · **Branch:** `feat/ocr-import` · **Plan:** [`docs/superpowers/plans/2026-09-16-ocr-import.md`](../plans/2026-09-16-ocr-import.md)
+**Date:** 2026-09-16 · **Status:** implemented 2026-09-16 on feat/ocr-import (Task 16, the LLM fallback, not built); extended 2026-09-17 with real-screenshot fixes and the Uber, Uber Eats and WeChat Pay layouts (see *Revision notes (2026-09-17)*) · **Branch:** `feat/ocr-import` · **Plan:** [`docs/superpowers/plans/2026-09-16-ocr-import.md`](../plans/2026-09-16-ocr-import.md)
 
 ## 1. Goal
 
 A new **Import** page where a user drops in screenshots of Canadian bank-app
-transaction lists or photos of paper receipts, reviews the transactions that
+transaction lists, photos of paper receipts, or screenshots of Uber's trip
+activity, Uber Eats' past orders or WeChat Pay's transaction list, reviews the
+transactions that
 open-source OCR (PaddleOCR, **PP-OCRv6 small**, running **on the user's
 device**) extracted, and saves them in one step.
 
@@ -42,10 +44,13 @@ separately deployed OCR service.
 
 ### Non-goals (v1)
 
-WeChat Pay / Alipay bills, credit-card statement pages, PDFs, a native mobile
-app, learned categorisation, server-side draft persistence, a server-side OCR
-path, multi-threaded or GPU inference. PP-OCRv6's dictionary covers Chinese, so
-WeChat/Alipay is a new layout for the parser, not a model change.
+Alipay bills, credit-card statement pages, PDFs, a native mobile app, learned
+categorisation, server-side draft persistence, a server-side OCR path,
+multi-threaded or GPU inference. WeChat Pay's transaction list was added on
+2026-09-17 (§4.9) as a new parser layout with no model change, since PP-OCRv6's
+dictionary covers Chinese; Alipay would be the same kind of change. Uber Eats'
+*Past items* tab is deliberately not a layout: it shows today's menu prices
+and no dates, so nothing on it is a charge (§4.8).
 
 ## 2. Architecture
 
@@ -55,7 +60,7 @@ Browser (/import)                                          Node API (Render)
   Web Worker: ppu-paddle-ocr + ONNX Runtime Web (WASM, 1 thread)
     PP-OCRv6 small det + rec → lines [{text, conf, box}]
   ── POST /import/parse { today, model, image:{w,h}, lines } ──▶ auth, importLimiter, validate payload
-                                                                 parser: rows → tokens → classify → bankList | receipt
+                                                                 parser: rows → tokens → classify → bankList | receipt | uberActivity | uberEats | wechat
                                                                  (optional) unsure → row text → LLM → same validators
                                                                  possible_duplicate lookup
   review (table ≥ md, cards < md) ◀── draft rows + flags ───────┘   (nothing persisted)
@@ -156,14 +161,31 @@ WebGPU (`jsep`) variant and is not used.
 
 ## 4. Parser (`backend/services/import/`)
 
-Pure functions, one purpose per module. Implemented and tested in the plan;
-this section states the rules.
+Pure functions, one purpose per module. §4.1–4.7 were implemented and tested
+in the plan; §4.8–4.9 and the rules marked *(2026-09-17)* came from real
+screenshots afterwards. This section states the rules.
+
+Several rules below compare a vertical **gap** between two lines with a line
+**height**. Every such threshold was set from measured boxes, with the
+synthetic set's nearest opposite case recorded next to it, so a change can be
+checked against both.
 
 ### 4.1 `rows.js` — boxes to visual rows
 
-Lines whose vertical extents overlap by at least half the shorter one form a
-row; each row is sorted left to right and keeps its lines, bounding box, height
-and minimum confidence.
+- **Icons are dropped first** *(2026-09-17)*. A box holding one character that
+  is not a Latin letter, a digit, a sign or a currency symbol is an icon the
+  model tried to read: a shopping bag came back as `凸` at up to 0.96
+  confidence, so confidence cannot tell them apart. A lone `A`, `7`, `-`, `$`
+  or `¥` is kept.
+- A line joins the row above when their vertical extents overlap by at least
+  half the shorter one **and** the line's middle lies inside the row so far
+  *(2026-09-17)*. Without the second rule a tall chevron straddling an amount
+  and the balance beneath it widened the row until it swallowed the next
+  line, and the two amounts came back in the wrong order.
+- Within a row, lines read **top line first, then left to right**
+  *(2026-09-17)*; ordering by x alone put a wrapped second line first when it
+  started a pixel further left.
+- Each row keeps its lines, bounding box, height and minimum confidence.
 
 ### 4.2 `tokens.js` — values
 
@@ -178,18 +200,28 @@ and minimum confidence.
 - **`parseDateDetail`** accepts ISO and `YYYY/MM/DD`, `Sep 14`, `SEPT. 14`,
   `September 14, 2025`, `14 Sep`, weekday prefixes, `Today`, `Yesterday`, and
   `MM/DD/YYYY` or `DD/MM/YYYY` **only when one part exceeds 12** (otherwise
-  refused as ambiguous). A day with no year is the most recent such day not
+  refused as ambiguous). Spaces OCR squeezes out are put back first
+  *(2026-09-17)*: `SEP15,2026`, `SEP 16,2026` and `14SEP` all read. A day with no year is the most recent such day not
   after `today`, and is marked `inferredYear`. No `Date` objects: civil-date
   integer arithmetic, so the server's timezone never matters (tested in four
   timezones).
 
 ### 4.3 `classify.js` — layout
 
-Counts receipt signals (`SUBTOTAL`, `TOTAL`, tax names, `TIP`, `CHANGE`, card
-brands, masked card numbers, `THANK YOU`, a total line) against bank-list
-signals (`Pending`, `Posted`, `Balance`, `Transactions`, `e-Transfer`, date
-headers, three or more rows ending in an amount). The layout is the larger
-count; confidence is its share. No signals at all is `unknown`.
+Counts signals for each layout; the layout is the largest count and confidence
+is its share of all signals. A tie goes to the earlier layout in this list. No
+signals at all is `unknown`.
+
+| Layout | Signals |
+|---|---|
+| `receipt` | `SUBTOTAL`, `TOTAL`, tax names, `TIP`, `CHANGE`, card brands, masked card numbers, `THANK YOU`, a total line (+2) |
+| `bank-list` | `Pending`, `Posted`, `Balance`, `Transactions`, `e-Transfer`, date rows (up to 3), three or more rows ending in an amount (+2) |
+| `uber-activity` | `Rebook`, an `Activity` title, rows dated with a time (`Sep 16 • 6:14 p.m.`, up to 3) |
+| `uber-eats-orders` | `View store`, `Past orders`, order lines (`Mar 15 • $60.54 • 1 item`, up to 3). **Counted only when at least one order line exists**, because the tab labels also appear on the Past items tab |
+| `wechat-pay` | WeChat words (`微信`, `零钱`, `转账`, `红包`), `Expenditures`/`Incomes` or `支出`/`收入`, `M/D HH:MM` lines (up to 3), a `2026/9` month header. **Counted only when both the words and a date-time line are present**, so another app's `9/13 20:23` does not trip it |
+
+The date-and-time and order-line matchers belong to their parsers and are
+imported by the classifier, so the two cannot disagree about what a line is.
 
 ### 4.4 `bankList.js`
 
@@ -212,6 +244,20 @@ count; confidence is its share. No signals at all is `unknown`.
   `arithmetic_verified`; one that does not is `balance_mismatch`. **This
   verifies the amount only, never the direction**: a credit card's balance
   rises with purchases, and OCR drops minus signs from balances too.
+- **Balance beneath the amount** *(2026-09-17)*. Some apps (RBC) stack an
+  entry: the amount on the right with the running balance directly under it.
+  A row holding one amount that sits right under the previous entry's amount,
+  right edges aligned, with a gap under **0.4** of the amount's height, is
+  that entry's balance, and its text continues the entry's description.
+  Measured: 0.26–0.27 for a stacked balance; never below 0.85 between
+  single-line transactions in the synthetic set.
+- **A description that wraps** *(2026-09-17)* puts its second line on a row of
+  its own with no amount. Tucked under the description (same 0.4 cut-off,
+  left edges aligned) it continues that description instead of ending the
+  date header. Measured: 0.04 for a wrapped name; never below 0.97 for the
+  date header after a transaction.
+- **Rows of pure symbols** (chevrons, icons) are skipped rather than read as
+  headers, and symbol-only lines never join a description *(2026-09-17)*.
 - Also: `pending`, `corrected_chars`; zero amounts are skipped.
 
 ### 4.5 `receipt.js`
@@ -234,7 +280,15 @@ parses as one.
   (default 0.80) the row is `low_confidence`.
 - `category` from `categorize.js`: a small keyword map onto the canonical
   category list (checked against `db/demoData.js`, which is pinned to the
-  frontend list); no confident match → `null`.
+  frontend list); no confident match → `null`. **A parser that sets
+  `category` itself — including to `null` — wins over the keyword guess**
+  *(2026-09-17)*: an Uber trip to "The Toronto Clinic" is Transportation, not
+  Healthcare, and an Uber Eats order from an unknown store must not become
+  Dining Out because its description starts with "Uber Eats".
+- **Direction.** On a bank list an unsigned amount is always `type_guessed`
+  (§4.4). A receipt, an Uber trip and an Uber Eats order are charges by
+  layout, so their rows are expenses without that flag. WeChat Pay prints its
+  own `+` and `−`, and only its unsigned amounts are guessed (§4.9).
 - `needsFallback` when layout confidence < 0.6, no rows, or
   `arithmetic_failed`. `unparsedLines` (every row's text) when no rows.
 - Warning flags — the ones that mean *look at this row* — are
@@ -267,6 +321,78 @@ through the same `parseAmount`/`parseDateDetail`/category checks, carry
 error, or an unusable response returns the parser's result with the warning
 `ai_fallback_unavailable` — which is also what the route adds whenever
 `needsFallback` is true and no fallback exists.
+
+### 4.8 `uberActivity.js` and `uberEats.js` *(2026-09-17)*
+
+Both work on **lines**, not rows, where logos and buttons share rows with the
+text that matters. "Tucked" below means a gap of under half the smaller
+line's height.
+
+**Uber trips** (`uber-activity`):
+
+```
+The Toronto Clinic            <- destination, may wrap
+Sep 16 • 6:14 p.m.   Rebook   <- date and time, beside a button
+$10.38                        <- the fare, alone on its line
+```
+
+- A trip is a date-and-time line (`•` or `·`, then `h:mm a.m./p.m.`) with a
+  lone fare tucked under it. The destination is the run of text lines tucked
+  above it (measured 0.02–0.34 inside a card; over 1.0 from the map's street
+  names above the first card).
+- Buttons (`Rate`, `Rebook`, `Help`, `Details`, `Receipt`) are removed first.
+- Every row is an expense, category **Transportation**, description
+  `Uber: <destination>`. `$0.00` (cancelled) is skipped.
+
+**Uber Eats orders** (`uber-eats-orders`, the *Past orders* tab):
+
+```
+[logo]  Shoppers Drug Mart            <- store
+        Mar 15 • $60.54 • 1 item      <- date, total paid, item count
+        Ankle Brace, Medium ...       <- first items     [View store]
+```
+
+- An order is its date-total-count line, squeezed forms included
+  (`Mar15·$60.54·1item`, `23 item s`). The store is the text tucked above it
+  **in the same column** (left edges within a line height): the logo is read
+  as text too (`SHOPPERS`, `LCBO`) and sits further left. Measured 0.19–0.28
+  from a store to its order line; over 1.5 from the previous order's last
+  item line.
+- The total is what was charged, fees and tip included. Item names are not
+  kept. Every row is an expense, description `Uber Eats: <store>`, category
+  from the **store name alone**, else `null`.
+
+These rides and orders are also on the card statement; the only protection
+against importing both is `possible_duplicate` (same day, amount and
+currency), which misses a charge posted on a different day (§11).
+
+### 4.9 `wechat.js` *(2026-09-17)*
+
+```
+2026/9        Expenditures¥485.00  Incomes¥485.00   <- month header
+[avatar]  微信红包-来自张三                  +120.00    <- description, amount
+          9/13 20:23                                <- date and time
+```
+
+- A transaction is a row holding an amount with an `M/D HH:MM` line under its
+  description (gap under one description-line height, left edges aligned;
+  measured 0.4–0.63 of the smaller line, over 1.5 to the next description).
+  A date line that a tall amount box pulled onto the description's row is
+  still a date, never description.
+- **Year** from the nearest `YYYY/M` month header above; with none above, the
+  most recent such day, flagged as inferred.
+- **Currency is always `CNY`**: a WeChat Pay balance holds nothing else, and
+  the headers print `¥`.
+- **Amounts** always have two decimals, so one stray character after them
+  (`+150.00.`, `+4.801`, measured) is dropped and the row is flagged
+  `corrected_chars`, with amount confidence × 0.8.
+- **Direction:** `+` income, `−` expense. Unsigned amounts are moves between
+  the user's own balances (`零钱通转出-到零钱`, which WeChat's own monthly totals
+  leave out); they are guessed from their words (`来自`, `收款`, `退款`,
+  `到零钱` → income, else expense) and flagged `type_guessed`.
+- Not built: checking a month's rows against the header's `Expenditures` and
+  `Incomes` totals, which would verify repaired amounts the way running
+  balances do on a bank list.
 
 ## 5. API
 
@@ -350,7 +476,9 @@ the dashboard and on `/transactions`.
    text is sent; nothing is saved until you confirm.
 3. **Drop zone** — drag and drop, file picker, or paste anywhere on the page;
    PNG, JPEG, WebP; up to five per batch. Each image shows queued / reading /
-   parsing / done / failed, layout and read time, with *Try again* and remove.
+   parsing / done / failed, layout (*Bank list*, *Receipt*, *Uber trips*,
+   *Uber Eats orders*, *WeChat Pay*, *Unrecognised layout*) and read time,
+   with *Try again* and remove.
    An image with no rows shows the text that was read and a link to manual
    entry.
 4. **Review** — a table from `md` up and one card per row below it (a
@@ -387,7 +515,9 @@ parser (required by path), then the scorer.
   and 24 receipts (tilted, with ambiguous and unambiguous date formats and
   optional tips) — each with a `.truth.json`.
 - `eval/private/` (gitignored): real screenshots with hand-written
-  `.truth.json`. Never committed or uploaded; OCR runs locally.
+  `.truth.json`. Never committed or uploaded; OCR runs locally. The fixtures
+  built from them for the backend tests keep the measured boxes and OCR
+  quirks but replace names, places and reference numbers.
 
 ### 8.3 Scoring (`eval/lib/score.cjs`)
 
@@ -426,11 +556,37 @@ the parser does not recognise as a date, so it is flagged `missing_date` too.
 Synthetic images are clean; the private set is what measures real screenshots
 and photos.
 
+### 8.5 Real screenshots (private set, 2026-09-17)
+
+Seven screenshots, shipped profile, after the 2026-09-17 changes (the
+synthetic results above were unchanged by them):
+
+| Screenshot | Layout | Rows (true / found) | Amount, date, type exact | Silent errors |
+|---|---|---|---|---|
+| RBC account, balance under each amount | bank-list | 2 / 2 | yes | 0 |
+| Wealthsimple card, icons, wrapped merchant | bank-list | 7 / 7 | yes | 0 |
+| Uber trip activity | uber-activity | 5 / 5 | yes | 0 |
+| Uber Eats past orders | uber-eats-orders | 6 / 6 | yes | 0 |
+| Uber Eats past items (no charges) | unknown | 0 / 0 | — | 0 |
+| WeChat Pay transactions | wechat-pay | 7 / 7 | yes | 0 |
+
+Before the changes, the RBC screenshot was classified as a receipt with no
+rows, the Wealthsimple rows carried icon characters and were all *Hard to
+read*, the Uber rows had no date or description, and the WeChat Pay
+screenshot lost three rows and every date and read as CAD. The browser's OCR
+output can differ slightly from Node's on the same image (seen once: a date
+line grouped onto its description's row), which is why the WeChat parser
+tolerates that case.
+
 ## 9. Testing
 
 - **Parser** — `importTokens`, `importRows`, `importClassify`,
-  `importBankList`, `importReceipt`, `importParse` tests (95 cases), with
-  hand-built layouts in `test/helpers/ocrLayouts.js`.
+  `importBankList`, `importReceipt`, `importUberActivity`, `importUberEats`,
+  `importWechat`, `importParse` tests, with hand-built layouts in
+  `test/helpers/ocrLayouts.js` — five of them (`stackedBalanceLines`,
+  `iconListLines`, `uberActivityLines`, `uberEatsOrderLines`,
+  `wechatPayLines`) copied from real screenshots' OCR boxes with the personal
+  details replaced.
 - **Recorded OCR** — `importFixtures.test.js` (§8.3).
 - **Routes** — `importRoutes.test.js`: both endpoints through the real routers
   with auth and `db.query` stubbed — payload validation, the 1 MB limit,
@@ -474,7 +630,14 @@ and photos.
 - **Library dependence** — `ppu-paddle-ocr` is young and moves fast; its
   version is pinned and the model files are self-hosted.
 - **Real layouts vary**; the private set's per-layout numbers show where the
-  parser falls short.
+  parser falls short. Every layout added so far needed at least one
+  measured-gap rule (§4.1, §4.4, §4.8, §4.9); a new bank app should be
+  expected to need its own.
+- **Double counting.** Uber trips and Uber Eats orders are also card
+  charges. `possible_duplicate` matches only the same day, amount and
+  currency, so a charge posted a day later is not flagged.
+- **Browser and Node OCR differ slightly** on the same image, so the
+  benchmark is close to, not identical with, what a user sees.
 
 ## Revision notes (2026-09-16, after prototyping)
 
@@ -491,3 +654,16 @@ written. What that changed from the first approved draft:
 - **Review UI:** reason-named warning badges, a source dialog instead of a
   side panel, cards on phones (§7).
 - **Eval** is a top-level project with a canvas-drawn synthetic set (§8).
+
+## Revision notes (2026-09-17, from real screenshots)
+
+- **Row grouping** requires a line's middle inside the row, reads rows top
+  line first, and drops single-character icons (§4.1).
+- **Squeezed dates** parse (§4.2).
+- **Bank lists** read a balance stacked under its amount, join a wrapped
+  description, and skip symbol-only rows (§4.4).
+- **New layouts:** Uber trips and Uber Eats past orders (§4.8), WeChat Pay in
+  CNY (§4.9); the classifier gates the last two on their own evidence (§4.3).
+- **A parser's own category wins** over the keyword guess, and direction is
+  guessed only where a layout leaves it open (§4.6).
+- **Evidence:** seven real screenshots, all read correctly (§8.5).

@@ -9,7 +9,7 @@ const { parseAmount, makeDay } = require('./tokens');
  *
  * A transaction is a row holding an amount, with a date-and-time line under
  * its description (a gap of under one line height, left edges aligned —
- * measured 0.3–0.6 of the smaller line, over 1.5 to the next description).
+ * measured 0.4–0.63 of the smaller line, over 1.5 to the next description).
  * The year is the nearest month header's above it; with none above, the most
  * recent such day, flagged as inferred.
  *
