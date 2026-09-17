@@ -1,4 +1,4 @@
-const config = require('./index');
+import config = require('./index');
 
 /**
  * Startup configuration check.
@@ -14,7 +14,7 @@ const config = require('./index');
  */
 
 /** Optional variables, and what stops working without each. */
-const OPTIONAL = [
+const OPTIONAL: [string, string][] = [
   ['OPENAI_API_KEY', 'AI plans and investment advice (/ai) will fail'],
   ['EMAIL_USER', 'no verification or weekly-report email can be sent'],
   ['EMAIL_PASS', 'no verification or weekly-report email can be sent'],
@@ -24,10 +24,14 @@ const OPTIONAL = [
 
 const MIN_SECRET_LENGTH = 32;
 
-function validateConfig() {
-  const errors = [];
+function validateConfig(): void {
+  const errors: string[] = [];
+  // Captured once so the check below can be narrowed to `string`: TypeScript
+  // cannot tell, from `errors.length === 0`, that this specific push above
+  // never ran — the loud exit just after does.
+  const jwtSecret = config.jwt.secret;
 
-  if (!config.jwt.secret) {
+  if (!jwtSecret) {
     errors.push('JWT_SECRET is not set — every login and authenticated request would fail.');
   }
 
@@ -49,10 +53,12 @@ function validateConfig() {
     process.exit(1);
   }
 
-  // Non-fatal, but worth saying out loud.
-  if (config.jwt.secret.length < MIN_SECRET_LENGTH) {
+  // Non-fatal, but worth saying out loud. jwtSecret is defined here: an unset
+  // secret already pushed an error above, and the block above would have
+  // exited the process before reaching this line.
+  if (jwtSecret !== undefined && jwtSecret.length < MIN_SECRET_LENGTH) {
     console.warn(
-      `⚠️  JWT_SECRET is only ${config.jwt.secret.length} characters — ` +
+      `⚠️  JWT_SECRET is only ${jwtSecret.length} characters — ` +
         `use at least ${MIN_SECRET_LENGTH} random characters in production.`
     );
   }
@@ -62,4 +68,4 @@ function validateConfig() {
   }
 }
 
-module.exports = validateConfig;
+export = validateConfig;
