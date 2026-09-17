@@ -14,6 +14,7 @@ import { useTranslation } from 'next-i18next'
 import { formatDay } from '@/lib/date';
 import { i18n } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { readPreferences } from '@/lib/preferences';
 
 interface Transaction {
   id: number
@@ -84,17 +85,9 @@ export default function Transactions() {
   }, [router])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const prefs = localStorage.getItem('userPreferences');
-      if (prefs) {
-        try {
-          const lang = JSON.parse(prefs).language;
-          if (lang && i18n.language !== lang) {
-            i18n.changeLanguage(lang);
-          }
-        } catch {}
-      }
-    }
+    // A language chosen in Settings wins; 'system' leaves the page's locale alone.
+    const { language } = readPreferences();
+    if (language !== 'system' && i18n.language !== language) i18n.changeLanguage(language);
   }, [i18n]);
 
   const filteredTransactions = transactions.filter(transaction => {
