@@ -40,6 +40,7 @@ interface Shot {
 const LAYOUT_LABEL: Record<ParseResponse['layout'], string> = {
   'bank-list': 'Bank list',
   receipt: 'Receipt',
+  'uber-activity': 'Uber trips',
   unknown: 'Unrecognised layout',
 }
 

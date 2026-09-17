@@ -1,10 +1,12 @@
 const { extractTrailingAmount, parseDate } = require('./tokens');
+const { splitDateTime } = require('./uberActivity');
 
 /**
- * Decides whether a screenshot is a receipt or a bank-app transaction list by
- * counting signals for each. `confidence` is the winner's share of all
- * signals, so a screenshot with evidence for both scores low and is sent to
- * the fallback rather than parsed with false certainty.
+ * Decides whether a screenshot is a receipt, a bank-app transaction list or
+ * Uber's trip activity by counting signals for each; a tie goes to receipt,
+ * then bank list. `confidence` is the winner's share of all signals, so a
+ * screenshot with evidence for more than one scores low and is sent to the
+ * fallback rather than parsed with false certainty.
  */
 const RECEIPT_SIGNALS = [
   /\bsub\s*-?\s*total\b/i,
@@ -24,6 +26,12 @@ const BANK_SIGNALS = [
   /\be-?transfer\b/i,
 ];
 
+// Uber's Activity screen: its buttons and title, and trips dated with a time.
+const UBER_SIGNALS = [
+  /\brebook\b/i,
+  /^activity$/im,
+];
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 function classifyLayout(rows, today) {
@@ -40,11 +48,16 @@ function classifyLayout(rows, today) {
   });
   if (totalLine) receipt += 2;
 
-  if (receipt + bank === 0) return { layout: 'unknown', confidence: 0 };
-  return {
-    layout: receipt >= bank ? 'receipt' : 'bank-list',
-    confidence: round2(Math.max(receipt, bank) / (receipt + bank)),
-  };
+  let uber = UBER_SIGNALS.filter((re) => re.test(text)).length;
+  uber += Math.min(rows.filter((r) => splitDateTime(r.text, today)).length, 3);
+
+  const total = receipt + bank + uber;
+  if (total === 0) return { layout: 'unknown', confidence: 0 };
+  const best = Math.max(receipt, bank, uber);
+  let layout = 'uber-activity';
+  if (receipt === best) layout = 'receipt';
+  else if (bank === best) layout = 'bank-list';
+  return { layout, confidence: round2(best / total) };
 }
 
 module.exports = { classifyLayout };

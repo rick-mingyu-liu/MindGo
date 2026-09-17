@@ -91,8 +91,47 @@ const iconListLines = () => [
 ];
 const ICON_IMAGE = { width: 1206, height: 1848 };
 
+// Uber's Activity screen: a map card for the latest trip, then one card per
+// trip — destination (which can wrap), "Sep 16 • 6:14 p.m." beside a Rebook
+// button, and the fare on its own line. Boxes are the shipped model's output
+// for a real screenshot (2026-09-17); the places are not.
+const uberActivityLines = () => [
+  line('9:371', { x: 88, y: 47, width: 157, height: 54, conf: 0.98 }),
+  line('96', { x: 644, y: 51, width: 208, height: 49, conf: 0.93 }),
+  line('Activity', { x: 9, y: 150, width: 309, height: 96 }),
+  line('Past', { x: 17, y: 286, width: 127, height: 60 }),
+  line('YO', { x: 303, y: 418, width: 432, height: 131, conf: 0.8 }),
+  line('940', { x: 726, y: 459, width: 29, height: 6, conf: 0.37 }),
+  line('MAPLE HILL RIVER VALL', { x: 372, y: 495, width: 494, height: 61, conf: 0.96 }),
+  line('KING STW', { x: 129, y: 622, width: 259, height: 125 }),
+  line('CABB', { x: 722, y: 618, width: 137, height: 42 }),
+  line('Noodle House', { x: 61, y: 799, width: 266, height: 49 }),
+  line('Sep 16 • 7:16 p.m .', { x: 63, y: 862, width: 264, height: 41, conf: 0.97 }),
+  line('$7.53', { x: 57, y: 904, width: 103, height: 48 }),
+  line('☆ Rate', { x: 82, y: 997, width: 157, height: 59, conf: 0.95 }),
+  line(' Rebook', { x: 282, y: 996, width: 201, height: 59, conf: 0.93 }),
+  line('Riverside Clinic', { x: 210, y: 1169, width: 333, height: 42 }),
+  line('Sep 16 • 6:14 p.m.', { x: 210, y: 1222, width: 263, height: 41, conf: 0.97 }),
+  line('Rebook', { x: 674, y: 1213, width: 198, height: 54 }),
+  line('$10.38', { x: 207, y: 1267, width: 116, height: 47 }),
+  line('Riverside Clinic', { x: 210, y: 1370, width: 333, height: 42 }),
+  line('Sep 14 • 4:03 p.m.', { x: 209, y: 1423, width: 272, height: 42, conf: 0.94 }),
+  line(' Rebook', { x: 674, y: 1414, width: 198, height: 54, conf: 0.93 }),
+  line('$9.96', { x: 203, y: 1468, width: 108, height: 48 }),
+  line('Golden Lotus Chinese', { x: 210, y: 1570, width: 353, height: 43 }),
+  line('Seafood Cuisine', { x: 211, y: 1617, width: 297, height: 41 }),
+  line(' Rebook', { x: 676, y: 1637, width: 194, height: 53, conf: 0.94 }),
+  line('Aug 29 • 6:59 p.m .', { x: 210, y: 1666, width: 279, height: 43, conf: 0.98 }),
+  line('$11.89', { x: 206, y: 1713, width: 114, height: 48 }),
+  line('Lakeside Park', { x: 209, y: 1814, width: 174, height: 46 }),
+  line('Aug 21 • 12:53 p.m.', { x: 210, y: 1868, width: 285, height: 43, conf: 0.95 }),
+  line(' Rebook', { x: 676, y: 1860, width: 195, height: 54, conf: 0.94 }),
+  line('$8.40', { x: 207, y: 1915, width: 106, height: 46 }),
+];
+const UBER_IMAGE = { width: 920, height: 2000 };
+
 
 module.exports = {
   TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
-  iconListLines, ICON_IMAGE,
+  iconListLines, ICON_IMAGE, uberActivityLines, UBER_IMAGE,
 };
