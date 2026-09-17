@@ -24,6 +24,7 @@ const summaryRoutes = require('./routes/summary');
 const goalRoutes = require('./routes/goals');
 const investmentRoutes = require('./routes/investments');
 const aiRoutes = require('./routes/ai');
+const importRoutes = require('./routes/import');
 
 const app = express();
 const PORT = config.port;
@@ -39,6 +40,10 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(cors(config.cors));
+// Parsed here, before the app-wide parser, because the default 100 kB limit is
+// too small for one long screenshot's OCR output. The app-wide parser skips a
+// body that has already been read.
+app.use('/import', express.json({ limit: config.import.bodyLimit }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,6 +70,7 @@ app.use('/goals', goalRoutes);
 app.use('/investments', investmentRoutes);
 // Every /ai call costs real OpenAI credit, so it gets its own hourly budget.
 app.use('/ai', aiLimiter, aiRoutes);
+app.use('/import', importRoutes);
 
 // Error handling middleware
 app.use(ErrorHandler.globalErrorHandler);
