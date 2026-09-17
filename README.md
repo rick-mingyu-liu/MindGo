@@ -35,7 +35,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 
 **Transactions** — income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in.
 
-**Screenshot import** — drop bank-app screenshots or receipt photos; PaddleOCR (PP-OCRv6) reads them on your device, and every row is checked and flagged before anything is saved. Benchmarked on a synthetic set: every transaction found, amounts exact, no unflagged errors.
+**Screenshot import** — drop bank-app screenshots, receipt photos, or screenshots of Uber trips, Uber Eats past orders or WeChat Pay (read as CNY); PaddleOCR (PP-OCRv6) reads them on your device, and every row is checked and flagged before anything is saved. Benchmarked on a synthetic set (every transaction found, amounts exact, no unflagged errors) and on seven real screenshots, all read correctly. Design: [`docs/superpowers/specs/2026-09-16-ocr-import-design.md`](docs/superpowers/specs/2026-09-16-ocr-import-design.md).
 
 **Term budgeting** — the dashboard's period selector, category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick.
 
@@ -43,9 +43,11 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 
 **Investment watchlist** — quotes, company financials, news and market indices, with three data sources behind a fallback chain (Finnhub → Yahoo Finance → Alpha Vantage) so a missing API key degrades rather than breaks.
 
-**AI planning** — OpenAI-generated financial plans grounded in the user's actual transactions.
+**AI planning** — OpenAI-generated financial plans grounded in the user's actual transactions. When the OpenAI account is out of credit or rate-limited, the page says AI planning is unavailable rather than reporting a server error.
 
-**Weekly report emails** — a scheduled summary of the past seven days plus a four-month rollup.
+**Weekly report emails** — a summary of the past seven days plus a four-month rollup, every Sunday at 7 p.m. Toronto time, or on demand from the dashboard's *Send Report*. One switch in Settings turns the scheduled email on or off.
+
+**Settings** — theme, display currency, language, the weekly report, and the planning preferences AI planning uses. Every control saves as it changes.
 
 **English and 中文** throughout.
 
@@ -194,9 +196,9 @@ npm run check:locales    # fails on duplicate or unresolved keys
 
 ### Tests
 
-[`backend/test/`](backend/test/) holds the only automated tests — **419 across 24 files**, run by `node --test`. No test framework is installed and none is needed.
+[`backend/test/`](backend/test/) holds the only automated tests — **500 across 27 files**, run by `node --test`. No test framework is installed and none is needed.
 
-**Unit tests always run**, with no database and no network. They cover the things that fail silently: currency conversion and its caching, the term calendar swept across four timezones, the date helpers, the demo generator's evergreen properties at nine different "todays", the startup config check, retention predicates, scheduler timer plumbing, address masking, which log levels survive production, that registration never writes a token or a raw address to the log, and the screenshot-import parser piece by piece and end to end.
+**Unit tests always run**, with no database and no network. They cover the things that fail silently: currency conversion and its caching, the term calendar swept across four timezones, the date helpers, the demo generator's evergreen properties at nine different "todays", the startup config check, retention predicates, scheduler timer plumbing and the weekly report's next run on a UTC clock, AI endpoints when OpenAI is out of credit, address masking, which log levels survive production, that registration never writes a token or a raw address to the log, and the screenshot-import parser piece by piece and end to end.
 
 **Recorded OCR fixtures** (`importFixtures.test.js`) replay real OCR output — captured once by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI. `eval/` is a separate top-level npm project (`cd eval && npm test` — 10 tests) that also generates the synthetic screenshot set and scores accuracy per layout, including the *silent-error rate* that chose the shipped model.
 
@@ -301,7 +303,7 @@ The backend needs no build step — `npm start` runs `node app.js`. The frontend
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.js` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron`, plus interval jobs that delete expired AI plans and unverified accounts. Nothing mounts them over HTTP.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus interval jobs that delete expired AI plans and unverified accounts. Nothing mounts them over HTTP. `node-cron` must stay at 4.6 or later: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ---
 
@@ -319,15 +321,16 @@ Six tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `
 
 ## Known gaps
 
-Tracked in [`IMPROVEMENTS.md`](IMPROVEMENTS.md), which records what was found, what was decided and why.
+The improvement backlog is retired; the reasoning for anything already fixed lives in the comment next to the code, and the rest is in git history.
 
-- **Retention settings do not persist.** The settings page saves and reports success; the backend returns hardcoded defaults and stores nothing. Harmless today because nothing acts on them (item 20).
-- **`/summary/rolling` returns every transaction twice** and aggregates in Node — one user's year is a ~154 kB response. This is the gate on an *All time* view (item 21).
-- **No frontend test runner**, so `lib/date.ts` is unguarded (item 23).
-- **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not (item 18).
-- **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else (item 19).
+- **Retention settings do not persist.** `GET/PUT /transactions/retention-settings` reports a saved preference it never stores, and nothing acts on one. The settings page no longer shows or requests it.
+- **`/summary/rolling` returns every transaction twice** and aggregates in Node — one user's year is a ~154 kB response. This is the gate on an *All time* view.
+- **No frontend test runner**, so `lib/date.ts` and `lib/preferences.ts` are unguarded.
+- **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.
+- **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else.
 - **Phone OCR speed is unmeasured.** Screenshot import takes about 1–2 s per image on a laptop; a phone may be several times slower. Measure on a real device before announcing the feature.
-- **The LLM fallback for screenshot import was not built.** No private screenshot set yet shows the rule-based parser needs it; unsure rows report `ai_fallback_unavailable` and fall back to manual entry.
+- **The LLM fallback for screenshot import was not built.** The seven real screenshots tried so far were all read by the rule-based parser once their layouts were added; unsure rows report `ai_fallback_unavailable` and fall back to manual entry.
+- **Uber and Uber Eats imports can double-count** a card charge already imported from a bank screenshot. Duplicates are flagged only when the day, amount and currency all match.
 
 ## Contributing
 
