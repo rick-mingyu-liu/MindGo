@@ -1,4 +1,6 @@
-const { extractTrailingAmount, parseDate, parseDateDetail, toCents } = require('./tokens');
+import { extractTrailingAmount, parseDate, parseDateDetail, toCents } from './tokens';
+import type { DateDetail, ParsedAmount } from './tokens';
+import type { Box, DraftFlag, ImageSize, ParserDraft, Row } from '../../types/import';
 
 /**
  * A paper receipt: exactly one transaction, whose amount is the total line.
@@ -12,7 +14,7 @@ const TAX = /\b(gst|hst|pst|qst|tax)\b/i;
 const TOTAL_NOT_TAX = /\btotal\b(?!\s+tax)/i;
 const TIP = /\b(tip|gratuity)\b/i;
 const NOT_A_TOTAL = /\btotal\s+(savings|saved|items?|discount|qty|quantity|points)\b/i;
-const TOTAL_RANKS = [
+const TOTAL_RANKS: [RegExp, number][] = [
   [/\btotal\b/i, 4],
   [/\bamount\s+due\b/i, 3],
   [/\bbalance\s+due\b/i, 2],
@@ -22,11 +24,23 @@ const PHONE = /\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]\d{4}\b/;
 const URL = /www\.|https?:|\.(com|ca|net|org)\b/i;
 const ADDRESS = /^\d+\s+.*\b(st|street|ave|avenue|rd|road|blvd|boulevard|dr|drive|way|cres|crescent|unit|suite|hwy|highway)\b/i;
 
-function parseReceipt(rows, image, today) {
-  let total = null;
-  const subtotals = [];
-  const taxes = [];
-  const tips = [];
+/** An amount found at the end of a line, with the row's index on the receipt. */
+interface AmountAt {
+  amount: ParsedAmount;
+  index: number;
+}
+
+/** The candidate chosen as the total: its rank, and the row it came from. */
+interface TotalHit extends AmountAt {
+  rank: number;
+  row: Row;
+}
+
+export function parseReceipt(rows: Row[], image: ImageSize | null | undefined, today: string): { drafts: ParserDraft[] } {
+  let total: TotalHit | null = null;
+  const subtotals: AmountAt[] = [];
+  const taxes: AmountAt[] = [];
+  const tips: AmountAt[] = [];
 
   rows.forEach((row, index) => {
     const hit = extractTrailingAmount(row.text);
@@ -43,15 +57,20 @@ function parseReceipt(rows, image, today) {
   });
 
   if (!total) return { drafts: [] };
+  // `total` is reassigned inside the forEach closure above, so TypeScript
+  // cannot carry its narrowed, non-null type into the nested closures below
+  // (`between`) or even into this function's later statements. Rebind it to
+  // a `const` once, which narrowing survives everywhere.
+  const winner: TotalHit = total;
 
-  const flags = [];
-  const subtotal = subtotals.filter((s) => s.index < total.index).pop();
+  const flags: DraftFlag[] = [];
+  const subtotal = subtotals.filter((s) => s.index < winner.index).pop();
   if (subtotal) {
-    const between = (item) => item.index > subtotal.index && item.index < total.index;
+    const between = (item: AmountAt): boolean => item.index > subtotal.index && item.index < winner.index;
     const charges = [...taxes.filter(between), ...tips.filter(between)];
     if (charges.length > 0) {
       const sum = [subtotal, ...charges].reduce((acc, item) => acc + toCents(item.amount.value), 0);
-      flags.push(sum === toCents(total.amount.value) ? 'arithmetic_verified' : 'arithmetic_failed');
+      flags.push(sum === toCents(winner.amount.value) ? 'arithmetic_verified' : 'arithmetic_failed');
     }
   }
 
@@ -59,33 +78,33 @@ function parseReceipt(rows, image, today) {
   const merchant = rows
     .filter((r) => r.box.y < limit && /[a-z]/i.test(r.text) && !PHONE.test(r.text)
       && !URL.test(r.text) && !ADDRESS.test(r.text) && !parseDate(r.text, today))
-    .reduce((best, r) => (!best || r.height > best.height ? r : best), null);
+    .reduce<Row | null>((best, r) => (!best || r.height > best.height ? r : best), null);
 
   const date = findDate(rows, today);
   if (!date) flags.push('missing_date');
-  if (total.amount.corrected) flags.push('corrected_chars');
+  if (winner.amount.corrected) flags.push('corrected_chars');
 
   return {
     drafts: [{
       date: date ? date.day : null,
-      amount: total.amount.value,
-      currency: total.amount.currency || 'CAD',
+      amount: winner.amount.value,
+      currency: winner.amount.currency || 'CAD',
       description: merchant ? merchant.text : '',
       type: 'expense',
       flags,
       conf: {
-        amount: total.row.conf * (total.amount.corrected ? 0.8 : 1),
+        amount: winner.row.conf * (winner.amount.corrected ? 0.8 : 1),
         date: date ? date.conf * (date.inferredYear ? 0.9 : 1) : 0,
         description: merchant ? merchant.conf : 0,
         type: 1,
       },
-      boxes: [total.row.box, merchant && merchant.box].filter(Boolean),
+      boxes: [winner.row.box, merchant ? merchant.box : null].filter((b): b is Box => b !== null),
     }],
   };
 }
 
 /** The first run of up to four words, anywhere on the receipt, that is a day. */
-function findDate(rows, today) {
+function findDate(rows: Row[], today: string): (DateDetail & { conf: number }) | null {
   for (const row of rows) {
     const tokens = row.text.split(/\s+/);
     for (let len = Math.min(4, tokens.length); len >= 1; len--) {
@@ -97,5 +116,3 @@ function findDate(rows, today) {
   }
   return null;
 }
-
-module.exports = { parseReceipt };

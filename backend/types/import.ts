@@ -37,6 +37,12 @@ export interface Row {
   lines: OcrLine[];
 }
 
+/** The screenshot's pixel dimensions, as `POST /import/parse` receives them. */
+export interface ImageSize {
+  width: number;
+  height: number;
+}
+
 export type Layout = 'bank-list' | 'receipt' | 'uber-activity' | 'uber-eats-orders' | 'wechat-pay' | 'unknown';
 
 export type TransactionType = 'income' | 'expense';
