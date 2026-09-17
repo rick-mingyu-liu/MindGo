@@ -4,7 +4,26 @@
  * CommonJS and dependency-free so that both the eval runner (ESM) and the
  * backend's fixture test (CommonJS) use this one definition of "correct".
  */
-const { WARNING_FLAGS } = require('../../backend/services/import/parse');
+const path = require('node:path');
+
+/**
+ * The backend's compiled parser. The backend is TypeScript, built into
+ * backend/dist/ by `npm install` (its `prepare` script), so a checkout that
+ * has not installed the backend has no parser to load.
+ */
+function loadParser() {
+  const parser = path.join(__dirname, '..', '..', 'backend', 'dist', 'services', 'import', 'parse.js');
+  try {
+    return require(parser);
+  } catch (error) {
+    if (error.code === 'MODULE_NOT_FOUND' && error.message.startsWith(`Cannot find module '${parser}'`)) {
+      throw new Error('Run `npm install` in backend/ first; it builds the parser.');
+    }
+    throw error;
+  }
+}
+
+const { WARNING_FLAGS } = loadParser();
 
 const normalize = (text) => String(text ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -133,4 +152,4 @@ function rates(total) {
   };
 }
 
-module.exports = { similarity, matchRows, scoreImage, sumCounts, rates, normalize };
+module.exports = { similarity, matchRows, scoreImage, sumCounts, rates, normalize, loadParser };

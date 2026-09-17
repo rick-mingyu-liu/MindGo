@@ -5,6 +5,7 @@ const path = require('node:path');
 const { buildDemoData, CATEGORIES, isCoopTerm, TERMS_OF_HISTORY } = require('../db/demoData');
 const { currentTerm, previousTerm, boundsOf, termOf } = require('../utils/terms');
 const { monthOf } = require('../utils/dates');
+const { packageRoot } = require('../utils/packageRoot');
 
 /**
  * The demo account is generated relative to today rather than hardcoded, so
@@ -136,7 +137,7 @@ describe('categories stay in step with the frontend', () => {
    * unlisted category renders with a hash-derived colour and an untranslated
    * name — visible, but only to someone who happens to look.
    */
-  const FRONTEND = path.join(__dirname, '..', '..', 'frontend', 'pages', 'transactions', 'new.tsx');
+  const FRONTEND = path.join(packageRoot(__dirname), '..', 'frontend', 'pages', 'transactions', 'new.tsx');
 
   function frontendCategories() {
     const source = fs.readFileSync(FRONTEND, 'utf8');

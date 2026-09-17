@@ -2,14 +2,16 @@
   "name": "personal-finance-backend",
   "version": "1.0.0",
   "description": "Backend API for Personal Finance Web App",
-  "main": "app.js",
+  "main": "dist/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "db:setup": "node db/setup.js",
-    "db:seed": "node db/seed.js",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
+    "prepare": "npm run build",
+    "start": "node dist/app.js",
+    "dev": "tsx watch app.js",
+    "db:setup": "node dist/db/setup.js",
+    "db:seed": "node dist/db/seed.js",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "npm run build && node --test 'dist/test/**/*.test.js'"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -28,10 +30,22 @@
     "pg": "^8.11.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^22.20.3",
+    "@types/nodemailer": "^7.0.12",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
     "eslint": "^9.39.5",
     "globals": "^17.11.0",
-    "nodemon": "^3.0.2",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0"
   },
   "keywords": [
     "finance",
