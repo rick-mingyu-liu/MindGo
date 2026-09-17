@@ -408,7 +408,7 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 The backend runs on **Render**, the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
 
-The backend is built with `tsc` during `npm install` (its `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
+The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
 **Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `OPENAI_API_KEY` and the email credentials in Render, and keep the OpenAI account in credit — AI planning reports itself unavailable otherwise.
 

@@ -19,6 +19,8 @@ Success means:
 - `tsc` passes with `strict`, `noUncheckedIndexedAccess` and `noUnusedLocals`.
 - Render deploys the compiled output, and its Build and Start commands in the
   dashboard stay as they are (`npm install`, `npm start`).
+  > **2026-09-17:** Render's Build Command is now `npm ci --include=dev`; see
+  > the note under §6.2.
 - The docs describe the TypeScript backend.
 
 ### Out of scope
@@ -230,6 +232,12 @@ After step 1 is merged, the Render deploy log must show `tsc` running during
 the devDependencies (it skips them when `NODE_ENV=production` is set at build
 time), change the Build Command to `npm install --include=dev`, once, before
 step 2.
+
+> **2026-09-17:** Render's Build Command is now `npm ci --include=dev`
+> (Start Command stays `npm start`) — the old `yarn` build never ran
+> `prepare`, so neither devDependencies nor the `tsc` build ran. The
+> `npm install --include=dev` fix above describes an intermediate state;
+> treat `npm ci --include=dev` as current for step 2 onward.
 
 ## 7. CI
 
