@@ -31,8 +31,19 @@
  * under three timezones to hold that.
  */
 
+interface Term {
+  key: 'winter' | 'spring' | 'fall';
+  label: string;
+  startMonth: number;
+}
+
+interface TermBounds {
+  start: string;
+  end: string;
+}
+
 // Order matters: index is the term's position within the year.
-const TERMS = [
+const TERMS: Term[] = [
   { key: 'winter', label: 'Winter', startMonth: 0 },  // Jan, Feb, Mar, Apr
   { key: 'spring', label: 'Spring', startMonth: 4 },  // May, Jun, Jul, Aug
   { key: 'fall',   label: 'Fall',   startMonth: 8 },  // Sep, Oct, Nov, Dec
@@ -42,13 +53,26 @@ const MONTHS_PER_TERM = 4;
 const TERMS_PER_YEAR = TERMS.length;
 const TERM_ID = /^(\d{4})-(winter|spring|fall)$/;
 
-const pad2 = (n) => String(n).padStart(2, '0');
+/** `TERMS[index]`, narrowed: every real caller passes an index this module just computed (0, 1 or 2). */
+function termAt(index: number): Term {
+  const term = TERMS[index];
+  if (!term) throw new RangeError(`no such term index: ${index}`);
+  return term;
+}
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /** `(2026, 4, 1)` -> `'2026-05-01'`. month is 0-based, as in `Date`. */
-const isoDate = (year, month, day) => `${year}-${pad2(month + 1)}-${pad2(day)}`;
+const isoDate = (year: number, month: number, day: number): string =>
+  `${year}-${pad2(month + 1)}-${pad2(day)}`;
 
 /** Term id from its parts: `(2026, 1)` -> `'2026-spring'`. */
-const idOf = (year, index) => `${year}-${TERMS[index].key}`;
+const idOf = (year: number, index: number): string => `${year}-${termAt(index).key}`;
+
+interface DateParts {
+  year: number;
+  month: number;
+}
 
 /**
  * Accepts a `Date` or a `'YYYY-MM-DD'` string.
@@ -59,7 +83,7 @@ const idOf = (year, index) => `${year}-${TERMS[index].key}`;
  * with `getUTCMonth()` would be right there and wrong elsewhere; reading it
  * locally round-trips whatever `pg` produced.
  */
-function partsOf(date) {
+function partsOf(date: unknown): DateParts {
   if (typeof date === 'string') {
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
     if (!m) throw new TypeError(`Not a YYYY-MM-DD date: ${date}`);
@@ -72,18 +96,18 @@ function partsOf(date) {
 }
 
 /** `true` for a well-formed id like `'2026-spring'`. Use before `boundsOf`. */
-function isTermId(value) {
+function isTermId(value: unknown): boolean {
   return typeof value === 'string' && TERM_ID.test(value);
 }
 
-function parseTermId(termId) {
+function parseTermId(termId: unknown): { year: number; index: number } {
   const m = TERM_ID.exec(String(termId));
   if (!m) throw new TypeError(`Not a term id: ${String(termId)}`);
   return { year: Number(m[1]), index: TERMS.findIndex((t) => t.key === m[2]) };
 }
 
 /** Which term a date falls in. `'2026-06-15'` -> `'2026-spring'`. */
-function termOf(date) {
+function termOf(date: unknown): string {
   const { year, month } = partsOf(date);
   return idOf(year, Math.floor(month / MONTHS_PER_TERM));
 }
@@ -93,9 +117,9 @@ function termOf(date) {
  * `{ start: '2026-05-01', end: '2026-09-01' }`. Fall rolls into January of the
  * following year.
  */
-function boundsOf(termId) {
+function boundsOf(termId: unknown): TermBounds {
   const { year, index } = parseTermId(termId);
-  const startMonth = TERMS[index].startMonth;
+  const startMonth = termAt(index).startMonth;
   const endAbsolute = startMonth + MONTHS_PER_TERM;
   return {
     start: isoDate(year, startMonth, 1),
@@ -104,28 +128,28 @@ function boundsOf(termId) {
 }
 
 /** `'2026-spring'` -> `'Spring 2026'`, for a chart title. */
-function labelOf(termId) {
+function labelOf(termId: unknown): string {
   const { year, index } = parseTermId(termId);
-  return `${TERMS[index].label} ${year}`;
+  return `${termAt(index).label} ${year}`;
 }
 
 /** Absolute term number since year 0, so terms can be compared and stepped. */
-const ordinalOf = (year, index) => year * TERMS_PER_YEAR + index;
+const ordinalOf = (year: number, index: number): number => year * TERMS_PER_YEAR + index;
 
-function fromOrdinal(ordinal) {
+function fromOrdinal(ordinal: number): string {
   return idOf(Math.floor(ordinal / TERMS_PER_YEAR), ordinal % TERMS_PER_YEAR);
 }
 
-function shiftTerm(termId, by) {
+function shiftTerm(termId: unknown, by: number): string {
   const { year, index } = parseTermId(termId);
   return fromOrdinal(ordinalOf(year, index) + by);
 }
 
 /** `'2026-winter'` -> `'2025-fall'`. Crosses the year boundary correctly. */
-const previousTerm = (termId) => shiftTerm(termId, -1);
-const nextTerm = (termId) => shiftTerm(termId, 1);
+const previousTerm = (termId: unknown): string => shiftTerm(termId, -1);
+const nextTerm = (termId: unknown): string => shiftTerm(termId, 1);
 
-function currentTerm(now = new Date()) {
+function currentTerm(now: Date = new Date()): string {
   return termOf(now);
 }
 
@@ -138,12 +162,12 @@ function currentTerm(now = new Date()) {
  * a rolling 24-month cutoff would slice a term in half and leave a chart
  * showing a partial term's spending as if it were the whole thing.
  */
-function lastNTerms(n, now = new Date()) {
-  if (!Number.isInteger(n) || n < 1) {
+function lastNTerms(n: unknown, now: Date = new Date()): string[] {
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) {
     throw new RangeError(`lastNTerms needs a positive whole number, got ${String(n)}`);
   }
   const current = currentTerm(now);
-  const out = [];
+  const out: string[] = [];
   for (let i = n - 1; i >= 0; i--) out.push(shiftTerm(current, -i));
   return out;
 }
@@ -159,9 +183,9 @@ function lastNTerms(n, now = new Date()) {
  */
 
 /** The four months of a term, each as its first day. The seed builds on these. */
-function monthsOf(termId) {
+function monthsOf(termId: unknown): string[] {
   const { year, index } = parseTermId(termId);
-  const startMonth = TERMS[index].startMonth;
+  const startMonth = termAt(index).startMonth;
   return Array.from({ length: MONTHS_PER_TERM }, (_, i) => {
     const absolute = startMonth + i;
     return isoDate(year + Math.floor(absolute / 12), absolute % 12, 1);
@@ -171,42 +195,42 @@ function monthsOf(termId) {
 const YEAR_ID = /^\d{4}$/;
 
 /** True for '2026'. Deliberately not true for 2026 the number: ids are strings. */
-function isYearId(value) {
+function isYearId(value: unknown): boolean {
   return typeof value === 'string' && YEAR_ID.test(value);
 }
 
-function parseYearId(yearId) {
+function parseYearId(yearId: unknown): number {
   if (!isYearId(String(yearId))) throw new TypeError(`Not a year id: ${String(yearId)}`);
   return Number(yearId);
 }
 
 /** Half-open, like boundsOf: '2026' is 2026-01-01 up to but not including 2027-01-01. */
-function yearBoundsOf(yearId) {
+function yearBoundsOf(yearId: unknown): TermBounds {
   const year = parseYearId(yearId);
   return { start: isoDate(year, 0, 1), end: isoDate(year + 1, 0, 1) };
 }
 
-function yearLabelOf(yearId) {
+function yearLabelOf(yearId: unknown): string {
   return String(parseYearId(yearId));
 }
 
 /** The three terms of a year, in order. The yearly view's term axis. */
-function termsOfYear(yearId) {
+function termsOfYear(yearId: unknown): string[] {
   const year = parseYearId(yearId);
   return TERMS.map((_, index) => idOf(year, index));
 }
 
-function currentYear(now = new Date()) {
+function currentYear(now: Date = new Date()): string {
   return String(partsOf(now).year);
 }
 
-function shiftYear(yearId, by) {
+function shiftYear(yearId: unknown, by: number): string {
   return String(parseYearId(yearId) + by);
 }
 
-const previousYear = (yearId) => shiftYear(yearId, -1);
+const previousYear = (yearId: unknown): string => shiftYear(yearId, -1);
 
-module.exports = {
+export {
   TERMS,
   MONTHS_PER_TERM,
   isTermId,

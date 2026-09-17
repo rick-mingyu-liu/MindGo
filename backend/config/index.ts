@@ -1,14 +1,16 @@
-require('dotenv').config();
+import { config as loadEnv } from 'dotenv';
+
+loadEnv();
 
 /** Reads a number in (0, 1] from the environment, falling back when unset or out of range. */
-function fractionFromEnv(name, fallback) {
-  const parsed = Number.parseFloat(process.env[name]);
+function fractionFromEnv(name: string, fallback: number): number {
+  const parsed = Number.parseFloat(process.env[name] ?? '');
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 1 ? parsed : fallback;
 }
 
 /** Reads a positive integer from the environment, falling back when unset or unparseable. */
-function intFromEnv(name, fallback) {
-  const parsed = Number.parseInt(process.env[name], 10);
+function intFromEnv(name: string, fallback: number): number {
+  const parsed = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
@@ -160,4 +162,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export = config;

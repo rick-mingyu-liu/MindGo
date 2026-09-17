@@ -27,7 +27,7 @@
  * Never throws: it is called from logging, and a logging helper that can throw
  * turns a diagnostic line into an outage.
  */
-function maskEmail(email) {
+export function maskEmail(email: unknown): string {
   if (typeof email !== 'string' || email.length === 0) return '<no address>';
 
   const at = email.lastIndexOf('@');
@@ -42,5 +42,3 @@ function maskEmail(email) {
   // a small distinguisher on its own. Fixed width instead.
   return `${local[0]}***@${domain}`;
 }
-
-module.exports = { maskEmail };
