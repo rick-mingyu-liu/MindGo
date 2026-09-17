@@ -21,3 +21,6 @@ yarn-error.log*
 *.swp 
 
 .omc/
+
+# build output
+dist/

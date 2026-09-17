@@ -3,7 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseOcr } = require('../services/import/parse');
-const { scoreImage, sumCounts, rates } = require('../../eval/lib/score.cjs');
+const { packageRoot } = require('../utils/packageRoot');
+
+const ROOT = packageRoot(__dirname);
+const { scoreImage, sumCounts, rates } = require(path.join(ROOT, '..', 'eval', 'lib', 'score.cjs'));
 
 /**
  * Replays recorded OCR output from the synthetic benchmark through the parser.
@@ -15,7 +18,7 @@ const { scoreImage, sumCounts, rates } = require('../../eval/lib/score.cjs');
  * What must never regress is the silent part. A parser change that makes some
  * row wrong *and unflagged* fails here, whatever it does to the averages.
  */
-const DIR = path.join(__dirname, 'fixtures', 'ocr');
+const DIR = path.join(ROOT, 'test', 'fixtures', 'ocr');
 const fixtures = fs.readdirSync(DIR).filter((f) => f.endsWith('.json')).sort()
   .map((file) => ({ file, ...JSON.parse(fs.readFileSync(path.join(DIR, file), 'utf8')) }));
 
