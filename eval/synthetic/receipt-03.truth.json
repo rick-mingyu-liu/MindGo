@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "9.40",
+      "type": "expense",
+      "description": "TIM HORTONS",
+      "category": "Dining Out"
+    }
+  ]
+}

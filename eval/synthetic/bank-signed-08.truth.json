@@ -1,0 +1,41 @@
+{
+  "layout": "bank-list",
+  "style": "bank-signed",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-15",
+      "amount": "67.96",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "77.61",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "24.92",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "146.49",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "6.91",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "55.32",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "3.46",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "1269.63",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "84.76",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "99.88",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "1591.85",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "2050.06",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "44.71",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    }
+  ]
+}

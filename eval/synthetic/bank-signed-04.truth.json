@@ -1,0 +1,68 @@
+{
+  "layout": "bank-list",
+  "style": "bank-signed",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "35.87",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "103.93",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "79.79",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "139.68",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "41.13",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "2.62",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "15.21",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-09",
+      "amount": "10.02",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-08",
+      "amount": "143.09",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    }
+  ]
+}

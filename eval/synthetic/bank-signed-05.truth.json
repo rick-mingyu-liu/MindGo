@@ -1,0 +1,63 @@
+{
+  "layout": "bank-list",
+  "style": "bank-signed",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-15",
+      "amount": "89.23",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "117.20",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "786.11",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "38.78",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "41.62",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "37.58",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "61.73",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "130.51",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    }
+  ]
+}

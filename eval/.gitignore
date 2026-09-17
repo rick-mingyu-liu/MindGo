@@ -1,0 +1,6 @@
+node_modules/
+# OCR output cache, keyed by image hash and configuration.
+.cache/
+# Real screenshots and their labels. Never commit these.
+private/
+reports/private-*

@@ -1,0 +1,41 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "148.00",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "79.93",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "60.29",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "1799.14",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "392.83",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    }
+  ]
+}

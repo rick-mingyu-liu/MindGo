@@ -1,0 +1,42 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "49.27",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "124.08",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "13.85",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "9.24",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "32.73",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-15",
+      "amount": "18.50",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    }
+  ]
+}

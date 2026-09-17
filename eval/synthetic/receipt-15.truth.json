@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-09",
+      "amount": "21.28",
+      "type": "expense",
+      "description": "SOBEYS",
+      "category": "Groceries"
+    }
+  ]
+}

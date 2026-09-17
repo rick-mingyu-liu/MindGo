@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-07",
+      "amount": "41.23",
+      "type": "expense",
+      "description": "DOLLARAMA",
+      "category": "Shopping"
+    }
+  ]
+}
