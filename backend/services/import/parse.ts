@@ -1,11 +1,12 @@
-const { groupRows } = require('./rows');
-const { classifyLayout } = require('./classify');
-const { parseBankList } = require('./bankList');
-const { parseReceipt } = require('./receipt');
-const { parseUberActivity } = require('./uberActivity');
-const { parseUberEatsOrders } = require('./uberEats');
-const { parseWechatPay } = require('./wechat');
-const { categorize } = require('./categorize');
+import { groupRows } from './rows';
+import { classifyLayout } from './classify';
+import { parseBankList } from './bankList';
+import { parseReceipt } from './receipt';
+import { parseUberActivity } from './uberActivity';
+import { parseUberEatsOrders } from './uberEats';
+import { parseWechatPay } from './wechat';
+import { categorize } from './categorize';
+import type { Draft, DraftFlag, ImageSize, OcrLine, ParseResult, ParserDraft } from '../../types/import';
 
 /**
  * OCR lines in, draft transactions out. Pure: no database, no network, no
@@ -16,9 +17,19 @@ const { categorize } = require('./categorize');
  */
 const FALLBACK_BELOW_LAYOUT_CONFIDENCE = 0.6;
 const VERIFIED_FLOOR = 0.95;
-const round2 = (n) => Math.round(n * 100) / 100;
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-function parseOcr({ lines, image, today }, { confidenceThreshold = 0.8 } = {}) {
+interface ParseOcrInput {
+  lines: readonly (OcrLine | null | undefined)[] | null | undefined;
+  image?: ImageSize | null;
+  today: string;
+}
+
+interface ParseOcrOptions {
+  confidenceThreshold?: number;
+}
+
+export function parseOcr({ lines, image, today }: ParseOcrInput, { confidenceThreshold = 0.8 }: ParseOcrOptions = {}): ParseResult {
   const rows = groupRows(lines);
   if (rows.length === 0) {
     return {
@@ -28,7 +39,7 @@ function parseOcr({ lines, image, today }, { confidenceThreshold = 0.8 } = {}) {
   }
 
   const { layout, confidence } = classifyLayout(rows, today);
-  let drafts = [];
+  let drafts: ParserDraft[] = [];
   if (layout === 'receipt') drafts = parseReceipt(rows, image, today).drafts;
   if (layout === 'bank-list') drafts = parseBankList(rows, today).drafts;
   if (layout === 'uber-activity') drafts = parseUberActivity(rows, today).drafts;
@@ -48,8 +59,17 @@ function parseOcr({ lines, image, today }, { confidenceThreshold = 0.8 } = {}) {
   };
 }
 
-function finalize(draft, threshold) {
-  const flags = [...new Set(draft.flags)];
+// `category` is optional on ParserDraft: present (even as null) means the
+// parser knows the category, absent means finalize() should guess. A plain
+// `'category' in draft` check is correct at runtime but still types as
+// `string | null | undefined`, because TS can't rule out a key explicitly
+// set to `undefined`; no parser does that, so this predicate states it.
+function hasCategory(draft: ParserDraft): draft is ParserDraft & { category: string | null } {
+  return 'category' in draft;
+}
+
+function finalize(draft: ParserDraft, threshold: number): Draft {
+  const flags: DraftFlag[] = [...new Set(draft.flags)];
   const conf = { ...draft.conf };
   // Arithmetic that checks out proves the amount — not its direction, the
   // date or the merchant name — so only the amount is lifted.
@@ -64,7 +84,7 @@ function finalize(draft, threshold) {
     description: draft.description,
     // A parser that knows the category — including that it cannot know —
     // says so; the keyword guess is for the rest.
-    category: 'category' in draft ? draft.category : categorize(draft.description, draft.type),
+    category: hasCategory(draft) ? draft.category : categorize(draft.description, draft.type),
     type: draft.type,
     confidence: round2(confidence),
     flags,
@@ -74,7 +94,5 @@ function finalize(draft, threshold) {
 }
 
 /** Flags that mean "look at this row", as opposed to informational ones. */
-const WARNING_FLAGS = ['arithmetic_failed', 'balance_mismatch', 'corrected_chars',
+export const WARNING_FLAGS: DraftFlag[] = ['arithmetic_failed', 'balance_mismatch', 'corrected_chars',
   'low_confidence', 'missing_date', 'type_guessed'];
-
-module.exports = { parseOcr, WARNING_FLAGS };
