@@ -16,7 +16,7 @@ function loadParser() {
   try {
     return require(parser);
   } catch (error) {
-    if (error.code === 'MODULE_NOT_FOUND' && error.message.includes(parser)) {
+    if (error.code === 'MODULE_NOT_FOUND' && error.message.startsWith(`Cannot find module '${parser}'`)) {
       throw new Error('Run `npm install` in backend/ first; it builds the parser.');
     }
     throw error;
