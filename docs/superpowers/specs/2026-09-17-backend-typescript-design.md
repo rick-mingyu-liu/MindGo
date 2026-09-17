@@ -1,14 +1,15 @@
 # Backend TypeScript Conversion: Design
 
-**Date:** 2026-09-17 · **Status:** approved design, not started · **First branch:** `chore/ts-1-tooling`
+**Date:** 2026-09-17 · **Status:** approved design, not started · **First branch:** `chore/ts-1-tooling` · **Plan:** [`docs/superpowers/plans/2026-09-17-backend-typescript.md`](../plans/2026-09-17-backend-typescript.md)
 
 ## 1. Goal
 
 Convert the backend (`backend/`: 48 source files, about 6,900 lines, plus 28 test
 files, about 4,400 lines) from CommonJS JavaScript to strict TypeScript.
 **Behaviour stays the same.** Every endpoint, response body, status code and log
-line after the conversion matches what it was before, and all 500 tests still
-pass.
+line after the conversion matches what it was before, and every existing test
+still passes. The suite reports 507 from step 1 on: step 1 adds 8 tests, and the
+new test glob no longer counts `test/helpers/ocrLayouts.js` as a test file.
 
 Success means:
 
@@ -80,14 +81,14 @@ The source tree stays where it is, with `.js` files renamed to `.ts`:
 | `build` | `tsc` |
 | `prepare` | `npm run build`, which `npm install` and `npm ci` run automatically, so Render's existing Build Command compiles the backend |
 | `start` | `node dist/app.js` |
-| `dev` | `tsx watch app.ts` (runs `app.js` until step 7) |
-| `test` | `npm run build && node --test dist/test` |
+| `dev` | `tsx watch app.js`, and `app.ts` from step 7. Plain `node` and `nodemon` cannot `require()` a `.ts` module from JavaScript source, so `nodemon` is removed |
+| `test` | `npm run build && node --test 'dist/test/**/*.test.js'` (`node --test` does not accept a directory) |
 | `db:setup` / `db:seed` | `node dist/db/setup.js` / `node dist/db/seed.js` |
 | `lint` | `eslint .`, using `typescript-eslint`. The config becomes `eslint.config.mjs`, and `dist/` is ignored |
 
-New devDependencies: `typescript`, `tsx`, `typescript-eslint`,
+New devDependencies: `typescript` (pinned `~6.0.3`, because `typescript-eslint` 8 supports only `<6.1`), `tsx`, `typescript-eslint`, `@eslint/js` (already installed through `eslint`, but now imported directly),
 `@types/node`, `@types/express`, `@types/pg`, `@types/jsonwebtoken`,
-`@types/bcryptjs`, `@types/cors`, `@types/morgan`, `@types/nodemailer`,
+`@types/bcryptjs`, `@types/cors`, `@types/morgan`, `@types/nodemailer` (7, matching `nodemailer` 7),
 `@types/node-cron` (only where the package does not ship its own types), and
 `@types/supertest`.
 
@@ -125,7 +126,7 @@ getting exactly what it gets today. The rules:
 |---|---|
 | `module.exports = { a, b }` (22 modules) | `export { a, b }` / `export function a` |
 | `module.exports = <single value>`: a class instance, router, function or config object (23 modules) | `export = value` |
-| `module.exports.X = …` added to a single value (`aiPlanner.AiUnavailableError`) | A namespace merged with the exported value, so `require(...).AiUnavailableError` still works |
+| `module.exports.X = …` added to a single value (`aiPlanner.AiUnavailableError`) | `export = Object.assign(value, { X })`, the same object with the same property. TypeScript cannot merge a namespace with an instance |
 
 `export default` is not used anywhere during the conversion. Changing export
 shapes is out of scope, even after step 9.
@@ -145,7 +146,7 @@ and named-export modules with `import { a } from './x'`.
   parser in `db/connection` (see CLAUDE.md, *Dates are days*). `DECIMAL`
   columns are `string`, because that is what `pg` returns. `db.query` becomes
   `query<R extends QueryResultRow>(text, params?): Promise<QueryResult<R>>`.
-- `import.ts` has the parser's shapes: `OcrLine`, `Row`, `Draft`, `DraftFlag`
+- `import.ts` (written in step 3, together with the parser it describes) has the parser's shapes: `OcrLine`, `Row`, `Draft`, `DraftFlag`
   and `Layout`. They match the frontend's `lib/import/review.ts` and
   `lib/ocr/types.ts` by hand, not through shared code.
 
@@ -193,7 +194,7 @@ their exact output.
 
 | # | Branch | Contents | Files |
 |---|---|---|---|
-| 1 | `chore/ts-1-tooling` | This spec. `tsconfig.json`, scripts, devDependencies, the `typescript-eslint` config, `types/`, `utils/packageRoot.ts`, `utils/errorSummary.ts`, the three §3.3 callers, `eval/` requiring `dist/`, CI, `.gitignore`. No other source converted. | about 12 |
+| 1 | `chore/ts-1-tooling` | This spec and the plan. `tsconfig.json`, scripts, devDependencies, the `typescript-eslint` config, `types/db.ts` and `types/express.d.ts`, `utils/packageRoot.ts`, `utils/errorSummary.ts`, the three §3.3 callers, `eval/` requiring `dist/`, CI, `.gitignore`. No other source converted. | about 12 |
 | 2 | `chore/ts-2-utils-config` | `utils/*`, `config/*` | 7 |
 | 3 | `chore/ts-3-import-parser` | `services/import/*` | 11 |
 | 4 | `chore/ts-4-services` | `aiPlanner`, `emailService`, `emailValidationService`, `exchangeRateService`, `finnhubService`, `freeStockDataService`, `schedulerService`, `cleanupService`, `demoAccountService` | 9 |
@@ -211,7 +212,7 @@ in the PR.
 Before a step's PR is merged, all of these must pass:
 
 1. `npm run build` with no errors.
-2. `npm test`: 500 pass, 0 fail.
+2. `npm test`: 507 pass, 0 fail.
 3. `npm run lint`, clean.
 4. `npm start`, and `GET /health` returns 200.
 5. CI is green.
