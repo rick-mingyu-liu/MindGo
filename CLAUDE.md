@@ -32,6 +32,9 @@ npm run ocr-assets     # fetch + checksum the OCR model into public/models, copy
 ```
 
 ### Evaluation (`cd eval`)
+
+`eval/` loads the parser from `backend/dist/`, so run `npm run build` in `backend/` after any parser change before `npm run benchmark` or `npm run fixtures`.
+
 ```bash
 npm install
 npm run generate       # regenerate the synthetic screenshot set
