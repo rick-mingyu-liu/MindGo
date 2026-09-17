@@ -103,7 +103,6 @@ export default function Register() {
   } = useForm<RegisterForm>()
 
   const password = watch('password')
-  const email = watch('email')
 
   const onSubmit = async (data: RegisterForm) => {
     try {

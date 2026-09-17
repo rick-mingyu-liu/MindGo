@@ -105,8 +105,6 @@ const investmentController = {
         finnhubService.getQuote(symbol),
         finnhubService.getProfile(symbol)
       ]);
-      // Optionally, fetch from Moomoo as well if you want trading info
-      // const moomoo = await moomooService.getStockSnapshot(symbol);
 
       // Fallback logic for sector
       let sector = profile.gsector;
@@ -384,12 +382,6 @@ const investmentController = {
           const bs = reportData.bs || {};
           const ic = reportData.ic || {};
           const cf = reportData.cf || {};
-  
-          // Log what you're seeing from Finnhub
-          // console.log('--- Report for period:', period);
-          // console.log('BS:', bs);
-          // console.log('IC:', ic);
-          // console.log('CF:', cf);
   
           // Helper to find value by concept or label in an array
           function findValue(arr, concepts = [], labels = []) {

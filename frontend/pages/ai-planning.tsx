@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { Brain, ArrowLeft, Send, Sparkles, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
-import { api, logout, goalAPI } from '@/utils/api'
+import { Brain, ArrowLeft, Send, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { api, goalAPI } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import ReactMarkdown from 'react-markdown'
 import React from 'react'
@@ -37,16 +36,6 @@ interface PlanningResponse {
   plan?: {
     id: number
   }
-}
-
-// Helper to extract stock tickers from AI analysis
-function extractTickers(text: string): string[] {
-  // Simple regex for US stock tickers (all caps, 1-5 letters, not at start of line)
-  const matches = text.match(/\b[A-Z]{1,5}\b/g)
-  if (!matches) return []
-  // Filter out common English words and duplicates
-  const blacklist = ['AND', 'THE', 'FOR', 'WITH', 'FROM', 'THIS', 'THAT', 'YOUR', 'WILL', 'HAVE', 'ARE', 'NOT', 'BUT', 'CAN', 'HAS', 'ALL', 'YOU', 'ONE', 'TWO', 'FIVE', 'YEAR', 'YEARS', 'WEEK', 'WEEKS', 'SAVE', 'PLAN', 'RISK', 'HIGH', 'LOW', 'ETF', 'BOND', 'CASH', 'STOCK', 'GOAL', 'BUY', 'SELL', 'HOLD', 'USD']
-  return Array.from(new Set(matches.filter(t => !blacklist.includes(t))))
 }
 
 export default function AIPlanning() {

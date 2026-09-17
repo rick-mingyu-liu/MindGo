@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Edit, Trash2, Search, LogOut, Star, Info, Eye, ExternalLink } from 'lucide-react'
-import { api, logout, investmentAPI } from '@/utils/api'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, BarChart3, Trash2, Search, Info, Eye, ExternalLink } from 'lucide-react'
+import { api, investmentAPI } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFirstRow } from '@/components/ui/table'
 import { StockDetailModal } from '@/components/StockDetailModal'
 import Swal from 'sweetalert2'
@@ -26,11 +25,6 @@ interface WatchlistItem {
   changePercent: number
   marketCap?: string
   volume?: number
-}
-
-interface WatchlistForm {
-  symbol: string
-  company_name: string
 }
 
 // Add fallback index info
@@ -64,7 +58,6 @@ export default function Investments() {
   const [searchAddError, setSearchAddError] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
-  const [detailModalOpenId, setDetailModalOpenId] = useState<number | null>(null)
   const [indexRows, setIndexRows] = useState<any[]>([])
   const [indexLoading, setIndexLoading] = useState(true)
   const [indexError, setIndexError] = useState('')
@@ -197,13 +190,6 @@ export default function Investments() {
       style: 'currency',
       currency: 'USD',
     }).format(amount)
-  }
-
-  const formatNumber = (num: number) => {
-    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B'
-    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M'
-    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'
-    return num.toString()
   }
 
   const filteredWatchlist = watchlist.filter(item =>

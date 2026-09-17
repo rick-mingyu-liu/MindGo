@@ -222,25 +222,6 @@ Please provide:
 
     return this.generatePlan(prompt);
   }
-
-  /**
-   * Generate debt payoff strategy
-   * @param {Array} debts - User's debt information
-   * @returns {Promise<string>} Debt payoff strategy
-   */
-  async generateDebtPayoffStrategy(debts) {
-    const prompt = `Based on the following debt information, provide a debt payoff strategy:
-
-${JSON.stringify(debts, null, 2)}
-
-Please provide:
-1. Recommended payoff order (avalanche vs snowball method)
-2. Monthly payment recommendations
-3. Timeline for debt freedom
-4. Strategies to avoid new debt`;
-
-    return this.generatePlan(prompt);
-  }
 }
 
 module.exports = new AIPlanner();

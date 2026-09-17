@@ -91,40 +91,11 @@ api.interceptors.response.use(
   }
 )
 
-// Enhanced Stock API functions
-export const enhancedStockAPI = {
-  // Get enhanced watchlist
-  getWatchlist: () => api.get('/enhanced-stocks/watchlist'),
-  
-  // Get detailed stock data
-  getStockData: (symbol: string) => api.get(`/enhanced-stocks/stock/${symbol}`),
-  
-  // Add stock to watchlist
-  addToWatchlist: (symbol: string, companyName: string) => 
-    api.post('/enhanced-stocks/watchlist', { symbol, companyName }),
-  
-  // Remove stock from watchlist
-  removeFromWatchlist: (symbol: string) => 
-    api.delete(`/enhanced-stocks/watchlist/${symbol}`),
-  
-  // Search stocks
-  searchStocks: (query: string) => 
-    api.get(`/enhanced-stocks/search?q=${encodeURIComponent(query)}`),
-  
-  // Get market overview
-  getMarketOverview: () => api.get('/enhanced-stocks/market-overview'),
-  
-  // Seed sample data (for development)
-  seedSampleData: () => api.post('/enhanced-stocks/seed-sample-data')
-}
-
-// Add searchStocks for investments
 export const investmentAPI = {
   searchStocks: (query: string) => api.get(`/investments/search?query=${encodeURIComponent(query)}`),
   getStockSnapshot: (symbol: string) => api.get(`/investments/snapshot/${symbol}`),
   getStockNews: (symbol: string) => api.get(`/investments/news/${symbol}`),
   getStockFinancials: (symbol: string) => api.get(`/investments/financials/${symbol}`),
-  getMarketOverview: () => api.get('/investments/market-overview'),
   getStockAnalysis: (symbol: string) => api.get(`/investments/analysis/${symbol}`),
   getStockHistoricalData: (symbol: string, period: string = '1m') => api.get(`/investments/historical/${symbol}?period=${period}`),
 }

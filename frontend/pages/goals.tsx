@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Plus, Target, Calendar, DollarSign, Edit, Trash2, LogOut, Eye, Brain } from 'lucide-react'
-import { api, logout } from '@/utils/api'
+import { ArrowLeft, Plus, Target, Calendar, Edit, Eye, Brain } from 'lucide-react'
+import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -38,28 +38,6 @@ interface GoalForm {
   target_date: string
   description: string
   currency: string // Add currency to GoalForm
-}
-
-function GoalDescription({ description }: { description: string }) {
-  const [expanded, setExpanded] = React.useState(false);
-  const isLong = description && description.length > 220;
-  return (
-    <div className="mt-1 prose prose-sm max-w-none relative">
-      <div className={expanded ? '' : 'clamp-5-lines'}>
-        {React.createElement(ReactMarkdown as any, {}, description)}
-      </div>
-      {isLong && (
-        <button
-          type="button"
-          className="text-xs text-primary underline mt-1 absolute right-0 bg-background px-1"
-          style={{ bottom: '-1.5em' }}
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
-      )}
-    </div>
-  );
 }
 
 function GoalDescriptionPreview({ description }: { description: string }) {
@@ -159,28 +137,6 @@ export default function Goals() {
       currency: goal.currency, // Ensure currency is set
     });
     setIsDialogOpen(true);
-  }
-
-  const handleDelete = async (goalId: number) => {
-    if (confirm('Are you sure you want to delete this goal?')) {
-      try {
-        await api.delete(`/goals/${goalId}`)
-        Swal.fire({
-          icon: 'success',
-          title: t('Goal deleted successfully!'),
-        })
-        fetchGoals()
-      } catch (error) {
-        console.error('Error deleting goal:', error)
-      }
-    }
-  }
-
-  const getProgressColor = (progress: number) => {
-    if (progress >= 100) return 'bg-green-500'
-    if (progress >= 75) return 'bg-blue-500'
-    if (progress >= 50) return 'bg-yellow-500'
-    return 'bg-red-500'
   }
 
   if (loading) {

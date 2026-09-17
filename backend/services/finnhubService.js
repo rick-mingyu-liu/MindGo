@@ -151,18 +151,6 @@ class FinnhubService {
     }
   }
 
-  // Fetch key indicators (SMA, EMA, RSI, MACD)
-  async getKeyIndicators(symbol) {
-    const url = `https://finnhub.io/api/v1/indicator?symbol=${symbol}&resolution=D&indicator=sma,ema,rsi,macd&token=${FINNHUB_TOKEN}`;
-    const { data } = await axios.get(url);
-    return {
-      sma: data.sma?.values?.slice(-1)[0] ?? null,
-      ema: data.ema?.values?.slice(-1)[0] ?? null,
-      rsi: data.rsi?.values?.slice(-1)[0] ?? null,
-      macd: data.macd?.macd?.slice(-1)[0] ?? null
-    };
-  }
-
   // Fetch recommendation trends
   async getRecommendationTrends(symbol) {
     const url = `https://finnhub.io/api/v1/stock/recommendation?symbol=${symbol}&token=${FINNHUB_TOKEN}`;
