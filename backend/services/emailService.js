@@ -107,7 +107,8 @@ exports.generateWeeklyReport = async (userId) => {
     );
 
     if (transactions.rows.length === 0) {
-      return `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
+      const emptyText = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
+      return { text: emptyText, html: `<div>${emptyText.replace(/\n/g, '<br>')}</div>` };
     }
 
     // Organize transactions by type
