@@ -1,6 +1,6 @@
 # Screenshot Import (OCR) — Design
 
-**Date:** 2026-09-16 · **Status:** approved; revised the same day after prototyping (see *Revision notes*) · **Branch:** `feat/ocr-import` · **Plan:** [`docs/superpowers/plans/2026-09-16-ocr-import.md`](../plans/2026-09-16-ocr-import.md)
+**Date:** 2026-09-16 · **Status:** implemented 2026-09-16 on feat/ocr-import (Task 16, the LLM fallback, not built) · **Branch:** `feat/ocr-import` · **Plan:** [`docs/superpowers/plans/2026-09-16-ocr-import.md`](../plans/2026-09-16-ocr-import.md)
 
 ## 1. Goal
 
@@ -442,8 +442,9 @@ and photos.
   manual entry is `manual`, and parse flags a row just imported.
 - **Eval** — `eval/test/score.test.mjs`.
 - **Frontend** — no runner. Verified by `npm run build` (types and lint), and
-  in Chrome: the full flow, source dialog, the import itself (rows and batch
-  record checked in the database), dark theme, and a 390 px viewport.
+  in Chrome: the full flow, source dialog, the import itself (16 rows plus one
+  `import_batches` record checked in the database), duplicates re-flagged on a
+  second import, paste, `zh`, dark theme, and a 390 px viewport.
 - **CI** — the backend job runs the new tests; the frontend job's build runs
   `ocr-assets` first, so it downloads the model (31 MB) from the pinned commit.
 
