@@ -36,7 +36,6 @@ export default function EditTransaction() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [transaction, setTransaction] = useState<Transaction | null>(null)
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -69,7 +68,6 @@ export default function EditTransaction() {
         return
       }
 
-      setTransaction(targetTransaction)
       setFormData({
         description: targetTransaction.description,
         amount: targetTransaction.amount.toString(),

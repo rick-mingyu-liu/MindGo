@@ -62,14 +62,6 @@ export interface ReviewRow {
 
 export const CURRENCIES = ['CAD', 'USD', 'EUR', 'GBP', 'AUD', 'CNY']
 
-/** Flags that mean "look at this row" — the rest are informational. */
-export const WARNING_FLAGS: DraftFlag[] = [
-  'arithmetic_failed', 'balance_mismatch', 'corrected_chars', 'low_confidence', 'missing_date', 'type_guessed',
-]
-
-export const needsAttention = (row: Pick<ReviewRow, 'flags'>) =>
-  row.flags.some((flag) => WARNING_FLAGS.includes(flag))
-
 /** Why a row needs checking, most serious first, as translation keys. */
 const REASONS: [DraftFlag, string][] = [
   ['balance_mismatch', 'Does not match the running balance'],

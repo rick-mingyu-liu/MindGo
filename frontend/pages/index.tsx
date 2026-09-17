@@ -10,17 +10,15 @@ import {
   ArrowRight,
   Brain,
   BarChart3,
-  LogOut,
   Sparkles,
   Info,
   Eye,
   Edit,
   Settings as SettingsIcon,
-  Star,
   Mail,
-  CheckCircle2, ScanText } from 'lucide-react'
+  ScanText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
-import { api, logout, investmentAPI } from '@/utils/api'
+import { api, investmentAPI } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,7 +26,6 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import Swal from 'sweetalert2'
@@ -86,15 +83,6 @@ interface Goal {
   convertedCurrentAmount?: number
   convertedTargetAmount?: number
   convertedCurrency?: string
-}
-
-interface WatchlistItem {
-  id: number
-  symbol: string
-  company_name: string
-  currentPrice: number
-  change: number
-  changePercent: number
 }
 
 // Colour follows the category, not its rank in the pie, so a slice keeps the same
@@ -232,7 +220,6 @@ export default function Dashboard() {
   const router = useRouter()
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
@@ -270,7 +257,6 @@ export default function Dashboard() {
 
       setSummary(summaryRes.data)
       setGoals(goalsRes.data.goals)
-      setWatchlist(watchlistRes.data.watchlist)
       setTransactions(transactionsRes.data.transactions)
 
       // Check if this is a new user (has very little data or sample data)

@@ -6,13 +6,13 @@ const { categorize } = require('./categorize');
  *
  *   [logo]  Shoppers Drug Mart            <- store
  *           Mar 15 • $60.54 • 1 item      <- date, total paid, item count
- *           Trainers Choice Kinetic ...   <- the first items   [View store]
+ *           Ankle Brace, Medium ...       <- the first items   [View store]
  *
  * An order is its date-total-count line. Its store is the text tucked above
  * that line in the same column — the logo on the left is read as text too
  * ("SHOPPERS", "LCBO") and shares rows with these lines, which is why this
  * works on lines, not rows. "Tucked" is a gap of under half the smaller
- * line's height: measured 0.14–0.28 from a store to its order line, and over
+ * line's height: measured 0.19–0.28 from a store to its order line, and over
  * 1.5 from the previous order's last item (2026-09-17).
  *
  * The total is what was charged, fees and tip included; the Past items tab

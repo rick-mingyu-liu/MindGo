@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next'
 import { formatDay } from '@/lib/date';
-import { i18n } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import { readPreferences } from '@/lib/preferences';
 
@@ -99,16 +98,6 @@ export default function Transactions() {
     return matchesSearch && matchesType && matchesCategory
   })
 
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const totalExpenses = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const netAmount = totalIncome - totalExpenses
-
   const categories = [...new Set(transactions.map(t => t.category))]
 
   const handleDelete = async (id: number) => {
@@ -144,12 +133,6 @@ export default function Transactions() {
     } finally {
       setDeletingId(null)
     }
-  }
-
-  // Helper to determine if a currency symbol is ambiguous
-  const ambiguousSymbols = ['CAD', 'USD', 'AUD', 'NZD', 'SGD', 'HKD'];
-  function shouldShowCode(currency: string) {
-    return ambiguousSymbols.includes(currency);
   }
 
   if (loading) {

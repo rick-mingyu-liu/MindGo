@@ -10,6 +10,8 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-16-ocr-import-design.md`](../specs/2026-09-16-ocr-import-design.md) — read it first; this plan argues from it.
 
+> **Status (2026-09-17):** this plan is the record of the first build and is not updated. Changes made afterwards from real screenshots — row grouping, squeezed dates, stacked balances, icons, and the Uber, Uber Eats and WeChat Pay layouts — are described in the spec's §4 (rules marked *2026-09-17*), §8.5 and *Revision notes (2026-09-17)*. Where the code blocks below differ from `backend/services/import/`, the code and the spec are current.
+
 ## How this plan was made
 
 Every file below was written and run in a scratch copy of the repo before this plan was written: the backend suite (419 unit tests, 439 with a database), lint, `next build`, the benchmark on 48 synthetic images, and the whole flow in Chrome against a scratch Postgres 17 — import saved, batch row checked, dark theme and a 390 px viewport. The code blocks are those files. Where a step says **Expected**, that is what the scratch run printed.

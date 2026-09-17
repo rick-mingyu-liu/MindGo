@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Save, Calendar, DollarSign, Tag } from 'lucide-react'
+import { ArrowLeft, Save, Calendar, DollarSign } from 'lucide-react'
 import { api } from '@/utils/api'
 import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/button'
@@ -62,7 +62,6 @@ export default function NewTransaction() {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<TransactionForm>({
     defaultValues: {
@@ -76,7 +75,7 @@ export default function NewTransaction() {
     try {
       setLoading(true)
       
-      const response = await api.post('/transactions', {
+      await api.post('/transactions', {
         ...data,
         amount: parseFloat(data.amount),
         currency: data.currency,

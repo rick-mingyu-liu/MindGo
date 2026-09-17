@@ -9,20 +9,14 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
   Building, 
-  Globe, 
   Users, 
   BarChart3,
   FileText,
   Newspaper,
-  Target,
-  AlertTriangle,
   ExternalLink,
   Calendar,
   ArrowUpRight,
@@ -44,66 +38,6 @@ interface StockDetailModalProps {
   children: React.ReactNode
 }
 
-interface StockData {
-  symbol: string
-  company_name: string
-  sector: string
-  industry: string
-  employees: number
-  website: string
-  description: string
-  market_cap: number
-  pe_ratio: number
-  dividend_yield: number
-  beta: number
-  volume: number
-  avg_volume: number
-  day_range: string
-  year_range: string
-  current_price: number
-  change_amount: number
-  change_percent: number
-}
-
-interface FinancialReport {
-  id: number
-  symbol: string
-  report_type: string
-  period: string
-  title: string
-  description: string
-  file_url: string
-  release_date: string
-}
-
-interface NewsItem {
-  id: number
-  symbol: string
-  title: string
-  summary: string
-  url: string
-  source: string
-  published_at: string
-  sentiment: 'positive' | 'negative' | 'neutral'
-}
-
-interface AnalystRating {
-  id: number
-  symbol: string
-  analyst_firm: string
-  rating: 'buy' | 'hold' | 'sell'
-  price_target: number
-  rating_date: string
-}
-
-interface AnalystSummary {
-  total: number
-  buy: number
-  hold: number
-  sell: number
-  averagePriceTarget: number
-}
-
 export function StockDetailModal({ 
   symbol, 
   companyName, 
@@ -118,13 +52,10 @@ export function StockDetailModal({
   const [stockData, setStockData] = useState<any | null>(null)
   const [news, setNews] = useState<any[]>([])
   const [financials, setFinancials] = useState<any | null>(null)
-  const [marketOverview, setMarketOverview] = useState<any | null>(null)
   const [loadingNews, setLoadingNews] = useState(false)
   const [loadingFinancials, setLoadingFinancials] = useState(false)
-  const [loadingMarket, setLoadingMarket] = useState(false)
   const [errorNews, setErrorNews] = useState('')
   const [errorFinancials, setErrorFinancials] = useState('')
-  const [errorMarket, setErrorMarket] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
   const [analysis, setAnalysis] = useState<any>(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
@@ -139,7 +70,6 @@ export function StockDetailModal({
       fetchStockData()
       fetchNews()
       fetchFinancials()
-      fetchMarketOverview()
       fetchAnalysis()
       fetchHistoricalData()
     }
@@ -189,20 +119,6 @@ export function StockDetailModal({
     }
   }
 
-  const fetchMarketOverview = async () => {
-    setLoadingMarket(true)
-    setErrorMarket('')
-    try {
-      const res = await investmentAPI.getMarketOverview()
-      setMarketOverview(res.data || null)
-    } catch (err) {
-      setErrorMarket('Failed to load market overview')
-      setMarketOverview(null)
-    } finally {
-      setLoadingMarket(false)
-    }
-  }
-
   const fetchAnalysis = async () => {
     setLoadingAnalysis(true)
     setErrorAnalysis('')
@@ -235,14 +151,6 @@ export function StockDetailModal({
     if (change > 0) return <ArrowUpRight className="w-4 h-4" />
     if (change < 0) return <ArrowDownRight className="w-4 h-4" />
     return <Minus className="w-4 h-4" />
-  }
-
-  const getSentimentColor = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'negative': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
   }
 
   return (
@@ -392,10 +300,7 @@ export function StockDetailModal({
                       <div className="text-center py-8 text-red-600">{errorHistorical}</div>
                     ) : historicalData && historicalData.data && historicalData.data.o && historicalData.data.o.length > 0 ? (
                       <div className="h-80">
-                        <CandlestickChart 
-                          data={historicalData.data}
-                          symbol={symbol}
-                        />
+                        <CandlestickChart data={historicalData.data} />
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">{t('No historical data available.')}</div>
@@ -678,7 +583,7 @@ function FinancialsTable({ financials }: { financials: any }) {
 }
 
 // OHLC Chart Component
-const CandlestickChart = ({ data, symbol }: { data: any; symbol: string }) => {
+const CandlestickChart = ({ data }: { data: any }) => {
   const { t } = useTranslation('common');
   // Transform Finnhub data to the format expected by Recharts
   const chartData = data.t.map((timestamp: number, index: number) => ({
