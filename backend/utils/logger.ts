@@ -1,11 +1,13 @@
-const config = require('../config');
+import config = require('../config');
 
 class Logger {
+  private readonly enabled: boolean;
+
   constructor() {
     this.enabled = config.logging.enableConsoleLogs;
   }
 
-  info(message, data = null) {
+  info(message: string, data: unknown = null): void {
     if (this.enabled) {
       const timestamp = new Date().toISOString();
       console.log(`[INFO] ${timestamp} - ${message}`);
@@ -15,11 +17,11 @@ class Logger {
     }
   }
 
-  error(message, error = null) {
+  error(message: string, error: unknown = null): void {
     const timestamp = new Date().toISOString();
     console.error(`[ERROR] ${timestamp} - ${message}`);
     if (error) {
-      console.error(error.stack || error);
+      console.error((error instanceof Error && error.stack) || error);
     }
   }
 
@@ -41,7 +43,7 @@ class Logger {
    * The general fix — giving this class a real level hierarchy, since `level`
    * today gates only `debug()` — is still open.
    */
-  audit(message, data = null) {
+  audit(message: string, data: unknown = null): void {
     const timestamp = new Date().toISOString();
     console.log(`[AUDIT] ${timestamp} - ${message}`);
     if (data) {
@@ -49,7 +51,7 @@ class Logger {
     }
   }
 
-  warn(message, data = null) {
+  warn(message: string, data: unknown = null): void {
     if (this.enabled) {
       const timestamp = new Date().toISOString();
       console.warn(`[WARN] ${timestamp} - ${message}`);
@@ -59,7 +61,7 @@ class Logger {
     }
   }
 
-  debug(message, data = null) {
+  debug(message: string, data: unknown = null): void {
     if (this.enabled && config.logging.level === 'debug') {
       const timestamp = new Date().toISOString();
       console.log(`[DEBUG] ${timestamp} - ${message}`);
@@ -70,25 +72,25 @@ class Logger {
   }
 
   // Specialized logging methods
-  auth(action, email, data = null) {
+  auth(action: string, email: string, data: unknown = null): void {
     this.info(`[AUTH] ${action} - ${email}`, data);
   }
 
-  transaction(action, userId, data = null) {
+  transaction(action: string, userId: number | string, data: unknown = null): void {
     this.info(`[TRANSACTION] ${action} - User: ${userId}`, data);
   }
 
-  investment(action, symbol, data = null) {
+  investment(action: string, symbol: string, data: unknown = null): void {
     this.info(`[INVESTMENT] ${action} - ${symbol}`, data);
   }
 
-  ai(action, userId, data = null) {
+  ai(action: string, userId: number | string, data: unknown = null): void {
     this.info(`[AI] ${action} - User: ${userId}`, data);
   }
 
-  email(action, recipient, data = null) {
+  email(action: string, recipient: string, data: unknown = null): void {
     this.info(`[EMAIL] ${action} - ${recipient}`, data);
   }
 }
 
-module.exports = new Logger(); 
+export = new Logger(); 
