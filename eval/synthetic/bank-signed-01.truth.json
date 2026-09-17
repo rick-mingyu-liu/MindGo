@@ -1,0 +1,63 @@
+{
+  "layout": "bank-list",
+  "style": "bank-signed",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "145.29",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "64.44",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "61.16",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "215.06",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "29.44",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "120.00",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "82.37",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "115.79",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    }
+  ]
+}

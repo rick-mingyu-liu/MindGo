@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-08",
+      "amount": "33.94",
+      "type": "expense",
+      "description": "CAFE PYRENEES",
+      "category": "Dining Out"
+    }
+  ]
+}

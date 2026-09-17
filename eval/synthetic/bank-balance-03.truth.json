@@ -1,0 +1,55 @@
+{
+  "layout": "bank-list",
+  "style": "bank-balance",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-14",
+      "amount": "81.17",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "68.10",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "100.86",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "1020.00",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "89.97",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "115.55",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "9.38",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    }
+  ]
+}

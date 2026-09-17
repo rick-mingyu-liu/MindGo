@@ -1,0 +1,47 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-14",
+      "amount": "1353.91",
+      "type": "income",
+      "description": "E-TRANSFER RECEIVED"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "1008.62",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "14.14",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "17.53",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-09",
+      "amount": "91.20",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-09",
+      "amount": "42.43",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    }
+  ]
+}

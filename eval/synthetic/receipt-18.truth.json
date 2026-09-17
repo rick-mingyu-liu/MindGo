@@ -1,0 +1,14 @@
+{
+  "layout": "receipt",
+  "style": "receipt",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-12",
+      "amount": "66.04",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 require('dotenv').config();
 
+/** Reads a number in (0, 1] from the environment, falling back when unset or out of range. */
+function fractionFromEnv(name, fallback) {
+  const parsed = Number.parseFloat(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= 1 ? parsed : fallback;
+}
+
 /** Reads a positive integer from the environment, falling back when unset or unparseable. */
 function intFromEnv(name, fallback) {
   const parsed = Number.parseInt(process.env[name], 10);
@@ -82,11 +88,30 @@ const config = {
     authMax: intFromEnv('RATE_LIMIT_AUTH_MAX', 5),
     aiWindowMs: 60 * 60 * 1000,
     aiMax: intFromEnv('RATE_LIMIT_AI_MAX', 20),
+    // Per user, not per IP: each screenshot parse queries the user's
+    // transactions and may reach the LLM fallback.
+    importMax: intFromEnv('RATE_LIMIT_IMPORT_MAX', 30),
+  },
+
+  // Screenshot import. The OCR itself runs in the browser; these bound what
+  // the browser may send and what the server does with it.
+  import: {
+    // Rows whose weakest field is below this are flagged for the user to check.
+    confidenceThreshold: fractionFromEnv('IMPORT_CONFIDENCE_THRESHOLD', 0.8),
+    // One screenshot's OCR output. The app-wide JSON limit is 100 kB, which a
+    // long statement screenshot can pass.
+    bodyLimit: '1mb',
+    maxLines: 2000,
+    maxLineLength: 500,
+    // Rows accepted by one POST /transactions/import.
+    maxRows: 100,
   },
 
   // Cron jobs
   cron: {
-    weeklyReports: '0 19 * * 0', // Every Sunday at 7pm
+    weeklyReports: '0 19 * * 0', // Every Sunday at 7pm, in `timezone`
+    // Settings promises 7 p.m.; the host's clock is UTC, so say whose 7 p.m.
+    timezone: 'America/Toronto',
     aiPlanCleanup: 5 * 60 * 1000, // 5 minutes
     unverifiedAccountCleanup: 10 * 60 * 1000, // 10 minutes
     demoRefresh: 30 * 24 * 60 * 60 * 1000, // 30 days

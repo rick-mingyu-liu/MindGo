@@ -1,0 +1,49 @@
+{
+  "layout": "bank-list",
+  "style": "bank-balance",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "34.19",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "57.61",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "108.70",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "142.57",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "72.57",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "113.28",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    }
+  ]
+}

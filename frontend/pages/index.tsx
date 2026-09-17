@@ -13,14 +13,12 @@ import {
   LogOut,
   Sparkles,
   Info,
-  RefreshCw,
   Eye,
   Edit,
   Settings as SettingsIcon,
   Star,
   Mail,
-  CheckCircle2
-} from 'lucide-react'
+  CheckCircle2, ScanText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api, logout, investmentAPI } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
@@ -238,7 +236,6 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   const { resolvedTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false)
   const [indexRows, setIndexRows] = useState<any[]>([]);
@@ -291,12 +288,6 @@ export default function Dashboard() {
     }
   }, [period])
 
-  const handleRefresh = async () => {
-    setRefreshing(true)
-    await fetchDashboardData()
-    setRefreshing(false)
-  }
-
   const handleSendReport = async () => {
     try {
       await api.post('/auth/test-email');
@@ -315,30 +306,6 @@ export default function Dashboard() {
       });
     }
   };
-
-  // const handleClearData = async () => {
-  //   if (confirm('This will clear all your data for testing purposes. Are you sure?')) {
-  //     try {
-  //       setRefreshing(true)
-        
-  //       // Clear all user data
-  //       await Promise.all([
-  //         api.delete('/transactions/clear-all'),
-  //         api.delete('/goals/clear-all'),
-  //         api.delete('/investments/watchlist/clear-all')
-  //       ])
-        
-  //       // Refresh dashboard
-  //       await fetchDashboardData()
-  //       toast.success('Data cleared for testing')
-  //     } catch (error) {
-  //       console.error('Error clearing data:', error)
-  //       toast.error('Failed to clear data')
-  //     } finally {
-  //       setRefreshing(false)
-  //     }
-  //   }
-  // }
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -539,19 +506,15 @@ export default function Dashboard() {
                   {i18n.language === 'en' ? '中文' : 'EN'}
                 </Button>
                 <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  {t('Refresh')}
-                </Button>
-                <Button
                   onClick={() => router.push('/transactions/new')}
                   className="aurora-glow"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   {t('Add Transaction')}
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/import')}>
+                  <ScanText className="w-4 h-4 mr-2" />
+                  {t('Import from screenshot')}
                 </Button>
                 <Button
                   variant="outline"
@@ -591,10 +554,6 @@ export default function Dashboard() {
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="p-6 flex flex-col gap-4">
-                    <Button onClick={handleRefresh} disabled={refreshing}>
-                      <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                      {t('Refresh')}
-                    </Button>
                     <Button onClick={() => router.push('/ai-planning')}>
                       <Brain className="w-4 h-4 mr-2" />
                       {t('AI Planning')}

@@ -40,8 +40,11 @@ api.interceptors.response.use(
   (error) => {
     const { response } = error
 
-    // Don't show automatic toast for auth endpoints (handled manually in components)
+    // Don't show automatic toast for auth endpoints (handled manually in components).
+    // The screenshot import reports its own 4xx errors next to the row or image
+    // they concern, so it is exempt too.
     const isAuthEndpoint = error.config?.url?.includes('/auth/')
+    const handledByCaller = isAuthEndpoint || error.config?.url?.includes('/import')
 
     if (response?.status === 401) {
       // Unauthorized - redirect to login
@@ -58,19 +61,25 @@ api.interceptors.response.use(
         title: 'Resource not found',
         text: 'Resource not found.',
       })
+    } else if (response?.data?.code === 'ai_unavailable') {
+      Swal.fire({
+        icon: 'info',
+        title: 'AI planning unavailable',
+        text: response.data.error,
+      })
     } else if (response?.status >= 500) {
       Swal.fire({
         icon: 'error',
         title: 'Server error',
         text: 'Server error. Please try again later.',
       })
-    } else if (response?.data?.error && !isAuthEndpoint) {
+    } else if (response?.data?.error && !handledByCaller) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: response.data.error,
       })
-    } else if (!isAuthEndpoint) {
+    } else if (!handledByCaller) {
       Swal.fire({
         icon: 'error',
         title: 'An unexpected error occurred',

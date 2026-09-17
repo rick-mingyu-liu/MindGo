@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2 } from 'lucide-react'
+import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2, ScanText } from 'lucide-react'
 import { api } from '@/utils/api'
 import { formatCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { useTranslation } from 'next-i18next'
 import { formatDay } from '@/lib/date';
 import { i18n } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import { readPreferences } from '@/lib/preferences';
 
 interface Transaction {
   id: number
@@ -84,17 +85,9 @@ export default function Transactions() {
   }, [router])
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const prefs = localStorage.getItem('userPreferences');
-      if (prefs) {
-        try {
-          const lang = JSON.parse(prefs).language;
-          if (lang && i18n.language !== lang) {
-            i18n.changeLanguage(lang);
-          }
-        } catch {}
-      }
-    }
+    // A language chosen in Settings wins; 'system' leaves the page's locale alone.
+    const { language } = readPreferences();
+    if (language !== 'system' && i18n.language !== language) i18n.changeLanguage(language);
   }, [i18n]);
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -197,6 +190,10 @@ export default function Transactions() {
                 </div>
               </div>
               <div className="hidden sm:flex items-center space-x-2">
+                <Button variant="outline" onClick={() => router.push('/import')}>
+                  <ScanText className="w-4 h-4 mr-2" />
+                  {t('Import from screenshot')}
+                </Button>
                 <Button onClick={() => router.push('/transactions/new')}>
                   <Plus className="w-4 h-4 mr-2" />
                   {t('Add Transaction')}

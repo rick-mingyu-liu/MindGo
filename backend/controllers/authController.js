@@ -258,7 +258,7 @@ const authController = {
   async getProfile(req, res) {
     try {
       const user = await db.query(
-        'SELECT id, email, first_name, last_name, created_at FROM users WHERE id = $1',
+        'SELECT id, email, first_name, last_name, created_at, weekly_reports_enabled, email_notifications_enabled FROM users WHERE id = $1',
         [req.user.userId]
       );
 

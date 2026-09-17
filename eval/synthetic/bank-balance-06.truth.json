@@ -1,0 +1,55 @@
+{
+  "layout": "bank-list",
+  "style": "bank-balance",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "29.95",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "140.34",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "76.20",
+      "type": "income",
+      "description": "E-TRANSFER RECEIVED"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "139.85",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "116.10",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "136.98",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "97.62",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    }
+  ]
+}

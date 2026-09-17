@@ -258,4 +258,74 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       );
     });
   });
+
+  describe('screenshot import', () => {
+    const row = (overrides = {}) => ({
+      date: '2021-03-10',
+      amount: '12.34',
+      description: 'Imported row',
+      category: 'Groceries',
+      type: 'expense',
+      currency: 'CAD',
+      source: 'ocr',
+      edited: false,
+      ...overrides,
+    });
+    const importRows = (rows, token = aliceToken) =>
+      request(app).post('/transactions/import').set('Authorization', `Bearer ${token}`).send({ rows });
+    const countImported = async (userId) => Number((await db.query(
+      "SELECT COUNT(*) AS n FROM transactions WHERE user_id = $1 AND date = '2021-03-10'", [userId]
+    )).rows[0].n);
+
+    test('saves the rows with their source, and one batch record', async () => {
+      const res = await importRows([row(), row({ amount: '1.00', source: 'ocr_llm', edited: true })]);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.equal(res.body.ids.length, 2);
+
+      const saved = await db.query(
+        'SELECT amount, source FROM transactions WHERE id = ANY($1) ORDER BY amount', [res.body.ids]
+      );
+      assert.deepEqual(saved.rows, [
+        { amount: '1.00', source: 'ocr_llm' },
+        { amount: '12.34', source: 'ocr' },
+      ]);
+
+      const batches = await db.query(
+        'SELECT row_count, edited_count, llm_count FROM import_batches WHERE user_id = $1', [alice.id]
+      );
+      assert.deepEqual(batches.rows, [{ row_count: 2, edited_count: 1, llm_count: 1 }]);
+    });
+
+    test('a rejected import saves nothing', async () => {
+      const before = await countImported(bob.id);
+      const res = await importRows([row(), row({ amount: 'abc' })], bobToken);
+      assert.equal(res.status, 400);
+      assert.equal(await countImported(bob.id), before);
+    });
+
+    test('a manual entry is recorded as manual', async () => {
+      const res = await auth(request(app).post('/transactions')).send({
+        date: '2021-03-11', currency: 'CAD', amount: 3, description: 'Typed', category: 'Groceries', type: 'expense',
+      });
+      assert.equal(res.status, 201);
+      assert.equal(res.body.transaction.source, 'manual');
+    });
+
+    test('parse finds the duplicate of a row just imported', async () => {
+      const res = await auth(request(app).post('/import/parse')).send({
+        today: '2021-03-20',
+        model: 'test',
+        image: { width: 800, height: 600 },
+        lines: [
+          { text: 'Mar 10', conf: 0.99, box: { x: 0, y: 0, width: 100, height: 40 } },
+          { text: 'Imported row', conf: 0.99, box: { x: 0, y: 60, width: 200, height: 40 } },
+          { text: '-$12.34', conf: 0.99, box: { x: 600, y: 60, width: 100, height: 40 } },
+        ],
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.deepEqual(res.body.rows.map((r) => [r.date, r.amount, r.flags]), [
+        ['2021-03-10', '12.34', ['possible_duplicate']],
+      ]);
+    });
+  });
 });

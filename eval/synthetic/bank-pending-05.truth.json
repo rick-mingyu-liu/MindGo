@@ -1,0 +1,55 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "72.03",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "116.67",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "51.67",
+      "type": "expense",
+      "description": "ROGERS WIRELESS",
+      "category": "Utilities"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "83.60",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "82.90",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "2021.10",
+      "type": "income",
+      "description": "E-TRANSFER RECEIVED"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "50.56",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "layout": "bank-list",
+  "style": "bank-balance",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "51.61",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "28.95",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "1073.51",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "127.42",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "98.17",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "119.84",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "402.10",
+      "type": "income",
+      "description": "E-TRANSFER RECEIVED"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "82.81",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    }
+  ]
+}

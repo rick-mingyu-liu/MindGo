@@ -5,6 +5,10 @@ node_modules/
 .next/
 out/
 
+# on-device OCR assets, fetched and checksummed by scripts/ocr-assets.js
+public/models/
+public/ort/
+
 # env files
 .env
 .env.*

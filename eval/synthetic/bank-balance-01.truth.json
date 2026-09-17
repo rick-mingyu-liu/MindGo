@@ -1,0 +1,42 @@
+{
+  "layout": "bank-list",
+  "style": "bank-balance",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-15",
+      "amount": "103.64",
+      "type": "expense",
+      "description": "W STORE UWATERLOO",
+      "category": "Education"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "95.21",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-13",
+      "amount": "43.77",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-11",
+      "amount": "134.72",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-10",
+      "amount": "101.92",
+      "type": "expense",
+      "description": "PRESTO FARE",
+      "category": "Transportation"
+    }
+  ]
+}

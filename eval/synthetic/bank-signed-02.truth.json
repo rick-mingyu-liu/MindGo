@@ -1,0 +1,61 @@
+{
+  "layout": "bank-list",
+  "style": "bank-signed",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "131.42",
+      "type": "expense",
+      "description": "UBER EATS",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "17.99",
+      "type": "expense",
+      "description": "LOCAL BAKERY"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "87.62",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "145.77",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "20.08",
+      "type": "expense",
+      "description": "SOBEYS #1234",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "1157.58",
+      "type": "income",
+      "description": "E-TRANSFER RECEIVED"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "52.89",
+      "type": "expense",
+      "description": "SHOPPERS DRUG MART",
+      "category": "Healthcare"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "9.61",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    }
+  ]
+}

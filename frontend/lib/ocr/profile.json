@@ -1,0 +1,11 @@
+{
+  "name": "PP-OCRv6_small",
+  "preset": "v6-small",
+  "engine": "canvas-native",
+  "strategy": "per-box",
+  "files": {
+    "detection": "PP-OCRv6_small_det.ort",
+    "recognition": "PP-OCRv6_small_rec.ort",
+    "charactersDictionary": "ppocrv6_dict.txt"
+  }
+}

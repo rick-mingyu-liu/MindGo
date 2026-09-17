@@ -35,6 +35,8 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 
 **Transactions** — income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in.
 
+**Screenshot import** — drop bank-app screenshots or receipt photos; PaddleOCR (PP-OCRv6) reads them on your device, and every row is checked and flagged before anything is saved. Benchmarked on a synthetic set: every transaction found, amounts exact, no unflagged errors.
+
 **Term budgeting** — the dashboard's period selector, category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick.
 
 **Savings goals** — targets with progress bars and days remaining.
@@ -143,7 +145,7 @@ backend/                        Express + PostgreSQL API (plain JavaScript)
 │   ├── dates.js                calendar-day helpers
 │   ├── logger.js               info/warn/debug are dev-only; error/audit always print
 │   └── privacy.js              maskEmail()
-└── test/                       15 files, 236 tests, node --test
+└── test/                       24 files, 419 tests, node --test
 
 frontend/                       Next.js 14, Pages Router, TypeScript
 ├── pages/                      one file per screen
@@ -192,9 +194,11 @@ npm run check:locales    # fails on duplicate or unresolved keys
 
 ### Tests
 
-[`backend/test/`](backend/test/) holds the only automated tests — **236 across 15 files**, run by `node --test`. No test framework is installed and none is needed.
+[`backend/test/`](backend/test/) holds the only automated tests — **419 across 24 files**, run by `node --test`. No test framework is installed and none is needed.
 
-**Unit tests always run**, with no database and no network. They cover the things that fail silently: currency conversion and its caching, the term calendar swept across four timezones, the date helpers, the demo generator's evergreen properties at nine different "todays", the startup config check, retention predicates, scheduler timer plumbing, address masking, which log levels survive production, and that registration never writes a token or a raw address to the log.
+**Unit tests always run**, with no database and no network. They cover the things that fail silently: currency conversion and its caching, the term calendar swept across four timezones, the date helpers, the demo generator's evergreen properties at nine different "todays", the startup config check, retention predicates, scheduler timer plumbing, address masking, which log levels survive production, that registration never writes a token or a raw address to the log, and the screenshot-import parser piece by piece and end to end.
+
+**Recorded OCR fixtures** (`importFixtures.test.js`) replay real OCR output — captured once by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI. `eval/` is a separate top-level npm project (`cd eval && npm test` — 10 tests) that also generates the synthetic screenshot set and scores accuracy per layout, including the *silent-error rate* that chose the shipped model.
 
 **`api.test.js` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`:
 
@@ -239,6 +243,12 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `DELETE /clear-all` | delete every transaction |
 | `DELETE /auto-delete?months=N` | delete everything older than N months (1–60) |
 | `GET, PUT /retention-settings` | retention preferences |
+| `POST /import` | write confirmed screenshot-import rows (1–100, all or nothing) plus one `import_batches` record |
+
+### `/import`
+| | |
+|---|---|
+| `POST /parse` | OCR lines in, draft transactions out; nothing stored; 30 per 15 min per user |
 
 ### `/summary`
 | | |
@@ -299,13 +309,13 @@ The backend needs no build step — `npm start` runs `node app.js`. The frontend
 
 **Backend** — Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai`.
 
-**Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, Lucide icons.
+**Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, Lucide icons, `ppu-paddle-ocr` and ONNX Runtime Web for on-device OCR.
 
 **External services** — [Finnhub](https://finnhub.io/), Yahoo Finance and [Alpha Vantage](https://www.alphavantage.co/) for stock data; [OpenAI](https://openai.com/) for planning; [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
 
 ## Database
 
-Five tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`. `updated_at` is maintained by triggers. Monetary rows carry a `currency` column.
+Six tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches`. `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` (`manual` | `ocr` | `ocr_llm`, migration `011`) records where a row came from; `import_batches` holds one row per confirmed screenshot import.
 
 ## Known gaps
 
@@ -316,6 +326,8 @@ Tracked in [`IMPROVEMENTS.md`](IMPROVEMENTS.md), which records what was found, w
 - **No frontend test runner**, so `lib/date.ts` is unguarded (item 23).
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not (item 18).
 - **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else (item 19).
+- **Phone OCR speed is unmeasured.** Screenshot import takes about 1–2 s per image on a laptop; a phone may be several times slower. Measure on a real device before announcing the feature.
+- **The LLM fallback for screenshot import was not built.** No private screenshot set yet shows the rule-based parser needs it; unsure rows report `ai_fallback_unavailable` and fall back to manual entry.
 
 ## Contributing
 

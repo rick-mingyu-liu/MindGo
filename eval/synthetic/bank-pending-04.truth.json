@@ -1,0 +1,63 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-16",
+      "amount": "64.69",
+      "type": "expense",
+      "description": "NETFLIX.COM",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-16",
+      "amount": "62.98",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "1418.28",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "47.19",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "47.20",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "134.94",
+      "type": "expense",
+      "description": "CINEPLEX",
+      "category": "Entertainment"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "626.98",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "25.90",
+      "type": "expense",
+      "description": "TIM HORTONS #2291",
+      "category": "Dining Out"
+    }
+  ]
+}

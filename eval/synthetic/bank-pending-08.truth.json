@@ -1,0 +1,49 @@
+{
+  "layout": "bank-list",
+  "style": "bank-pending",
+  "today": "2026-09-16",
+  "rows": [
+    {
+      "date": "2026-09-15",
+      "amount": "336.50",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-15",
+      "amount": "117.69",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "1694.74",
+      "type": "income",
+      "description": "INTEREST PAID",
+      "category": "Investment Returns"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "76.96",
+      "type": "expense",
+      "description": "FARM BOY",
+      "category": "Groceries"
+    },
+    {
+      "date": "2026-09-14",
+      "amount": "144.84",
+      "type": "expense",
+      "description": "AMAZON.CA",
+      "category": "Shopping"
+    },
+    {
+      "date": "2026-09-12",
+      "amount": "1999.83",
+      "type": "income",
+      "description": "PAYROLL DEPOSIT",
+      "category": "Salary"
+    }
+  ]
+}

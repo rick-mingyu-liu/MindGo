@@ -34,8 +34,21 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Screenshot parsing, keyed on the user rather than the IP. Mount after auth.
+const importLimiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.importMax,
+  keyGenerator: (req) => `user:${req.user.userId}`,
+  message: {
+    error: 'Too many screenshots in a short time, please wait a few minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   apiLimiter,
   authLimiter,
-  aiLimiter
-}; 
+  aiLimiter,
+  importLimiter
+};

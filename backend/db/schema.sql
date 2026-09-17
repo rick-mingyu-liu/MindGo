@@ -36,8 +36,21 @@ CREATE TABLE IF NOT EXISTS transactions (
     type VARCHAR(20) NOT NULL CHECK (type IN ('income', 'expense')),
     date DATE NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'CAD',
+    -- How the row was entered: typed in, or imported from a screenshot (and
+    -- whether the parser or the LLM fallback read it). See migration 011.
+    source VARCHAR(20) NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'ocr', 'ocr_llm')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One row per confirmed screenshot import. Counts only; see migration 011.
+CREATE TABLE IF NOT EXISTS import_batches (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    row_count INTEGER NOT NULL CHECK (row_count > 0),
+    edited_count INTEGER NOT NULL CHECK (edited_count >= 0),
+    llm_count INTEGER NOT NULL CHECK (llm_count >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Savings goals table
@@ -81,6 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
+CREATE INDEX IF NOT EXISTS idx_import_batches_user_id ON import_batches(user_id);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
