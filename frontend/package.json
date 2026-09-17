@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:locales": "node scripts/check-locales.js"
+    "check:locales": "node scripts/check-locales.js",
+    "ocr-assets": "node scripts/ocr-assets.js",
+    "predev": "npm run ocr-assets",
+    "prebuild": "npm run ocr-assets"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -31,7 +34,9 @@
     "lucide-react": "^0.292.0",
     "next": "^14.0.0",
     "next-i18next": "^15.4.2",
+    "onnxruntime-web": "1.30.0",
     "postcss": "^8.4.0",
+    "ppu-paddle-ocr": "6.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.59.0",
