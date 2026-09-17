@@ -19,8 +19,7 @@ import {
   Settings as SettingsIcon,
   Star,
   Mail,
-  CheckCircle2
-} from 'lucide-react'
+  CheckCircle2, ScanText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api, logout, investmentAPI } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
@@ -552,6 +551,10 @@ export default function Dashboard() {
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   {t('Add Transaction')}
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/import')}>
+                  <ScanText className="w-4 h-4 mr-2" />
+                  {t('Import from screenshot')}
                 </Button>
                 <Button
                   variant="outline"
