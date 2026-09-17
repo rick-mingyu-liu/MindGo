@@ -22,6 +22,11 @@ const { extractAmounts, parseDateDetail, splitLeadingDate, toCents } = require('
  * stacked balance, and never below 0.85 between single-line transactions.
  * Rows of pure symbols — chevrons, icons — are skipped rather than read as
  * headers.
+ *
+ * A description that wraps puts its second line on a row of its own with no
+ * amount. Tucked under the description (same cut-off, left edges aligned) it
+ * continues that description; measured 0.04 of the line height for a wrapped
+ * name, and never below 0.97 for the date header after a transaction.
  */
 const INCOME_WORDS = /\b(payroll|salary|deposit|e-?transfer (received|from)|refund|interest|dividend)\b/i;
 const STATUS_WORDS = /\b(pending|posted)\b/gi;
@@ -32,6 +37,7 @@ function parseBankList(rows, today) {
   const drafts = [];
   let header = null;
   let above = null; // the draft on the row just above, while it may still take a balance
+  let wrapping = null; // the last draft, and the lowest line of its description
 
   for (const row of rows) {
     if (!HAS_WORD.test(row.text)) continue;
@@ -39,6 +45,7 @@ function parseBankList(rows, today) {
     if (whole) {
       header = { ...whole, conf: row.conf };
       above = null;
+      wrapping = null;
       continue;
     }
 
@@ -51,17 +58,21 @@ function parseBankList(rows, today) {
       for (const amount of found) amounts.push({ ...amount, conf: line.conf, box: line.box });
     }
     if (amounts.length === 0) {
+      const first = row.lines.find((l) => HAS_WORD.test(l.text));
+      if (wrapping && words.length && isTuckedUnder(first.box, wrapping.labelBox)) {
+        appendDescription(wrapping.draft, words);
+        wrapping.labelBox = first.box;
+        continue;
+      }
       if (drafts.length > 0) header = null;
       above = null;
+      wrapping = null;
       continue;
     }
 
     if (above && amounts.length === 1 && isBeneath(amounts[0].box, above.amountBox)) {
       above.balance = amounts[0];
-      if (words.length) {
-        above.description = `${above.description} ${words.map((w) => w.text).join(' ')}`.trim();
-        above.conf.description = Math.min(above.conf.description || 1, ...words.map((w) => w.conf));
-      }
+      appendDescription(above, words);
       above = null;
       continue;
     }
@@ -111,18 +122,35 @@ function parseBankList(rows, today) {
     };
     drafts.push(draft);
     above = balance ? null : draft;
+    const labelLine = row.lines.find((l) => HAS_WORD.test(l.text) && extractAmounts(l.text).label);
+    wrapping = labelLine ? { draft, labelBox: labelLine.box } : null;
   }
 
   verifyBalances(drafts);
   return { drafts: drafts.map(({ balance: _balance, amountBox: _amountBox, ...draft }) => draft) };
 }
 
+function appendDescription(draft, words) {
+  if (words.length === 0) return;
+  draft.description = `${draft.description} ${words.map((w) => w.text).join(' ')}`.trim();
+  draft.conf.description = Math.min(draft.conf.description || 1, ...words.map((w) => w.conf));
+}
+
+const gapBetween = (lower, upper) => lower.y - (upper.y + upper.height);
+const isClose = (lower, upper) => {
+  const gap = gapBetween(lower, upper);
+  return gap >= 0 && gap < STACKED_GAP * Math.max(lower.height, upper.height);
+};
+
 /** `lower` sits directly beneath `upper`, right edges aligned. */
 function isBeneath(lower, upper) {
-  const height = Math.max(lower.height, upper.height);
-  const gap = lower.y - (upper.y + upper.height);
   const rightEdges = Math.abs((lower.x + lower.width) - (upper.x + upper.width));
-  return gap >= 0 && gap < STACKED_GAP * height && rightEdges < 0.5 * height;
+  return isClose(lower, upper) && rightEdges < 0.5 * Math.max(lower.height, upper.height);
+}
+
+/** `lower` sits directly beneath `upper`, left edges aligned. */
+function isTuckedUnder(lower, upper) {
+  return isClose(lower, upper) && Math.abs(lower.x - upper.x) < 0.5 * Math.max(lower.height, upper.height);
 }
 
 /**

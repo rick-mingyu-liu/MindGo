@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const { groupRows } = require('../services/import/rows');
 const { parseBankList } = require('../services/import/bankList');
 const { parseOcr } = require('../services/import/parse');
-const { TODAY, line, at, bankScreenshot, stackedBalanceLines } = require('./helpers/ocrLayouts');
+const {
+  TODAY, line, at, bankScreenshot, stackedBalanceLines, iconListLines,
+} = require('./helpers/ocrLayouts');
 
 /**
  * Bank-app transaction lists. OCR can drop a minus sign without lowering its
@@ -147,6 +149,26 @@ describe('parseBankList', () => {
       assert.ok(drafts[1].flags.includes('arithmetic_verified'));
       assert.ok(drafts[2].flags.includes('arithmetic_verified'));
       assert.ok(!drafts[0].flags.includes('arithmetic_verified'));
+    });
+  });
+
+  describe('a description that wraps', () => {
+    test('joins the line tucked under it instead of ending the date', () => {
+      const { drafts } = parseBankList(groupRows(iconListLines()), TODAY);
+      const bakery = drafts.find((d) => d.amount === '45.03');
+      assert.equal(bakery.description, 'Sq *Corner Bakery Annex');
+      assert.deepEqual(drafts.slice(-2).map((d) => d.date), ['2026-09-14', '2026-09-14']);
+    });
+
+    test('a header a normal row below is still a header', () => {
+      const { drafts } = parseBankList(groupRows([
+        line('Sep 14', { y: at(0) }),
+        line('SOBEYS', { y: at(1) }), line('$23.47', { x: 600, y: at(1) }),
+        line('Sep 12', { y: at(2) }),
+        line('TIM HORTONS', { y: at(3) }), line('$4.25', { x: 600, y: at(3) }),
+      ]), TODAY);
+      assert.deepEqual(drafts.map((d) => [d.description, d.date]),
+        [['SOBEYS', '2026-09-14'], ['TIM HORTONS', '2026-09-12']]);
     });
   });
 

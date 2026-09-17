@@ -61,7 +61,38 @@ const stackedBalanceLines = () => [
 ];
 const STACKED_IMAGE = { width: 1206, height: 1103 };
 
+// A dark-theme card list: a round icon left of every entry, which the model
+// reads as a single CJK character — at up to 0.96 confidence — and a merchant
+// name that wraps to a second line. Boxes are the shipped model's output for a
+// real screenshot (2026-09-17); the merchants are not.
+const iconListLines = () => [
+  line('Wed, Sep 16', { x: 31, y: 30, width: 247, height: 55 }),
+  line('凸', { x: 51, y: 149, width: 94, height: 79, conf: 0.51 }),
+  line('Noodle House', { x: 164, y: 165, width: 263, height: 50, conf: 0.94 }),
+  line('$46.84 CAD', { x: 897, y: 165, width: 271, height: 50 }),
+  line('Tue, Sep 15', { x: 30, y: 322, width: 233, height: 59 }),
+  line('曰', { x: 52, y: 454, width: 89, height: 62, conf: 0.61 }),
+  line('CAD Deposit', { x: 164, y: 457, width: 286, height: 59 }),
+  line('+$100.00 CAD', { x: 850, y: 455, width: 325, height: 55 }),
+  line('Mon, Sep 14', { x: 31, y: 792, width: 244, height: 50 }),
+  line('凸', { x: 50, y: 923, width: 90, height: 78, conf: 0.96 }),
+  line('Sq *Corner Bakery', { x: 164, y: 907, width: 443, height: 55 }),
+  line('$45.03 CAD', { x: 897, y: 933, width: 271, height: 54 }),
+  line('Annex', { x: 163, y: 964, width: 155, height: 55 }),
+  line('巴', { x: 55, y: 1279, width: 82, height: 71, conf: 0.19 }),
+  line('Uber Canada/Ubertrip', { x: 165, y: 1291, width: 472, height: 55 }),
+  line('$9.96 CAD', { x: 923, y: 1288, width: 247, height: 55 }),
+  line('©', { x: 52, y: 1456, width: 86, height: 60, conf: 0.41 }),
+  line('CAD Deposit', { x: 164, y: 1461, width: 286, height: 55 }),
+  line('+$100.00 CAD', { x: 849, y: 1461, width: 325, height: 50 }),
+  line('飞', { x: 547, y: 1622, width: 126, height: 98, conf: 0.89 }),
+  line('Home', { x: 128, y: 1711, width: 118, height: 47 }),
+  line('Trade', { x: 549, y: 1707, width: 124, height: 54 }),
+];
+const ICON_IMAGE = { width: 1206, height: 1848 };
+
 
 module.exports = {
   TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
+  iconListLines, ICON_IMAGE,
 };

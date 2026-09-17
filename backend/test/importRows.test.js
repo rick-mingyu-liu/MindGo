@@ -38,6 +38,29 @@ describe('groupRows', () => {
       rows.map((r) => r.text).join(' | '));
   });
 
+  test('drops a lone symbol the model made of an icon', () => {
+    const rows = groupRows([
+      line('凸', { x: 50, y: 923, width: 90, height: 78, conf: 0.96 }),
+      line('©', { x: 52, y: 1456, width: 86, height: 60 }),
+      line('Pho', { x: 164, y: 930, height: 55 }),
+    ]);
+    assert.deepEqual(rows.map((r) => r.text), ['Pho']);
+  });
+
+  test('keeps a lone letter, digit, sign or currency symbol', () => {
+    const rows = groupRows(['A', '7', '-', '$', '¥'].map((text, i) => line(text, { y: at(i) })));
+    assert.equal(rows.length, 5);
+  });
+
+  test('reads a row spanning two lines top line first, whatever their x', () => {
+    const rows = groupRows([
+      line('Corner Bakery', { x: 164, y: 905, height: 45 }),
+      line('$45.03', { x: 897, y: 900, height: 100 }),
+      line('Annex', { x: 163, y: 955, height: 45 }),
+    ]);
+    assert.deepEqual(rows.map((r) => r.text), ['Corner Bakery $45.03 Annex']);
+  });
+
   test('takes the lowest confidence of a row, and ignores blank lines', () => {
     const rows = groupRows([line('A', { conf: 0.9 }), line('B', { x: 300, conf: 0.6 }), line('  ')]);
     assert.equal(rows.length, 1);

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { parseOcr } = require('../services/import/parse');
 const {
   TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
+  iconListLines, ICON_IMAGE,
 } = require('./helpers/ocrLayouts');
 
 /**
@@ -45,6 +46,20 @@ describe('parseOcr', () => {
       ['2026-09-16', '25.00', 'expense'],
       ['2026-09-15', '32.00', 'expense'],
     ]);
+  });
+
+  test('icons read as characters stay out of descriptions and confidence', () => {
+    const result = parseOcr({ lines: iconListLines(), image: ICON_IMAGE, today: '2026-09-17' });
+    assert.equal(result.layout, 'bank-list');
+    assert.deepEqual(result.rows.map((r) => [r.date, r.amount, r.type, r.description]), [
+      ['2026-09-16', '46.84', 'expense', 'Noodle House'],
+      ['2026-09-15', '100.00', 'income', 'CAD Deposit'],
+      ['2026-09-14', '45.03', 'expense', 'Sq *Corner Bakery Annex'],
+      ['2026-09-14', '9.96', 'expense', 'Uber Canada/Ubertrip'],
+      ['2026-09-14', '100.00', 'income', 'CAD Deposit'],
+    ]);
+    assert.ok(result.rows.every((r) => !r.flags.includes('low_confidence')),
+      JSON.stringify(result.rows.map((r) => r.flags)));
   });
 
   test('low OCR confidence is flagged at the threshold', () => {
