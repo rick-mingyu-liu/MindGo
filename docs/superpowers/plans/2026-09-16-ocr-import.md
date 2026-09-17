@@ -2240,7 +2240,7 @@ Create `frontend/lib/ocr/profile.json`:
 {
   "name": "PP-OCRv6_small",
   "preset": "v6-small",
-  "engine": "opencv",
+  "engine": "canvas-native",
   "strategy": "per-box",
   "files": {
     "detection": "PP-OCRv6_small_det.ort",
@@ -2642,11 +2642,11 @@ cd eval && npm run benchmark
 Expected (numbers from the scratch run on the same machine; OCR time varies):
 
 ```
-| bank-list | 24 | 24 | 164 / 164 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 96.3% | 100.0% | **0 (0.0%)** | 0 (0.0%) | 0 | 0 |
+| bank-list | 24 | 24 | 164 / 164 | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 99.4% | 100.0% | **0 (0.0%)** | 0 (0.0%) | 0 | 0 |
 | receipt | 24 | 24 | 24 / 24 | 100.0% | 100.0% | 100.0% | 79.2% | 100.0% | 100.0% | 100.0% | **0 (0.0%)** | 0 (0.0%) | 0 | 0 |
 ```
 
-The five receipt date misses in the report must all be `MM/DD/YYYY` dates with a day ≤ 12, flagged `missing_date`. If any silent-error cell is not 0, stop: that is a parser bug.
+Of the five receipt date misses in the report, four must be an ambiguous `MM/DD/YYYY` date with a day ≤ 12 and one a `YYYY/MM/DD` date OCR merged with the receipt's printed time, all flagged `missing_date`. If any silent-error cell is not 0, stop: that is a parser bug.
 
 - [ ] **Step 3: Run the comparisons the spec cites**
 
@@ -2706,7 +2706,7 @@ console.log(`wrote ${written} fixtures (${config}) to ${OUT}`);
 ```
 
 Run: `cd eval && npm run fixtures`
-Expected: `wrote 48 fixtures (v6-small-opencv-per-box) to …/backend/test/fixtures/ocr` (about 192 KB).
+Expected: `wrote 48 fixtures (v6-small-canvas-native-per-box) to …/backend/test/fixtures/ocr` (about 192 KB).
 
 - [ ] **Step 5: Write the fixture test**
 

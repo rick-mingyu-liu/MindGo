@@ -94,10 +94,13 @@ Decisions:
   runs, read by both the worker and the benchmark:
 
   ```json
-  { "name": "PP-OCRv6_small", "preset": "v6-small", "engine": "opencv", "strategy": "per-box",
+  { "name": "PP-OCRv6_small", "preset": "v6-small", "engine": "canvas-native", "strategy": "per-box",
     "files": { "detection": "PP-OCRv6_small_det.ort", "recognition": "PP-OCRv6_small_rec.ort",
                "charactersDictionary": "ppocrv6_dict.txt" } }
   ```
+
+  The web build of the library always uses the canvas-native engine (it has no
+  OpenCV), so the profile names it and the benchmark runs it.
 
   Recognition calls always pass `flatten: true` and `minimumConfidence: 0`: the
   library's default of 0.5 silently drops low-confidence text, and this design
@@ -410,13 +413,18 @@ zero silent errors of any kind, recall ≥ 95%, amounts ≥ 98% exact.
 | v5 English mobile, canvas engine | 163/164 | 62.6% | 15/24 | 46.7% | 0 / 0 |
 | v5 multilingual mobile | 163/164 | 50.3% | 22/24 | 77.3% | 0 / 0 |
 | v6 small, per-line | 163/164 | 77.3% | 24/24 | 79.2% | 0 / 0 |
-| **v6 small, per-box (shipped)** | **164/164** | **100%** | **24/24** | **79.2%** | **0 / 0** |
+| v6 small, per-line, canvas engine | 164/164 | 81.1% | 24/24 | 83.3% | 0 / 0 |
+| v6 small, per-box, OpenCV engine | 164/164 | 100% | 24/24 | 79.2% | 0 / 0 |
+| **v6 small, per-box, canvas engine (shipped)** | **164/164** | **100%** | **24/24** | **79.2%** | **0 / 0** |
 
-All amounts that were found were exact in the shipped configuration. The five
-receipt dates it misses are all printed as `MM/DD/YYYY` with a day of 12 or
-less, which the parser refuses as ambiguous and flags `missing_date` — by
-design. Synthetic images are clean; the private set is what measures real
-screenshots and photos.
+All amounts that were found were exact in the shipped configuration. Of the
+five receipt dates it misses, four are printed as an ambiguous `MM/DD/YYYY`
+with a day of 12 or less, which the parser refuses as ambiguous and flags
+`missing_date` — by design; the fifth is printed as `YYYY/MM/DD` merged with
+the receipt's printed time (`2026/09/08 12:31`), which OCR read as one token
+the parser does not recognise as a date, so it is flagged `missing_date` too.
+Synthetic images are clean; the private set is what measures real screenshots
+and photos.
 
 ## 9. Testing
 

@@ -60,6 +60,7 @@ function service(): Promise<PaddleOcrService> {
   if (!ready) {
     ready = (async () => {
       const model = await fetchModels()
+      // The web build always runs the canvas-native engine; profile.json says so explicitly so the benchmark matches.
       const ocr = new PaddleOcrService({
         model,
         processing: { engine: profile.engine as 'opencv' | 'canvas-native' },

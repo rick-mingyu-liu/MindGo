@@ -1,7 +1,7 @@
 {
   "name": "PP-OCRv6_small",
   "preset": "v6-small",
-  "engine": "opencv",
+  "engine": "canvas-native",
   "strategy": "per-box",
   "files": {
     "detection": "PP-OCRv6_small_det.ort",
