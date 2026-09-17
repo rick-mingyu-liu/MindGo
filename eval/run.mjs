@@ -22,8 +22,8 @@ import { loadImage } from '@napi-rs/canvas';
 import { MODEL_PRESETS, PaddleOcrService } from 'ppu-paddle-ocr';
 
 const require = createRequire(import.meta.url);
-const { parseOcr } = require('../backend/services/import/parse');
-const { scoreImage, sumCounts, rates } = require('./lib/score.cjs');
+const { scoreImage, sumCounts, rates, loadParser } = require('./lib/score.cjs');
+const { parseOcr } = loadParser();
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PROFILE = JSON.parse(readFileSync(join(HERE, '..', 'frontend', 'lib', 'ocr', 'profile.json'), 'utf8'));
