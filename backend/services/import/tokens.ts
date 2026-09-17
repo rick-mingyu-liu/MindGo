@@ -8,21 +8,26 @@
 
 // Letters OCR commonly returns in place of digits. Applied only inside a token
 // that already has the shape of an amount, never to free text.
-const DIGIT_REPAIRS = { O: '0', o: '0', l: '1', I: '1', S: '5', B: '8' };
+const DIGIT_REPAIRS: Record<string, string> = { O: '0', o: '0', l: '1', I: '1', S: '5', B: '8' };
 const DIGITISH = '[0-9OolISB]';
 const GROUPED = new RegExp(`^${DIGITISH}{1,3}(?:,${DIGITISH}{3})+\\.${DIGITISH}{2}$`);
 const PLAIN = new RegExp(`^${DIGITISH}+\\.${DIGITISH}{2}$`);
 
+export interface ParsedAmount {
+  value: string;
+  sign: -1 | 1 | null;
+  currency: 'USD' | null;
+  corrected: boolean;
+}
+
 /**
  * Reads one amount token. Returns null for anything that is not unambiguously
  * an amount with cents — rejecting beats misreading.
- *
- * @returns {{ value: string, sign: -1|1|null, currency: 'USD'|null, corrected: boolean } | null}
  */
-function parseAmount(text) {
+export function parseAmount(text: unknown): ParsedAmount | null {
   let s = String(text ?? '').trim();
-  let sign = null;
-  let currency = null;
+  let sign: -1 | 1 | null = null;
+  let currency: 'USD' | null = null;
 
   const credit = /\s*CR$/i;
   if (credit.test(s)) {
@@ -32,7 +37,7 @@ function parseAmount(text) {
   const paren = /^\((.*)\)$/.exec(s);
   if (paren) {
     sign = -1;
-    s = paren[1].trim();
+    s = (paren[1] ?? '').trim();
   }
 
   // A sign and a currency marker can come in either order: -$12.50, $-12.50.
@@ -41,33 +46,38 @@ function parseAmount(text) {
     const signMatch = /^([+\-−–])\s*/.exec(s);
     if (signMatch) {
       if (sign === null) sign = signMatch[1] === '+' ? 1 : -1;
-      s = s.slice(signMatch[0].length);
+      s = s.slice((signMatch[0] ?? '').length);
       changed = true;
     }
     const marker = /^(US\$|USD|CA\$|C\$|CAD|\$)\s*/i.exec(s);
     if (marker) {
-      if (/^US/i.test(marker[1])) currency = 'USD';
-      s = s.slice(marker[0].length);
+      if (/^US/i.test(marker[1] ?? '')) currency = 'USD';
+      s = s.slice((marker[0] ?? '').length);
       changed = true;
     }
   }
   const code = /\s*(USD|CAD)$/i.exec(s);
   if (code) {
-    if (code[1].toUpperCase() === 'USD') currency = 'USD';
-    s = s.slice(0, s.length - code[0].length);
+    if ((code[1] ?? '').toUpperCase() === 'USD') currency = 'USD';
+    s = s.slice(0, s.length - (code[0] ?? '').length);
   }
 
   if (!GROUPED.test(s) && !PLAIN.test(s)) return null;
   if (!/[0-9]/.test(s)) return null;
 
-  const repaired = s.replace(/[OolISB]/g, (c) => DIGIT_REPAIRS[c]);
+  const repaired = s.replace(/[OolISB]/g, (c) => DIGIT_REPAIRS[c] ?? c);
   const [whole, cents] = repaired.replace(/,/g, '').split('.');
   return {
-    value: `${whole.replace(/^0+(?=\d)/, '')}.${cents}`,
+    value: `${(whole ?? '').replace(/^0+(?=\d)/, '')}.${cents ?? ''}`,
     sign,
     currency,
     corrected: repaired !== s,
   };
+}
+
+export interface ExtractedAmounts {
+  amounts: ParsedAmount[];
+  label: string;
 }
 
 /**
@@ -76,9 +86,9 @@ function parseAmount(text) {
  *
  * "SOBEYS -$23.47 $1,200.00" -> label "SOBEYS", amounts [23.47, 1200.00]
  */
-function extractAmounts(text) {
+export function extractAmounts(text: unknown): ExtractedAmounts {
   const tokens = String(text ?? '').trim().split(/\s+/).filter(Boolean);
-  const amounts = [];
+  const amounts: ParsedAmount[] = [];
   let end = tokens.length;
   outer: while (end > 0) {
     // Longest tail first, so "US$ -3.00" and "12.50 CR" stay together.
@@ -95,16 +105,22 @@ function extractAmounts(text) {
   return { amounts, label: tokens.slice(0, end).join(' ') };
 }
 
+export interface TrailingAmount {
+  amount: ParsedAmount;
+  label: string;
+}
+
 /** The last amount on a line and the text before it, or null. */
-function extractTrailingAmount(text) {
+export function extractTrailingAmount(text: unknown): TrailingAmount | null {
   const { amounts, label } = extractAmounts(text);
-  if (amounts.length === 0) return null;
+  const amount = amounts[amounts.length - 1];
+  if (!amount) return null;
   const earlier = amounts.slice(0, -1).map((a) => a.value);
-  return { amount: amounts[amounts.length - 1], label: [label, ...earlier].filter(Boolean).join(' ') };
+  return { amount, label: [label, ...earlier].filter(Boolean).join(' ') };
 }
 
 /** '23.47' -> 2347. Amounts are at most 8 whole digits, well inside 2^53. */
-function toCents(value) {
+export function toCents(value: string): number {
   return Number.parseInt(String(value).replace('.', ''), 10);
 }
 
@@ -114,18 +130,22 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 const FULL_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
   'september', 'october', 'november', 'december'];
 
-const pad2 = (n) => String(n).padStart(2, '0');
-const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
-const daysInMonth = (y, m) => [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1];
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+const isLeap = (y: number): boolean => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+// m is 1-12 here: makeDay validates the range before calling this.
+const daysInMonth = (y: number, m: number): number => {
+  const table = [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return table[m - 1] ?? 31;
+};
 
-function makeDay(y, m, d) {
+export function makeDay(y: number, m: number, d: number): string | null {
   if (!Number.isInteger(y) || m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return null;
   return `${y}-${pad2(m)}-${pad2(d)}`;
 }
 
 // Days since 1970-01-01 and back (Howard Hinnant's civil-date algorithms).
 // Integer arithmetic, so no Date and no timezone is involved.
-function daysFromCivil(y, m, d) {
+function daysFromCivil(y: number, m: number, d: number): number {
   const yy = m <= 2 ? y - 1 : y;
   const era = Math.floor(yy / 400);
   const yoe = yy - era * 400;
@@ -134,7 +154,13 @@ function daysFromCivil(y, m, d) {
   return era * 146097 + doe - 719468;
 }
 
-function civilFromDays(days) {
+interface CivilDate {
+  y: number;
+  m: number;
+  d: number;
+}
+
+function civilFromDays(days: number): CivilDate {
   const z = days + 719468;
   const era = Math.floor(z / 146097);
   const doe = z - era * 146097;
@@ -146,13 +172,14 @@ function civilFromDays(days) {
   return { y: yoe + era * 400 + (m <= 2 ? 1 : 0), m, d };
 }
 
-function addDays(day, n) {
+export function addDays(day: string, n: number): string | null {
   const [y, m, d] = day.split('-').map(Number);
+  if (y === undefined || m === undefined || d === undefined) return null;
   const c = civilFromDays(daysFromCivil(y, m, d) + n);
   return makeDay(c.y, c.m, c.d);
 }
 
-function monthIndex(name) {
+function monthIndex(name: string): number | null {
   const word = name.replace(/\.$/, '');
   const full = FULL_MONTHS.indexOf(word);
   if (full !== -1) return full + 1;
@@ -161,15 +188,18 @@ function monthIndex(name) {
   return short === -1 ? null : short + 1;
 }
 
-const found = (day, inferredYear) => (day ? { day, inferredYear } : null);
+export interface DateDetail {
+  day: string;
+  inferredYear: boolean;
+}
+
+const found = (day: string | null, inferredYear: boolean): DateDetail | null => (day ? { day, inferredYear } : null);
 
 /**
  * Reads a whole string as one day. `today` is the viewer's 'YYYY-MM-DD'; a day
  * with no year becomes the most recent such day not after it.
- *
- * @returns {{ day: string, inferredYear: boolean } | null}
  */
-function parseDateDetail(text, today) {
+export function parseDateDetail(text: unknown, today: string): DateDetail | null {
   const s = String(text ?? '')
     .trim()
     .toLowerCase()
@@ -184,28 +214,43 @@ function parseDateDetail(text, today) {
   if (s === 'yesterday') return found(addDays(today, -1), false);
 
   let m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(s);
-  if (m) return found(makeDay(+m[1], +m[2], +m[3]), false);
+  if (m) {
+    const [, y, mo, d] = m;
+    if (!y || !mo || !d) return null;
+    return found(makeDay(+y, +mo, +d), false);
+  }
 
   m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
   if (m) {
-    const a = +m[1];
-    const b = +m[2];
+    const [, mm, dd, yyyy] = m;
+    if (!mm || !dd || !yyyy) return null;
+    const a = +mm;
+    const b = +dd;
+    const y = +yyyy;
     // 03/04/2026 could be either order; refuse rather than guess.
-    if (a > 12 && b <= 12) return found(makeDay(+m[3], b, a), false);
-    if (b > 12 && a <= 12) return found(makeDay(+m[3], a, b), false);
-    if (a === b) return found(makeDay(+m[3], a, b), false);
+    if (a > 12 && b <= 12) return found(makeDay(y, b, a), false);
+    if (b > 12 && a <= 12) return found(makeDay(y, a, b), false);
+    if (a === b) return found(makeDay(y, a, b), false);
     return null;
   }
 
   m = /^([a-z]+\.?) (\d{1,2})(?:st|nd|rd|th)?(?:,? (\d{4}))?$/.exec(s);
-  if (m) return named(m[1], +m[2], m[3]);
+  if (m) {
+    const [, name, date, year] = m;
+    if (!name || !date) return null;
+    return named(name, +date, year);
+  }
 
   m = /^(\d{1,2}) ([a-z]+\.?)(?:,? (\d{4}))?$/.exec(s);
-  if (m) return named(m[2], +m[1], m[3]);
+  if (m) {
+    const [, date, name, year] = m;
+    if (!date || !name) return null;
+    return named(name, +date, year);
+  }
 
   return null;
 
-  function named(name, date, year) {
+  function named(name: string, date: number, year?: string): DateDetail | null {
     const month = monthIndex(name);
     if (!month) return null;
     if (year) return found(makeDay(+year, month, date), false);
@@ -219,16 +264,17 @@ function parseDateDetail(text, today) {
   }
 }
 
-function parseDate(text, today) {
+export function parseDate(text: unknown, today: string): string | null {
   const detail = parseDateDetail(text, today);
   return detail ? detail.day : null;
 }
 
-/**
- * A day at the start of a label: "Sep 14 SOBEYS" -> day + "SOBEYS".
- * @returns {{ day: string, inferredYear: boolean, rest: string } | null}
- */
-function splitLeadingDate(label, today) {
+export interface SplitDate extends DateDetail {
+  rest: string;
+}
+
+/** A day at the start of a label: "Sep 14 SOBEYS" -> day + "SOBEYS". */
+export function splitLeadingDate(label: unknown, today: string): SplitDate | null {
   const tokens = String(label ?? '').trim().split(/\s+/).filter(Boolean);
   for (let take = Math.min(4, tokens.length); take >= 1; take--) {
     const detail = parseDateDetail(tokens.slice(0, take).join(' '), today);
@@ -236,15 +282,3 @@ function splitLeadingDate(label, today) {
   }
   return null;
 }
-
-module.exports = {
-  parseAmount,
-  extractAmounts,
-  extractTrailingAmount,
-  toCents,
-  parseDate,
-  parseDateDetail,
-  splitLeadingDate,
-  addDays,
-  makeDay,
-};
