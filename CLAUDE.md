@@ -11,7 +11,7 @@ MindGo is a personal finance app: an Express/PostgreSQL REST API (`backend/`) an
 ### Backend (`cd backend`)
 ```bash
 npm install            # also builds: `prepare` runs tsc into dist/
-npm run build          # tsc → dist/ (CommonJS). Source is being converted to TypeScript: docs/superpowers/specs/2026-09-17-backend-typescript-design.md
+npm run build          # clears dist/, then tsc → dist/ (CommonJS). Source is being converted to TypeScript: docs/superpowers/specs/2026-09-17-backend-typescript-design.md
 npm run dev            # tsx watch app.js (plain node cannot require the .ts modules)
 npm start              # node dist/app.js (production)
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)

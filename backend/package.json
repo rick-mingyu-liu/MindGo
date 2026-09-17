@@ -4,7 +4,7 @@
   "description": "Backend API for Personal Finance Web App",
   "main": "dist/app.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "prepare": "npm run build",
     "start": "node dist/app.js",
     "dev": "tsx watch app.js",
