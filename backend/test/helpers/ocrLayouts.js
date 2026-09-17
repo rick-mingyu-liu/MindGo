@@ -178,9 +178,54 @@ const uberEatsOrderLines = () => [
 ];
 const UBER_EATS_IMAGE = { width: 920, height: 2000 };
 
+// WeChat Pay's Transactions list: a "2026/9" month header with ¥ totals, then
+// per transaction a description with the signed amount on the right and
+// "9/13 20:23" beneath. Amounts carry no currency, and the model tacks stray
+// characters onto some ("+150.00.", "+4.801"). Boxes and amounts are the
+// shipped model's output for a real screenshot (2026-09-17); the names are not.
+const wechatPayLines = () => [
+  line('10:32', { x: 88, y: 51, width: 165, height: 46 }),
+  line('X', { x: 8, y: 141, width: 104, height: 78, conf: 0.92 }),
+  line('Transactions', { x: 336, y: 156, width: 248, height: 42 }),
+  line('All Transactions', { x: 55, y: 289, width: 283, height: 37 }),
+  line('Q Search', { x: 412, y: 283, width: 176, height: 47, conf: 0.93 }),
+  line('Statistics >', { x: 710, y: 289, width: 182, height: 37, conf: 0.95 }),
+  line('2026/9', { x: 25, y: 427, width: 241, height: 48 }),
+  line('Expenditures¥485.00 Incomes¥485.00i', { x: 250, y: 432, width: 641, height: 37, conf: 0.97 }),
+  line('微信红包-来自张三', { x: 174, y: 553, width: 379, height: 47 }),
+  line('+120.00', { x: 733, y: 555, width: 166, height: 47, conf: 0.9 }),
+  line('9/13 20:23', { x: 174, y: 617, width: 176, height: 41 }),
+  line('转账-转给李四', { x: 174, y: 739, width: 303, height: 43 }),
+  line('-485.00', { x: 731, y: 738, width: 163, height: 47 }),
+  line('4.', { x: 78, y: 816, width: 38, height: 30, conf: 0.56 }),
+  line('9/5 10:37', { x: 172, y: 799, width: 162, height: 43 }),
+  line('位', { x: 41, y: 934, width: 101, height: 71, conf: 0.29 }),
+  line('零钱通转出-到零钱', { x: 176, y: 922, width: 339, height: 42 }),
+  line('56.26', { x: 771, y: 920, width: 129, height: 49 }),
+  line('9/5 10:36', { x: 173, y: 983, width: 161, height: 42 }),
+  line('转账-来自张三', { x: 176, y: 1105, width: 301, height: 43 }),
+  line('+215.00', { x: 733, y: 1104, width: 166, height: 48 }),
+  line('9/2 18:48', { x: 173, y: 1166, width: 161, height: 41 }),
+  line('转账-来自张三', { x: 174, y: 1287, width: 303, height: 43 }),
+  line('+150.00.', { x: 733, y: 1287, width: 166, height: 48, conf: 0.91 }),
+  line('9/1 14:25', { x: 172, y: 1348, width: 156, height: 43 }),
+  line('2026/8', { x: 24, y: 1473, width: 189, height: 48 }),
+  line('Expenditures¥0.00 Incomes¥4.80', { x: 326, y: 1476, width: 565, height: 41, conf: 0.98 }),
+  line('微信红包-来自爸爸', { x: 176, y: 1601, width: 340, height: 43 }),
+  line('+4.801', { x: 770, y: 1600, width: 130, height: 49, conf: 0.98 }),
+  line('10—', { x: 60, y: 1630, width: 62, height: 38, conf: 0.47 }),
+  line('8/2 07:21', { x: 172, y: 1662, width: 158, height: 43, conf: 0.95 }),
+  line('2026/7', { x: 24, y: 1786, width: 186, height: 49 }),
+  line('Expenditures¥26.98 Incomes¥139.80 1', { x: 277, y: 1789, width: 615, height: 42, conf: 0.96 }),
+  line('转账-来自王五Sam', { x: 174, y: 1914, width: 399, height: 47 }),
+  line('+110.001', { x: 737, y: 1914, width: 163, height: 49, conf: 0.96 }),
+  line('7/15.18:36', { x: 176, y: 1976, width: 168, height: 24, conf: 0.96 }),
+];
+const WECHAT_IMAGE = { width: 920, height: 2000 };
+
 
 module.exports = {
   TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
   iconListLines, ICON_IMAGE, uberActivityLines, UBER_IMAGE,
-  uberEatsOrderLines, UBER_EATS_IMAGE,
+  uberEatsOrderLines, UBER_EATS_IMAGE, wechatPayLines, WECHAT_IMAGE,
 };

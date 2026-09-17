@@ -246,4 +246,5 @@ module.exports = {
   parseDateDetail,
   splitLeadingDate,
   addDays,
+  makeDay,
 };

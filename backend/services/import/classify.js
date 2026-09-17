@@ -1,11 +1,12 @@
 const { extractTrailingAmount, parseDate } = require('./tokens');
 const { splitDateTime } = require('./uberActivity');
 const { splitOrderLine } = require('./uberEats');
+const { isStamp, isMonthHeader } = require('./wechat');
 
 /**
  * Decides whether a screenshot is a receipt, a bank-app transaction list,
- * Uber's trip activity or Uber Eats' past orders by counting signals for each;
- * a tie goes to receipt, then bank list, then Uber trips. `confidence` is the winner's share of all signals, so a
+ * Uber's trip activity, Uber Eats' past orders or WeChat Pay's transactions by
+ * counting signals for each; a tie goes to the earlier in that list. `confidence` is the winner's share of all signals, so a
  * screenshot with evidence for more than one scores low and is sent to the
  * fallback rather than parsed with false certainty.
  */
@@ -39,6 +40,12 @@ const UBER_EATS_SIGNALS = [
   /\bpast orders\b/i,
 ];
 
+// WeChat Pay's list: its words, English or Chinese, and its "2026/9" headers.
+const WECHAT_SIGNALS = [
+  /微信|零钱|转账|红包/,
+  /\b(expenditures?|incomes?)\b|支出|收入/i,
+];
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 function classifyLayout(rows, today) {
@@ -64,13 +71,21 @@ function classifyLayout(rows, today) {
   const eats = orderLines === 0 ? 0
     : UBER_EATS_SIGNALS.filter((re) => re.test(text)).length + Math.min(orderLines, 3);
 
-  const total = receipt + bank + uber + eats;
+  // "9/13 20:23" alone could be any app's; it counts only beside WeChat's words.
+  const lines = rows.flatMap((r) => r.lines);
+  const stamps = lines.filter((l) => isStamp(l.text)).length;
+  const wechatWords = WECHAT_SIGNALS.filter((re) => re.test(text)).length;
+  const wechat = stamps === 0 || wechatWords === 0 ? 0
+    : wechatWords + Math.min(stamps, 3) + (lines.some((l) => isMonthHeader(l.text)) ? 1 : 0);
+
+  const total = receipt + bank + uber + eats + wechat;
   if (total === 0) return { layout: 'unknown', confidence: 0 };
-  const best = Math.max(receipt, bank, uber, eats);
-  let layout = 'uber-eats-orders';
+  const best = Math.max(receipt, bank, uber, eats, wechat);
+  let layout = 'wechat-pay';
   if (receipt === best) layout = 'receipt';
   else if (bank === best) layout = 'bank-list';
   else if (uber === best) layout = 'uber-activity';
+  else if (eats === best) layout = 'uber-eats-orders';
   return { layout, confidence: round2(best / total) };
 }
 

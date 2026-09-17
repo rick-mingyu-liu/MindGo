@@ -4,6 +4,7 @@ const { parseBankList } = require('./bankList');
 const { parseReceipt } = require('./receipt');
 const { parseUberActivity } = require('./uberActivity');
 const { parseUberEatsOrders } = require('./uberEats');
+const { parseWechatPay } = require('./wechat');
 const { categorize } = require('./categorize');
 
 /**
@@ -32,6 +33,7 @@ function parseOcr({ lines, image, today }, { confidenceThreshold = 0.8 } = {}) {
   if (layout === 'bank-list') drafts = parseBankList(rows, today).drafts;
   if (layout === 'uber-activity') drafts = parseUberActivity(rows, today).drafts;
   if (layout === 'uber-eats-orders') drafts = parseUberEatsOrders(rows, today).drafts;
+  if (layout === 'wechat-pay') drafts = parseWechatPay(rows, today).drafts;
 
   const out = drafts.map((draft) => finalize(draft, confidenceThreshold));
   return {

@@ -42,6 +42,7 @@ const LAYOUT_LABEL: Record<ParseResponse['layout'], string> = {
   receipt: 'Receipt',
   'uber-activity': 'Uber trips',
   'uber-eats-orders': 'Uber Eats orders',
+  'wechat-pay': 'WeChat Pay',
   unknown: 'Unrecognised layout',
 }
 

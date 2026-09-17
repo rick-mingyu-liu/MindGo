@@ -35,7 +35,7 @@ export interface DraftRow {
 }
 
 export interface ParseResponse {
-  layout: 'bank-list' | 'receipt' | 'uber-activity' | 'uber-eats-orders' | 'unknown'
+  layout: 'bank-list' | 'receipt' | 'uber-activity' | 'uber-eats-orders' | 'wechat-pay' | 'unknown'
   layoutConfidence: number
   model: string
   warnings: string[]
