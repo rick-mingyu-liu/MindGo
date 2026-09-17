@@ -1,5 +1,7 @@
-const { extractAmounts, parseDateDetail, toCents } = require('./tokens');
-const { categorize } = require('./categorize');
+import { extractAmounts, parseDateDetail, toCents } from './tokens';
+import type { DateDetail, ParsedAmount } from './tokens';
+import { categorize } from './categorize';
+import type { OcrLine, ParserDraft, Row } from '../../types/import';
 
 /**
  * Uber Eats' Past orders tab: one order per store, stacked as
@@ -24,25 +26,30 @@ const { categorize } = require('./categorize');
 const ORDER_LINE = /^(.+?)\s*[•·]\s*(.+?)\s*[•·]\s*\d+\s*i\s*t\s*e\s*m\s*s?$/i;
 const TUCKED = 0.5;
 
+/** An order's date and its single total amount. */
+type OrderLine = DateDetail & { amount: ParsedAmount };
+
 /** "Mar 15 • $60.54 • 1 item" -> the day and the amount; anything else -> null. */
-function splitOrderLine(text, today) {
+export function splitOrderLine(text: unknown, today: string): OrderLine | null {
   const match = ORDER_LINE.exec(String(text ?? '').trim().replace(/\s+/g, ' '));
   if (!match) return null;
   const date = parseDateDetail(match[1], today);
   const { amounts, label } = extractAmounts(match[2]);
   if (!date || amounts.length !== 1 || label) return null;
-  return { ...date, amount: amounts[0] };
+  const amount = amounts[0];
+  if (!amount) return null;
+  return { ...date, amount };
 }
 
-function parseUberEatsOrders(rows, today) {
+export function parseUberEatsOrders(rows: Row[], today: string): { drafts: ParserDraft[] } {
   const lines = rows.flatMap((row) => row.lines);
-  const drafts = [];
+  const drafts: ParserDraft[] = [];
 
   for (const line of lines) {
     const order = splitOrderLine(line.text, today);
     if (!order || toCents(order.amount.value) === 0) continue;
 
-    const store = [];
+    const store: OcrLine[] = [];
     let below = line;
     for (;;) {
       const above = lines
@@ -75,13 +82,11 @@ function parseUberEatsOrders(rows, today) {
 }
 
 /** Left edges within a line's height of each other. */
-const inColumn = (a, b) => Math.abs(a.box.x - b.box.x) < Math.min(a.box.height, b.box.height);
+const inColumn = (a: OcrLine, b: OcrLine): boolean => Math.abs(a.box.x - b.box.x) < Math.min(a.box.height, b.box.height);
 
 /** `upper` ends just above where `lower` starts. */
-function isTucked(lower, upper) {
+function isTucked(lower: OcrLine, upper: OcrLine): boolean {
   const gap = lower.box.y - (upper.box.y + upper.box.height);
   const height = Math.min(lower.box.height, upper.box.height);
   return gap > -TUCKED * height && gap < TUCKED * height;
 }
-
-module.exports = { parseUberEatsOrders, splitOrderLine };
