@@ -1,6 +1,7 @@
-const db = require('../db/connection');
-const { buildDemoData } = require('../db/demoData');
-const logger = require('../utils/logger');
+import { getPool } from '../db/connection';
+import { buildDemoData } from '../db/demoData';
+import logger = require('../utils/logger');
+import type { PoolClient } from 'pg';
 
 /**
  * Writes the demo account.
@@ -50,26 +51,43 @@ const OWNED_TABLES = ['transactions', 'savings_goals', 'watchlist', 'ai_plans'];
  * `VALUES ($1,$2,$3),($4,$5,$6),...` for `rows.length` rows of `width` columns.
  * One round trip instead of one per row.
  */
-function valuesClause(rows, width) {
+function valuesClause(rows: readonly unknown[], width: number): string {
   return rows
     .map((_, r) => `(${Array.from({ length: width }, (_, c) => `$${r * width + c + 1}`).join(',')})`)
     .join(',');
 }
 
+type RefreshStatus = 'refreshed' | 'created' | 'absent';
+
+interface RefreshOptions {
+  create?: boolean;
+  now?: Date;
+}
+
+interface RefreshResult {
+  status: RefreshStatus;
+  userId?: number;
+  deleted: number;
+  inserted: number;
+}
+
 /**
  * Rewrites the demo account's data as of `now`.
  *
- * @returns {Promise<{status: string, userId?: number, deleted: number, inserted: number}>}
- *   `status` is 'refreshed', 'created', or 'absent' when there is no demo
- *   account and `create` was false.
+ * @returns `status` is 'refreshed', 'created', or 'absent' when there is no
+ *   demo account and `create` was false.
  */
-async function refreshDemoAccount({ create = false, now = new Date() } = {}) {
+async function refreshDemoAccount({ create = false, now = new Date() }: RefreshOptions = {}): Promise<RefreshResult> {
   const data = buildDemoData(now);
 
   // A dedicated client, not db.query: the pool hands out a different
   // connection per call, so BEGIN and COMMIT issued through it need not land
   // on the same session and the rewrite would not be atomic at all.
-  const client = await db.getPool().connect();
+  //
+  // db/connection.js is still JavaScript (a later step); TS still infers
+  // getPool()'s return as pg's own Pool from the require('pg') call inside
+  // it, so no cast is needed to annotate what connect() hands back here.
+  const client: PoolClient = await getPool().connect();
 
   try {
     await client.query('BEGIN');
@@ -78,8 +96,8 @@ async function refreshDemoAccount({ create = false, now = new Date() } = {}) {
       'SELECT id FROM users WHERE is_demo = TRUE LIMIT 1'
     );
 
-    let userId = existing.rows[0]?.id;
-    let status = 'refreshed';
+    let userId: number | undefined = existing.rows[0]?.id;
+    let status: RefreshStatus = 'refreshed';
 
     if (!userId) {
       if (!create) {
@@ -104,7 +122,9 @@ async function refreshDemoAccount({ create = false, now = new Date() } = {}) {
     let deleted = 0;
     for (const table of OWNED_TABLES) {
       const result = await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
-      deleted += result.rowCount;
+      // pg types rowCount as number | null; a DELETE always reports one, and
+      // `deleted += null` coerced to a no-op addition in the original JS too.
+      deleted += result.rowCount ?? 0;
     }
 
     const txRows = data.transactions.map((t) =>
@@ -151,7 +171,7 @@ async function refreshDemoAccount({ create = false, now = new Date() } = {}) {
  * `scheduleInterval` logs and audits — and the deletion is the half worth
  * auditing, per decision D. The insert detail goes to the dev channel.
  */
-async function refreshDemoAccountOnSchedule(now = new Date()) {
+async function refreshDemoAccountOnSchedule(now: Date = new Date()): Promise<number> {
   const result = await refreshDemoAccount({ create: false, now });
 
   if (result.status === 'absent') {
@@ -169,7 +189,7 @@ async function refreshDemoAccountOnSchedule(now = new Date()) {
   return result.deleted;
 }
 
-module.exports = {
+export {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
   DEMO_EMAIL,
