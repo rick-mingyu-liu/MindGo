@@ -1,0 +1,51 @@
+/**
+ * A first guess at a category from the merchant name. Deliberately small: a
+ * wrong guess costs the user a correction, and no guess costs them one pick,
+ * so this only answers when a keyword is unambiguous.
+ *
+ * Every category named here must exist in the canonical list — the one in
+ * frontend/pages/transactions/new.tsx, mirrored by db/demoData.js and pinned
+ * to it by test/demoData.test.js. test/importParser.test.js checks this map
+ * against that mirror.
+ */
+const KEYWORDS = {
+  expense: {
+    Groceries: ['sobeys', 'loblaws', 'no frills', 'metro', 'freshco', 'food basics', 'zehrs',
+      'fortinos', 't&t', 'farm boy', 'real canadian superstore', 'costco', 'safeway', 'longos'],
+    'Dining Out': ['tim hortons', 'starbucks', 'mcdonald', 'subway', 'a&w', 'pizza', 'restaurant',
+      'cafe', 'sushi', 'burrito', 'uber eats', 'doordash', 'skipthedishes', 'chipotle', 'popeyes'],
+    Transportation: ['presto', 'grt', 'ttc', 'go transit', 'uber', 'lyft', 'petro canada', 'esso',
+      'shell', 'pioneer', 'parking'],
+    Utilities: ['rogers', 'bell canada', 'telus', 'fido', 'freedom mobile', 'koodo', 'enbridge',
+      'hydro', 'kitchener utilities'],
+    Entertainment: ['netflix', 'spotify', 'cineplex', 'steam', 'disney plus', 'crave'],
+    Shopping: ['amazon', 'best buy', 'winners', 'ikea', 'canadian tire', 'dollarama', 'uniqlo',
+      'walmart'],
+    Healthcare: ['shoppers drug mart', 'rexall', 'pharmacy', 'dental', 'clinic', 'physio'],
+    Education: ['university of waterloo', 'uwaterloo', 'w store', 'chegg', 'pearson', 'coursera'],
+    Travel: ['air canada', 'westjet', 'via rail', 'airbnb', 'expedia', 'hotel', 'flair'],
+    Housing: ['rent', 'property management'],
+  },
+  income: {
+    Salary: ['payroll', 'salary', 'pay deposit'],
+    'Tax Refund': ['canada revenue', 'cra'],
+    'Investment Returns': ['dividend', 'interest'],
+  },
+};
+
+const normalize = (text) => ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9&]+/g, ' ').trim()} `;
+
+// Longest keyword first, so "uber eats" is dining before "uber" is transport.
+const TABLE = Object.entries(KEYWORDS)
+  .flatMap(([type, map]) => Object.entries(map)
+    .flatMap(([category, words]) => words.map((word) => ({ type, category, word: normalize(word) }))))
+  .sort((a, b) => b.word.length - a.word.length);
+
+/** @returns {string|null} a category from the canonical list, or null */
+function categorize(description, type) {
+  const text = normalize(description);
+  const hit = TABLE.find((entry) => entry.type === type && text.includes(entry.word));
+  return hit ? hit.category : null;
+}
+
+module.exports = { categorize, KEYWORDS };
