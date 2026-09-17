@@ -1,5 +1,5 @@
-const OpenAI = require('openai');
-const config = require('../config');
+import OpenAI from 'openai';
+import config = require('../config');
 
 // OpenAI refusing for account reasons rather than failing: no credit left
 // (measured 2026-09-17: 429 credit_balance_exhausted), no quota, or throttled.
@@ -7,13 +7,69 @@ const UNAVAILABLE_CODES = ['credit_balance_exhausted', 'insufficient_quota', 'ra
 
 /** Thrown when OpenAI will not answer for now; the controller maps it to 503. */
 class AiUnavailableError extends Error {
-  constructor(cause) {
+  constructor(cause: unknown) {
     super('AI service temporarily unavailable', { cause });
     this.name = 'AiUnavailableError';
   }
 }
 
+/**
+ * The one method this module calls on an OpenAI client, declared
+ * structurally rather than as `OpenAI` itself. A real `OpenAI` instance has
+ * far more surface than this and still satisfies it; so does the fake client
+ * `test/aiUnavailable.test.js` swaps in
+ * (`{ chat: { completions: { create: async () => { throw failWith; } } } }`).
+ * Typing `openai` as `OpenAI | null` would reject that fake once the test
+ * itself is converted to TypeScript (step 8) even though it works fine at
+ * runtime today.
+ */
+interface ChatCompletionsClient {
+  chat: {
+    completions: {
+      // params is `unknown`, not the request shape this module actually
+      // sends: the real OpenAI client's create() takes a large discriminated
+      // union of message-param variants, and a looser object type here is
+      // not assignable to it under normal (contravariant) parameter
+      // checking, which real `OpenAI` instances must satisfy to be assigned
+      // to `openai` below. The request body is never read back out of this
+      // interface, only constructed at the call site, so nothing is lost by
+      // leaving it unchecked here.
+      create(params: unknown): Promise<{ choices: Array<{ message: { content: string | null } }> }>;
+    };
+  };
+}
+
+interface FormData {
+  currentIncome?: number;
+  currentExpenses?: number;
+  timeline?: string;
+  currency?: string;
+  additionalContext?: string;
+}
+
+interface GoalSummary {
+  name: string;
+  current: number;
+  target: number;
+  progress: number;
+}
+
+/** User's financial data, as generatePlan's callers assemble it — every field is optional. */
+interface FinancialData {
+  formData?: FormData;
+  monthlyIncome?: number;
+  monthlyExpenses?: number;
+  savings?: number;
+  targetSavings?: number;
+  goals?: GoalSummary[];
+  spendingByCategory?: Record<string, number>;
+}
+
 class AIPlanner {
+  // Public and writable, not readonly: test/aiUnavailable.test.js reassigns
+  // this directly in beforeEach.
+  openai: ChatCompletionsClient | null;
+
   constructor() {
     this.openai = null;
   }
@@ -28,7 +84,7 @@ class AIPlanner {
    * the "OpenAI API key not configured" guard in generatePlan unreachable.
    * Building it lazily lets that guard do its job.
    */
-  get client() {
+  get client(): ChatCompletionsClient {
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey: config.apiKeys.openai });
     }
@@ -37,12 +93,12 @@ class AIPlanner {
 
   /**
    * Generate AI financial plan based on user prompt and financial data
-   * @param {string} userPrompt - User's financial question or request
-   * @param {Object} financialData - User's financial data (optional)
-   * @param {string} language - Language code (e.g., 'en', 'zh')
-   * @returns {Promise<string>} AI-generated financial plan
+   * @param userPrompt - User's financial question or request
+   * @param financialData - User's financial data (optional)
+   * @param language - Language code (e.g., 'en', 'zh')
+   * @returns AI-generated financial plan
    */
-  async generatePlan(userPrompt, financialData = null, language = 'en') {
+  async generatePlan(userPrompt: string, financialData: FinancialData | null = null, language: string = 'en'): Promise<string | null> {
     try {
       if (!config.apiKeys.openai) {
         throw new Error('OpenAI API key not configured');
@@ -111,31 +167,51 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
         temperature: 0.7,
       });
 
-      return completion.choices[0].message.content;
+      // completion.choices[0] is `| undefined` under noUncheckedIndexedAccess,
+      // since the client's return type is a plain array with no guaranteed
+      // minimum length. OpenAI's chat completions endpoint always returns at
+      // least one choice for a request that resolves rather than rejects, so
+      // this cast is that assumption made explicit. If it's ever wrong, the
+      // cast doesn't change what happens: choices[0] is still undefined at
+      // runtime, `.message` still throws a TypeError, and the catch block
+      // below still handles it exactly as it did before this file was typed.
+      const firstChoice = completion.choices[0] as { message: { content: string | null } };
+
+      return firstChoice.message.content;
 
     } catch (error) {
       console.error('❌ Error generating AI plan:', error);
 
-      if (error.status === 429 || UNAVAILABLE_CODES.includes(error.code)) {
+      // Duck-typed rather than narrowed to Error/AxiosError: the real failure
+      // this exists for is OpenAI's SDK error, but
+      // test/aiUnavailable.test.js throws a plain Error with .status/.code
+      // bolted on (Object.assign(new Error(...), { status, code })), which is
+      // exactly what this reads and nothing more.
+      const err = error as { status?: unknown; code?: unknown; message: string };
+
+      if (err.status === 429 || UNAVAILABLE_CODES.includes(err.code as string)) {
         throw new AiUnavailableError(error);
       }
 
-      if (error.message.includes('API key')) {
+      // err.message.includes(...) throws here if error has no usable
+      // .message — unchanged from the original, which read error.message the
+      // same way with no guard.
+      if (err.message.includes('API key')) {
         throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables.');
       }
-      
+
       throw new Error('Failed to generate financial plan. Please try again later.');
     }
   }
 
   /**
    * Build financial context from user data
-   * @param {Object} financialData - User's financial information
-   * @returns {string} Formatted financial context
+   * @param financialData - User's financial information
+   * @returns Formatted financial context
    */
-  buildFinancialContext(financialData) {
+  buildFinancialContext(financialData: FinancialData): string {
     let context = 'Based on the user\'s financial profile:\n\n';
-    
+
     // Add form data if available
     if (financialData.formData) {
       const income = (typeof financialData.formData.currentIncome === 'number' && !isNaN(financialData.formData.currentIncome)) ? financialData.formData.currentIncome : 0;
@@ -153,17 +229,21 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       }
       context += '\n';
     }
-    
-    // Add historical data if available
+
+    // Add historical data if available. Only monthlyIncome gates this block in
+    // the original, which assumes the other three arrive alongside it without
+    // checking; these casts keep that assumption exactly as it was — a caller
+    // that sends monthlyIncome without the rest still throws the same
+    // TypeError here that the untyped version did.
     if (financialData.monthlyIncome) {
       context += `**Historical Financial Data:**\n`;
       context += `• Average Monthly Income: $${financialData.monthlyIncome.toFixed(2)}\n`;
-      context += `• Average Monthly Expenses: $${financialData.monthlyExpenses.toFixed(2)}\n`;
-      context += `• Current Savings: $${financialData.savings.toFixed(2)}\n`;
-      context += `• Target Savings: $${financialData.targetSavings.toFixed(2)}\n`;
+      context += `• Average Monthly Expenses: $${(financialData.monthlyExpenses as number).toFixed(2)}\n`;
+      context += `• Current Savings: $${(financialData.savings as number).toFixed(2)}\n`;
+      context += `• Target Savings: $${(financialData.targetSavings as number).toFixed(2)}\n`;
       context += '\n';
     }
-    
+
     if (financialData.goals && financialData.goals.length > 0) {
       context += `**Current Financial Goals:**\n`;
       financialData.goals.forEach(goal => {
@@ -171,7 +251,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       });
       context += '\n';
     }
-    
+
     if (financialData.spendingByCategory && Object.keys(financialData.spendingByCategory).length > 0) {
       context += `**Spending by Category (Last 6 Months):**\n`;
       Object.entries(financialData.spendingByCategory).forEach(([category, amount]) => {
@@ -179,18 +259,18 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       });
       context += '\n';
     }
-    
+
     context += 'Please provide personalized advice based on this information, focusing on practical steps and realistic timelines.';
-    
+
     return context;
   }
 
   /**
    * Generate budget recommendations
-   * @param {Object} spendingData - User's spending patterns
-   * @returns {Promise<string>} Budget recommendations
+   * @param spendingData - User's spending patterns
+   * @returns Budget recommendations
    */
-  async generateBudgetRecommendations(spendingData) {
+  async generateBudgetRecommendations(spendingData: unknown): Promise<string | null> {
     const prompt = `Based on the following spending patterns, provide specific budget recommendations:
 
 ${JSON.stringify(spendingData, null, 2)}
@@ -206,10 +286,10 @@ Please provide:
 
   /**
    * Generate investment advice
-   * @param {Object} investmentProfile - User's investment profile
-   * @returns {Promise<string>} Investment recommendations
+   * @param investmentProfile - User's investment profile
+   * @returns Investment recommendations
    */
-  async generateInvestmentAdvice(investmentProfile) {
+  async generateInvestmentAdvice(investmentProfile: unknown): Promise<string | null> {
     const prompt = `Based on the following investment profile, provide personalized investment advice:
 
 ${JSON.stringify(investmentProfile, null, 2)}
@@ -224,5 +304,4 @@ Please provide:
   }
 }
 
-module.exports = new AIPlanner();
-module.exports.AiUnavailableError = AiUnavailableError; 
+export = Object.assign(new AIPlanner(), { AiUnavailableError });

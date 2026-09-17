@@ -1,5 +1,5 @@
-const db = require('../db/connection');
-const config = require('../config');
+import { query } from '../db/connection';
+import config = require('../config');
 
 /**
  * Scheduled deletions, owned by the service layer.
@@ -25,8 +25,8 @@ const config = require('../config');
  */
 
 /** Deletes AI plans past `config.dataRetention.aiPlanMinutes`. Returns the row count. */
-async function deleteOldAIPlans() {
-  const result = await db.query(
+async function deleteOldAIPlans(): Promise<number | null> {
+  const result = await query(
     'DELETE FROM ai_plans WHERE created_at < NOW() - make_interval(mins => $1)',
     [config.dataRetention.aiPlanMinutes]
   );
@@ -34,12 +34,12 @@ async function deleteOldAIPlans() {
 }
 
 /** Deletes never-verified accounts past `config.dataRetention.unverifiedAccountMinutes`. Returns the row count. */
-async function deleteUnverifiedAccounts() {
-  const result = await db.query(
+async function deleteUnverifiedAccounts(): Promise<number | null> {
+  const result = await query(
     'DELETE FROM users WHERE email_verified = FALSE AND created_at < NOW() - make_interval(mins => $1)',
     [config.dataRetention.unverifiedAccountMinutes]
   );
   return result.rowCount;
 }
 
-module.exports = { deleteOldAIPlans, deleteUnverifiedAccounts };
+export { deleteOldAIPlans, deleteUnverifiedAccounts };

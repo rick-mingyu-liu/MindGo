@@ -1,7 +1,66 @@
-const axios = require('axios');
-const config = require('../config');
+import axios from 'axios';
+import config = require('../config');
+
+/** The OHLCV arrays every historical-data source in this file settles into. */
+interface HistoricalBars {
+  t: number[];
+  o: number[];
+  h: number[];
+  l: number[];
+  c: number[];
+  v: number[];
+}
+
+/**
+ * Yahoo's per-field OHLCV arrays. Elements can be `null` or missing — the
+ * `|| 0` fallbacks below are already in the original code, which is the
+ * evidence for that.
+ */
+interface YahooQuoteData {
+  open: Array<number | null>;
+  high: Array<number | null>;
+  low: Array<number | null>;
+  close: Array<number | null>;
+  volume: Array<number | null>;
+}
+
+interface YahooAdjCloseData {
+  adjclose?: Array<number | null>;
+}
+
+interface YahooChartResult {
+  timestamp?: number[];
+  indicators: {
+    quote: YahooQuoteData[];
+    adjclose: YahooAdjCloseData[];
+  };
+}
+
+interface YahooChartResponse {
+  chart: {
+    result: YahooChartResult[];
+  };
+}
+
+interface AlphaVantageDailyBar {
+  '1. open': string;
+  '2. high': string;
+  '3. low': string;
+  '4. close': string;
+  '5. volume': string;
+}
+
+interface AlphaVantageTimeSeriesResponse {
+  'Error Message'?: string;
+  Note?: string;
+  'Time Series (Daily)'?: Record<string, AlphaVantageDailyBar>;
+}
 
 class FreeStockDataService {
+  alphaVantageApiKey: string;
+  cache: Map<string, { data: HistoricalBars; timestamp: number }>;
+  cacheTimeout: number;
+
   constructor() {
     this.alphaVantageApiKey = config.apiKeys.alphaVantage;
     this.cache = new Map();
@@ -9,13 +68,13 @@ class FreeStockDataService {
   }
 
   // Get historical data from Yahoo Finance (completely free, no API key needed)
-  async getYahooFinanceHistoricalData(symbol, period = '1mo') {
+  async getYahooFinanceHistoricalData(symbol: string, period: string = '1mo'): Promise<HistoricalBars> {
     try {
       // Add longer delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Yahoo Finance uses a different endpoint structure
-      const response = await axios.get(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
+      const response = await axios.get<YahooChartResponse>(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`, {
         params: {
           range: period,
           interval: '1d',
@@ -61,7 +120,7 @@ class FreeStockDataService {
       }
 
       // Transform Yahoo Finance data to match our expected format
-      const data = {
+      const data: HistoricalBars = {
         t: [], // timestamps
         o: [], // open
         h: [], // high
@@ -81,29 +140,29 @@ class FreeStockDataService {
 
       return data;
     } catch (error) {
-      console.error('Error fetching historical data from Yahoo Finance:', error.message);
-      
+      console.error('Error fetching historical data from Yahoo Finance:', error instanceof Error ? error.message : error);
+
       // Check if it's a rate limit error
-      if (error.response && error.response.status === 429) {
+      if (axios.isAxiosError(error) && error.response && error.response.status === 429) {
         throw new Error('Rate limited by Yahoo Finance. Please try again later.');
       }
-      
+
       // If it's a network error or timeout, try with a different approach
-      if (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      if (axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT')) {
         console.log('Network error, trying alternative endpoint...');
         return await this.getYahooFinanceAlternativeData(symbol, period);
       }
-      
+
       throw new Error('Failed to fetch historical data from Yahoo Finance');
     }
   }
 
   // Alternative Yahoo Finance endpoint as fallback
-  async getYahooFinanceAlternativeData(symbol, period = '1mo') {
+  async getYahooFinanceAlternativeData(symbol: string, period: string = '1mo'): Promise<HistoricalBars> {
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const response = await axios.get(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}`, {
+
+      const response = await axios.get<YahooChartResponse>(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}`, {
         params: {
           range: period,
           interval: '1d',
@@ -133,7 +192,7 @@ class FreeStockDataService {
         throw new Error('Invalid data structure from Yahoo Finance alternative endpoint');
       }
 
-      const data = {
+      const data: HistoricalBars = {
         t: [], o: [], h: [], l: [], c: [], v: []
       };
 
@@ -148,20 +207,20 @@ class FreeStockDataService {
 
       return data;
     } catch (error) {
-      console.error('Alternative Yahoo Finance endpoint also failed:', error.message);
+      console.error('Alternative Yahoo Finance endpoint also failed:', error instanceof Error ? error.message : error);
       throw error;
     }
   }
 
   // Get historical data from Alpha Vantage
-  async getAlphaVantageHistoricalData(symbol) {
+  async getAlphaVantageHistoricalData(symbol: string): Promise<HistoricalBars> {
     try {
       // Skip Alpha Vantage if using demo key (limited functionality)
       if (this.alphaVantageApiKey === 'demo') {
         throw new Error('Alpha Vantage demo key has limited functionality. Please get a free API key from alphavantage.co');
       }
 
-      const response = await axios.get('https://www.alphavantage.co/query', {
+      const response = await axios.get<AlphaVantageTimeSeriesResponse>('https://www.alphavantage.co/query', {
         params: {
           function: 'TIME_SERIES_DAILY',
           symbol: symbol,
@@ -186,7 +245,7 @@ class FreeStockDataService {
 
       // Transform Alpha Vantage data to match expected format
       const dates = Object.keys(timeSeriesData).sort();
-      const data = {
+      const data: HistoricalBars = {
         t: [], // timestamps
         o: [], // open
         h: [], // high
@@ -197,6 +256,10 @@ class FreeStockDataService {
 
       dates.forEach(date => {
         const dayData = timeSeriesData[date];
+        // Guard only: date always comes from Object.keys(timeSeriesData), so
+        // this is never actually undefined — noUncheckedIndexedAccess just
+        // can't see that.
+        if (!dayData) return;
         data.t.push(new Date(date).getTime() / 1000); // Convert to Unix timestamp
         data.o.push(parseFloat(dayData['1. open']));
         data.h.push(parseFloat(dayData['2. high']));
@@ -207,15 +270,15 @@ class FreeStockDataService {
 
       return data;
     } catch (error) {
-      console.error('Error fetching historical data from Alpha Vantage:', error.message);
+      console.error('Error fetching historical data from Alpha Vantage:', error instanceof Error ? error.message : error);
       throw new Error('Failed to fetch historical data from Alpha Vantage');
     }
   }
 
   // Get historical data with fallback to multiple free sources
-  async getHistoricalData(symbol, period = '1mo') {
+  async getHistoricalData(symbol: string, period: string = '1mo'): Promise<HistoricalBars> {
     const cacheKey = `${symbol}-${period}`;
-    
+
     // Check cache first
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
@@ -225,26 +288,27 @@ class FreeStockDataService {
 
     // Retry logic for better reliability
     const maxRetries = 3;
-    let lastError;
+    let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Attempt ${attempt}/${maxRetries}: Trying Yahoo Finance for historical data...`);
         const data = await this.getYahooFinanceHistoricalData(symbol, period);
-        
+
         // Cache the successful result
         this.cache.set(cacheKey, {
           data,
           timestamp: Date.now()
         });
-        
+
         return data;
       } catch (error) {
         lastError = error;
-        console.log(`Yahoo Finance attempt ${attempt} failed:`, error.message);
-        
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`Yahoo Finance attempt ${attempt} failed:`, message);
+
         // If it's a rate limit error, wait longer
-        if (error.message.includes('429') || error.message.includes('Rate limited')) {
+        if (message.includes('429') || message.includes('Rate limited')) {
           const waitTime = Math.min(5000 * Math.pow(2, attempt - 1), 30000); // Up to 30 seconds
           console.log(`Rate limited, waiting ${waitTime}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -261,17 +325,19 @@ class FreeStockDataService {
     console.log('All Yahoo Finance attempts failed, trying Alpha Vantage...');
     try {
       const data = await this.getAlphaVantageHistoricalData(symbol);
-      
+
       // Cache the successful result
       this.cache.set(cacheKey, {
         data,
         timestamp: Date.now()
       });
-      
+
       return data;
     } catch (alphaError) {
-      console.error('All free data sources failed:', lastError.message, alphaError.message);
-      
+      console.error('All free data sources failed:',
+        lastError instanceof Error ? lastError.message : lastError,
+        alphaError instanceof Error ? alphaError.message : alphaError);
+
       // Return mock data as final fallback to prevent app crashes
       console.log('Returning mock data as fallback...');
       return this.getMockHistoricalData(symbol, period);
@@ -279,14 +345,14 @@ class FreeStockDataService {
   }
 
   // Generate mock historical data as final fallback
-  getMockHistoricalData(symbol, period = '1mo') {
+  getMockHistoricalData(symbol: string, period: string = '1mo'): HistoricalBars {
     console.log(`Generating mock historical data for ${symbol} (${period})`);
-    
+
     const now = Math.floor(Date.now() / 1000);
     const days = period === '1mo' ? 30 : period === '3mo' ? 90 : period === '6mo' ? 180 : 365;
     const basePrice = 100 + Math.random() * 200; // Random base price between 100-300
-    
-    const data = {
+
+    const data: HistoricalBars = {
       t: [], // timestamps
       o: [], // open
       h: [], // high
@@ -296,27 +362,27 @@ class FreeStockDataService {
     };
 
     let currentPrice = basePrice;
-    
+
     for (let i = days; i >= 0; i--) {
       const timestamp = now - (i * 24 * 60 * 60);
-      
+
       // Generate realistic price movement
       const change = (Math.random() - 0.5) * 0.1; // ±5% daily change
       const newPrice = currentPrice * (1 + change);
-      
+
       const open = currentPrice;
       const close = newPrice;
       const high = Math.max(open, close) * (1 + Math.random() * 0.02);
       const low = Math.min(open, close) * (1 - Math.random() * 0.02);
       const volume = Math.floor(1000000 + Math.random() * 9000000); // 1M-10M volume
-      
+
       data.t.push(timestamp);
       data.o.push(parseFloat(open.toFixed(2)));
       data.h.push(parseFloat(high.toFixed(2)));
       data.l.push(parseFloat(low.toFixed(2)));
       data.c.push(parseFloat(close.toFixed(2)));
       data.v.push(volume);
-      
+
       currentPrice = close;
     }
 
@@ -324,4 +390,4 @@ class FreeStockDataService {
   }
 }
 
-module.exports = new FreeStockDataService(); 
+export = new FreeStockDataService();
