@@ -3,6 +3,20 @@ const db = require('../db/connection');
 const aiPlanner = require('../services/aiPlanner');
 const { monthOf, monthSpan } = require('../utils/dates');
 
+/**
+ * Answers 503 when OpenAI will not take requests for now (no credit, rate
+ * limit), so the page can say so instead of reporting a server fault.
+ * @returns {boolean} whether it answered
+ */
+function answerIfUnavailable(res, error) {
+  if (error.name !== 'AiUnavailableError') return false;
+  res.status(503).json({
+    error: 'AI planning is temporarily unavailable. Please try again later.',
+    code: 'ai_unavailable',
+  });
+  return true;
+}
+
 const aiController = {
   // Generate AI financial plan
   async generatePlan(req, res) {
@@ -100,6 +114,7 @@ const aiController = {
 
     } catch (error) {
       console.error('Generate AI plan error:', error);
+      if (answerIfUnavailable(res, error)) return;
       
       if (error.message.includes('OpenAI API key')) {
         return res.status(500).json({ error: 'AI service not configured. Please set up OpenAI API key.' });
@@ -381,6 +396,7 @@ const aiController = {
 
     } catch (error) {
       console.error('Generate budget recommendations error:', error);
+      if (answerIfUnavailable(res, error)) return;
       res.status(500).json({ error: 'Failed to generate budget recommendations' });
     }
   },
@@ -413,6 +429,7 @@ const aiController = {
 
     } catch (error) {
       console.error('Generate investment advice error:', error);
+      if (answerIfUnavailable(res, error)) return;
       res.status(500).json({ error: 'Failed to generate investment advice' });
     }
   }

@@ -61,6 +61,12 @@ api.interceptors.response.use(
         title: 'Resource not found',
         text: 'Resource not found.',
       })
+    } else if (response?.data?.code === 'ai_unavailable') {
+      Swal.fire({
+        icon: 'info',
+        title: 'AI planning unavailable',
+        text: response.data.error,
+      })
     } else if (response?.status >= 500) {
       Swal.fire({
         icon: 'error',

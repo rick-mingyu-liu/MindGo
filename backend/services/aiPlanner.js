@@ -1,6 +1,18 @@
 const OpenAI = require('openai');
 const config = require('../config');
 
+// OpenAI refusing for account reasons rather than failing: no credit left
+// (measured 2026-09-17: 429 credit_balance_exhausted), no quota, or throttled.
+const UNAVAILABLE_CODES = ['credit_balance_exhausted', 'insufficient_quota', 'rate_limit_exceeded'];
+
+/** Thrown when OpenAI will not answer for now; the controller maps it to 503. */
+class AiUnavailableError extends Error {
+  constructor(cause) {
+    super('AI service temporarily unavailable', { cause });
+    this.name = 'AiUnavailableError';
+  }
+}
+
 class AIPlanner {
   constructor() {
     this.openai = null;
@@ -103,7 +115,11 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
 
     } catch (error) {
       console.error('❌ Error generating AI plan:', error);
-      
+
+      if (error.status === 429 || UNAVAILABLE_CODES.includes(error.code)) {
+        throw new AiUnavailableError(error);
+      }
+
       if (error.message.includes('API key')) {
         throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables.');
       }
@@ -227,4 +243,5 @@ Please provide:
   }
 }
 
-module.exports = new AIPlanner(); 
+module.exports = new AIPlanner();
+module.exports.AiUnavailableError = AiUnavailableError; 
