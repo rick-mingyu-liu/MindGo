@@ -5,7 +5,7 @@
  *
  * Every category named here must exist in the canonical list — the one in
  * frontend/pages/transactions/new.tsx, mirrored by db/demoData.js and pinned
- * to it by test/demoData.test.js. test/importParser.test.js checks this map
+ * to it by test/demoData.test.js. test/importClassify.test.js checks this map
  * against that mirror.
  */
 const KEYWORDS = {

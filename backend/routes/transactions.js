@@ -74,4 +74,5 @@ router.put('/retention-settings', transactionController.updateDataRetentionSetti
 router.put('/:id', transactionValidation, transactionController.updateTransaction);
 router.delete('/:id', transactionController.deleteTransaction);
 
+
 module.exports = router; 
