@@ -176,7 +176,7 @@ cd backend && npm run dev      # http://localhost:3001
 cd frontend && npm run dev     # http://localhost:3000 — downloads the OCR model on first run
 ```
 
-If the backend reports `EADDRINUSE :3001`, another backend is still running — check for a leftover `nodemon`, which restarts its child if you only stop the child.
+If the backend reports `EADDRINUSE :3001`, another backend is still running — find it with `lsof -iTCP:3001 -sTCP:LISTEN` and stop it.
 
 ---
 
@@ -269,10 +269,11 @@ docs/superpowers/               design spec and implementation plan for screensh
 
 ```bash
 # backend
-npm run dev              # nodemon
+npm run dev              # tsx watch
 npm start                # production
-npm test                 # node --test
-npm run lint             # eslint 9, flat config
+npm run build            # tsc → dist/
+npm test                 # builds, then node --test
+npm run lint             # eslint 9, flat config, typescript-eslint
 npm run db:setup         # apply schema (idempotent)
 npm run db:seed          # rebuild the demo account
 
@@ -407,7 +408,7 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 The backend runs on **Render**, the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
 
-The backend needs no build step — `npm start` runs `node app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
+The backend is built with `tsc` during `npm install` (its `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
 **Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `OPENAI_API_KEY` and the email credentials in Render, and keep the OpenAI account in credit — AI planning reports itself unavailable otherwise.
 
