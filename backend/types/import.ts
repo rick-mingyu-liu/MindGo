@@ -56,6 +56,34 @@ export type DraftFlag =
 /** Where a draft row's values came from: the rule-based parser, or the LLM fallback (not yet built). */
 export type DraftSource = 'parser' | 'llm';
 
+/** Per-field confidence, before `finalize()` reduces it to `Draft.confidence`. */
+export interface ParserDraftConfidence {
+  amount: number;
+  date: number;
+  description: number;
+  type: number;
+}
+
+/**
+ * What each of the five layout parsers (`services/import/bankList.ts` etc.)
+ * pushes, before `finalize()` in `services/import/parse.ts` turns it into a
+ * `Draft`. `category` is deliberately optional rather than `string | null`:
+ * a parser that knows the category — including that it is `null` — sets the
+ * key; a parser that never sets it gets `finalize()`'s keyword guess. See the
+ * `'category' in draft` check in `finalize()`.
+ */
+export interface ParserDraft {
+  date: string | null;
+  amount: string;
+  currency: string;
+  description: string;
+  category?: string | null;
+  type: TransactionType;
+  flags: DraftFlag[];
+  conf: ParserDraftConfidence;
+  boxes: Box[];
+}
+
 /** A row as `parseOcr` (services/import/parse.js) returns it in `ParseResult.rows`. */
 export interface Draft {
   date: string | null;

@@ -1,4 +1,6 @@
-const { extractAmounts, parseDateDetail, splitLeadingDate, toCents } = require('./tokens');
+import { extractAmounts, parseDateDetail, splitLeadingDate, toCents } from './tokens';
+import type { DateDetail, ParsedAmount } from './tokens';
+import type { Box, DraftFlag, ParserDraft, Row, TransactionType } from '../../types/import';
 
 /**
  * A bank app's transaction list: one transaction per row that ends in an
@@ -33,11 +35,33 @@ const STATUS_WORDS = /\b(pending|posted)\b/gi;
 const HAS_WORD = /[\p{L}\p{N}]/u;
 const STACKED_GAP = 0.4;
 
-function parseBankList(rows, today) {
-  const drafts = [];
-  let header = null;
-  let above = null; // the draft on the row just above, while it may still take a balance
-  let wrapping = null; // the last draft, and the lowest line of its description
+/** An amount peeled off a line, with the box and confidence it came from. */
+type AmountHit = ParsedAmount & { conf: number; box: Box };
+
+/** A run of text peeled off a line as a description word, with its confidence. */
+interface WordHit {
+  text: string;
+  conf: number;
+}
+
+/** A date, either a header's or a row's own leading date, with its confidence. */
+type BankDate = DateDetail & { conf: number };
+
+/**
+ * `parseBankList`'s own draft, before `balance`/`amountBox` are stripped for
+ * `finalize()`. `balance` starts as whatever this row read (often `null`) and
+ * can be filled in by a later row that turns out to be a stacked balance.
+ */
+interface BankListDraft extends ParserDraft {
+  balance: AmountHit | null;
+  amountBox: Box;
+}
+
+export function parseBankList(rows: Row[], today: string): { drafts: ParserDraft[] } {
+  const drafts: BankListDraft[] = [];
+  let header: BankDate | null = null;
+  let above: BankListDraft | null = null; // the draft on the row just above, while it may still take a balance
+  let wrapping: { draft: BankListDraft; labelBox: Box } | null = null; // the last draft, and the lowest line of its description
 
   for (const row of rows) {
     if (!HAS_WORD.test(row.text)) continue;
@@ -49,8 +73,8 @@ function parseBankList(rows, today) {
       continue;
     }
 
-    const amounts = [];
-    const words = [];
+    const amounts: AmountHit[] = [];
+    const words: WordHit[] = [];
     for (const line of row.lines) {
       if (!HAS_WORD.test(line.text)) continue;
       const { amounts: found, label } = extractAmounts(line.text);
@@ -59,7 +83,7 @@ function parseBankList(rows, today) {
     }
     if (amounts.length === 0) {
       const first = row.lines.find((l) => HAS_WORD.test(l.text));
-      if (wrapping && words.length && isTuckedUnder(first.box, wrapping.labelBox)) {
+      if (wrapping && words.length && first && isTuckedUnder(first.box, wrapping.labelBox)) {
         appendDescription(wrapping.draft, words);
         wrapping.labelBox = first.box;
         continue;
@@ -70,19 +94,25 @@ function parseBankList(rows, today) {
       continue;
     }
 
-    if (above && amounts.length === 1 && isBeneath(amounts[0].box, above.amountBox)) {
-      above.balance = amounts[0];
+    const soleAmount = amounts[0];
+    if (above && amounts.length === 1 && soleAmount && isBeneath(soleAmount.box, above.amountBox)) {
+      above.balance = soleAmount;
       appendDescription(above, words);
       above = null;
       continue;
     }
 
     const txn = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
-    const balance = amounts.length >= 2 ? amounts[amounts.length - 1] : null;
+    if (!txn) continue;
+    let balance: AmountHit | null = null;
+    if (amounts.length >= 2) {
+      const last = amounts[amounts.length - 1];
+      if (last) balance = last;
+    }
     if (toCents(txn.value) === 0) continue;
 
     let label = words.map((w) => w.text).join(' ').replace(STATUS_WORDS, ' ').replace(/\s+/g, ' ').trim();
-    let date = null;
+    let date: BankDate | null = null;
     const lead = splitLeadingDate(label, today);
     if (lead) {
       date = { day: lead.day, inferredYear: lead.inferredYear, conf: row.conf };
@@ -91,8 +121,8 @@ function parseBankList(rows, today) {
       date = header;
     }
 
-    const flags = [];
-    let type;
+    const flags: DraftFlag[] = [];
+    let type: TransactionType;
     if (txn.sign === -1) type = 'expense';
     else if (txn.sign === 1) type = 'income';
     else {
@@ -103,7 +133,7 @@ function parseBankList(rows, today) {
     if (/\bpending\b/i.test(row.text)) flags.push('pending');
     if (txn.corrected) flags.push('corrected_chars');
 
-    const draft = {
+    const draft: BankListDraft = {
       date: date ? date.day : null,
       amount: txn.value,
       currency: txn.currency || 'CAD',
@@ -130,26 +160,26 @@ function parseBankList(rows, today) {
   return { drafts: drafts.map(({ balance: _balance, amountBox: _amountBox, ...draft }) => draft) };
 }
 
-function appendDescription(draft, words) {
+function appendDescription(draft: BankListDraft, words: WordHit[]): void {
   if (words.length === 0) return;
   draft.description = `${draft.description} ${words.map((w) => w.text).join(' ')}`.trim();
   draft.conf.description = Math.min(draft.conf.description || 1, ...words.map((w) => w.conf));
 }
 
-const gapBetween = (lower, upper) => lower.y - (upper.y + upper.height);
-const isClose = (lower, upper) => {
+const gapBetween = (lower: Box, upper: Box): number => lower.y - (upper.y + upper.height);
+const isClose = (lower: Box, upper: Box): boolean => {
   const gap = gapBetween(lower, upper);
   return gap >= 0 && gap < STACKED_GAP * Math.max(lower.height, upper.height);
 };
 
 /** `lower` sits directly beneath `upper`, right edges aligned. */
-function isBeneath(lower, upper) {
+function isBeneath(lower: Box, upper: Box): boolean {
   const rightEdges = Math.abs((lower.x + lower.width) - (upper.x + upper.width));
   return isClose(lower, upper) && rightEdges < 0.5 * Math.max(lower.height, upper.height);
 }
 
 /** `lower` sits directly beneath `upper`, left edges aligned. */
-function isTuckedUnder(lower, upper) {
+function isTuckedUnder(lower: Box, upper: Box): boolean {
   return isClose(lower, upper) && Math.abs(lower.x - upper.x) < 0.5 * Math.max(lower.height, upper.height);
 }
 
@@ -164,27 +194,34 @@ function isTuckedUnder(lower, upper) {
  * as from amounts, so the sign of a difference proves nothing about whether
  * money came in or went out.
  */
-function verifyBalances(drafts) {
-  const signedBalance = (d) => (d.balance.sign === -1 ? -1 : 1) * toCents(d.balance.value);
-  const pairs = [];
+function verifyBalances(drafts: BankListDraft[]): void {
+  const signedBalance = (balance: AmountHit): number => (balance.sign === -1 ? -1 : 1) * toCents(balance.value);
+
+  const pairs: number[] = [];
   for (let i = 0; i + 1 < drafts.length; i++) {
-    if (drafts[i].balance && drafts[i + 1].balance) pairs.push(i);
+    const current = drafts[i];
+    const next = drafts[i + 1];
+    if (current?.balance && next?.balance) pairs.push(i);
   }
   if (pairs.length === 0) return;
 
   let newestFirst = 0;
   let oldestFirst = 0;
   for (const i of pairs) {
-    const diff = Math.abs(signedBalance(drafts[i]) - signedBalance(drafts[i + 1]));
-    if (diff === toCents(drafts[i].amount)) newestFirst++;
-    if (diff === toCents(drafts[i + 1].amount)) oldestFirst++;
+    const current = drafts[i];
+    const next = drafts[i + 1];
+    if (!current?.balance || !next?.balance) continue;
+    const diff = Math.abs(signedBalance(current.balance) - signedBalance(next.balance));
+    if (diff === toCents(current.amount)) newestFirst++;
+    if (diff === toCents(next.amount)) oldestFirst++;
   }
 
   for (const i of pairs) {
-    const diff = Math.abs(signedBalance(drafts[i]) - signedBalance(drafts[i + 1]));
-    const target = newestFirst >= oldestFirst ? drafts[i] : drafts[i + 1];
+    const current = drafts[i];
+    const next = drafts[i + 1];
+    if (!current?.balance || !next?.balance) continue;
+    const diff = Math.abs(signedBalance(current.balance) - signedBalance(next.balance));
+    const target = newestFirst >= oldestFirst ? current : next;
     target.flags.push(diff === toCents(target.amount) ? 'arithmetic_verified' : 'balance_mismatch');
   }
 }
-
-module.exports = { parseBankList };
