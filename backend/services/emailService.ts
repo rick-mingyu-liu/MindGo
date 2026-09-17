@@ -1,8 +1,9 @@
-const nodemailer = require('nodemailer');
-const db = require('../db/connection');
-const { getExchangeRate } = require('./exchangeRateService');
-const { toDay, formatDay } = require('../utils/dates');
-const config = require('../config');
+import nodemailer from 'nodemailer';
+import { query } from '../db/connection';
+import { getExchangeRate } from './exchangeRateService';
+import { toDay, formatDay } from '../utils/dates';
+import config = require('../config');
+import type { TransactionRow } from '../types/db';
 
 // The dashboard defaults to CAD, so the report reads in the same currency.
 const REPORT_CURRENCY = 'CAD';
@@ -15,7 +16,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-exports.sendWeeklyReport = async (to, content, htmlContent) => {
+export const sendWeeklyReport = async (to: string, content: string, htmlContent: string): Promise<void> => {
   await transporter.sendMail({
     from: `"MindGo" <${config.email.user}>`,
     to,
@@ -25,44 +26,44 @@ exports.sendWeeklyReport = async (to, content, htmlContent) => {
   });
 };
 
-exports.sendEmailVerification = async (to, firstName, verificationToken) => {
+export const sendEmailVerification = async (to: string, firstName: string, verificationToken: string): Promise<void> => {
   const frontendUrl = config.frontendUrl;
   const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
   console.log(`[EmailService] Using verification URL: ${verificationUrl}`);
-  
+
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: #16a34a; margin: 0;">MindGo</h1>
         <p style="color: #6b7280; margin: 10px 0 0 0;">Personal Finance Management</p>
       </div>
-      
+
       <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; border-left: 4px solid #16a34a;">
         <h2 style="color: #111827; margin: 0 0 20px 0;">Welcome to MindGo, ${firstName}!</h2>
-        
+
         <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">
           Thank you for creating your MindGo account. To complete your registration and start managing your finances, please verify your email address by clicking the button below.
         </p>
-        
+
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}" 
+          <a href="${verificationUrl}"
              style="background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
             Verify Email Address
           </a>
         </div>
-        
+
         <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
           If the button doesn't work, you can copy and paste this link into your browser:
         </p>
         <p style="color: #6b7280; font-size: 14px; margin: 5px 0 0 0; word-break: break-all;">
           <a href="${verificationUrl}" style="color: #16a34a;">${verificationUrl}</a>
         </p>
-        
+
         <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
           This verification link will expire in 30 minutes. If you didn't create a MindGo account, you can safely ignore this email.
         </p>
       </div>
-      
+
       <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
         <p style="color: #6b7280; font-size: 14px; margin: 0;">
           © 2025 MindGo. All rights reserved.
@@ -93,18 +94,36 @@ The MindGo Team
   });
 };
 
-exports.generateWeeklyReport = async (userId) => {
+// The columns the SELECT ... FROM savings_goals below names — narrower than
+// the full SavingsGoalRow in types/db.ts.
+interface GoalSummaryRow {
+  name: string;
+  current_amount: string | null;
+  target_amount: string;
+  target_date: string | null;
+}
+
+// The columns the balance SELECT below names: currency plus its own computed
+// aggregate, not a table column.
+interface CurrencyBalanceRow {
+  currency: string | null;
+  balance: string;
+}
+
+export const generateWeeklyReport = async (userId: number): Promise<{ text: string; html: string }> => {
   try {
     // Get transactions from the past 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const transactions = await db.query(
-      `SELECT * FROM transactions 
-       WHERE user_id = $1 AND date >= $2 
+
+    // db/connection.js is not yet converted (a later step), so query()'s
+    // result is untyped; SELECT * matches every column of TransactionRow.
+    const transactions = await query(
+      `SELECT * FROM transactions
+       WHERE user_id = $1 AND date >= $2
        ORDER BY date DESC, created_at DESC`,
       [userId, toDay(sevenDaysAgo)]
-    );
+    ) as { rows: TransactionRow[] };
 
     if (transactions.rows.length === 0) {
       const emptyText = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
@@ -121,8 +140,8 @@ exports.generateWeeklyReport = async (userId) => {
     const netIncome = totalIncome - totalExpenses;
 
     // Group by category
-    const incomeByCategory = {};
-    const expensesByCategory = {};
+    const incomeByCategory: Record<string, number> = {};
+    const expensesByCategory: Record<string, number> = {};
 
     income.forEach(t => {
       incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + parseFloat(t.amount);
@@ -133,15 +152,17 @@ exports.generateWeeklyReport = async (userId) => {
     });
 
     // Helper for formatting columns (plain text)
-    function pad(str, len) {
+    function pad(str: string, len: number): string {
       return (str + '').padEnd(len, ' ');
     }
-    function money(val) {
-      return '$' + parseFloat(val).toFixed(2);
+    function money(val: string | number | null): string {
+      return '$' + parseFloat(String(val)).toFixed(2);
     }
 
     // Fetch user goals
-    const goalsRes = await db.query('SELECT name, current_amount, target_amount, target_date FROM savings_goals WHERE user_id = $1', [userId]);
+    // See the comment on the transactions query above: query()'s result is
+    // untyped, and this lists only the columns the SELECT names.
+    const goalsRes = await query('SELECT name, current_amount, target_amount, target_date FROM savings_goals WHERE user_id = $1', [userId]) as { rows: GoalSummaryRow[] };
     const goals = goalsRes.rows;
 
     // Current balance, derived from the transaction history. This used to read a
@@ -151,13 +172,13 @@ exports.generateWeeklyReport = async (userId) => {
     // Summed per currency and converted to CAD, the same target the dashboard
     // defaults to — a straight SUM would add CNY to CAD as if they were the
     // same unit.
-    const balanceRes = await db.query(
+    const balanceRes = await query(
       `SELECT currency,
               COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0)
             - COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS balance
          FROM transactions WHERE user_id = $1 GROUP BY currency`,
       [userId]
-    );
+    ) as { rows: CurrencyBalanceRow[] };
     let currentBalance = 0;
     for (const row of balanceRes.rows) {
       const amount = parseFloat(row.balance);
@@ -171,10 +192,10 @@ exports.generateWeeklyReport = async (userId) => {
     const fourMonthsAgo = new Date();
     fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 3); // includes current month
     const endOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
-    const rollingTx = await db.query(
+    const rollingTx = await query(
       `SELECT * FROM transactions WHERE user_id = $1 AND date >= $2 AND date < $3`,
       [userId, toDay(fourMonthsAgo), toDay(endOfThisMonth)]
-    );
+    ) as { rows: TransactionRow[] };
     let rollingIncome = 0, rollingExpenses = 0;
     rollingTx.rows.forEach(t => {
       if (t.type === 'income') rollingIncome += parseFloat(t.amount);
@@ -208,7 +229,7 @@ exports.generateWeeklyReport = async (userId) => {
       content += pad('Goal', 18) + pad('Current', 10) + pad('Target', 10) + pad('Date', 12) + pad('%', 6) + '\n';
       content += '--------------------------------------------------------------\n';
       goals.forEach(g => {
-        const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
+        const percent = Number(g.target_amount) > 0 ? (100 * Number(g.current_amount) / Number(g.target_amount)) : 0;
         content += pad(g.name, 18) + pad(money(g.current_amount), 10) + pad(money(g.target_amount), 10) + pad(formatDay(g.target_date), 12) + pad(percent.toFixed(1) + '%', 6) + '\n';
       });
       content += '\n';
@@ -262,7 +283,7 @@ exports.generateWeeklyReport = async (userId) => {
     content += `https://mindgo.io\n`;
 
     // --- HTML Content ---
-    let html = `
+    const html = `
       <div style="font-family: Arial, sans-serif; color: #222; max-width: 600px; margin: auto;">
         <h1 style="font-size: 2em; color: #2d3748; margin-bottom: 0.2em;">📊 WEEKLY FINANCIAL REPORT</h1>
         <div style="font-size: 1.1em; margin-bottom: 1.5em;">Period: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}</div>
@@ -310,7 +331,7 @@ exports.generateWeeklyReport = async (userId) => {
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
           <tr style="background: #f7fafc;"><th align="left">Goal</th><th align="right">Current</th><th align="right">Target</th><th align="center">Date</th><th align="right">%</th></tr>
           ${goals.map(g => {
-            const percent = g.target_amount > 0 ? (100 * g.current_amount / g.target_amount) : 0;
+            const percent = Number(g.target_amount) > 0 ? (100 * Number(g.current_amount) / Number(g.target_amount)) : 0;
             return `<tr><td>${g.name}</td><td align="right">${money(g.current_amount)}</td><td align="right">${money(g.target_amount)}</td><td align="center">${formatDay(g.target_date)}</td><td align="right">${percent.toFixed(1)}%</td></tr>`;
           }).join('')}
         </table>
@@ -325,4 +346,4 @@ exports.generateWeeklyReport = async (userId) => {
     console.error('Error generating weekly report:', error);
     return { text: `📊 WEEKLY FINANCIAL REPORT\nUnable to generate weekly report at this time. Please try again later.`, html: `<div>Unable to generate weekly report at this time.</div>` };
   }
-}; 
+};
