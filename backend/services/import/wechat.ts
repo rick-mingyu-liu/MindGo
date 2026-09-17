@@ -1,4 +1,6 @@
-const { parseAmount, makeDay } = require('./tokens');
+import { parseAmount, makeDay } from './tokens';
+import type { DateDetail, ParsedAmount } from './tokens';
+import type { DraftFlag, OcrLine, ParserDraft, Row, TransactionType } from '../../types/import';
 
 /**
  * WeChat Pay's Transactions list:
@@ -28,25 +30,33 @@ const MONTH_HEADER = /^(\d{4})\s*[/.年-]\s*(\d{1,2})\s*月?$/;
 const INCOME_WORDS = /来自|收款|退款|到零钱|收入|received|refund/i;
 const HAS_WORD = /[\p{L}\p{N}]/u;
 
+/** A month header's year and its vertical position. */
+interface MonthHeader {
+  year: number;
+  y: number;
+}
+
 /** "+4.801" -> 4.80, repaired; anything that is not a lone amount -> null. */
-function readWechatAmount(text) {
+export function readWechatAmount(text: unknown): ParsedAmount | null {
   const match = AMOUNT.exec(String(text ?? '').trim());
   if (!match) return null;
   const amount = parseAmount(`${match[1]}${match[2]}.${match[3]}`);
   return amount && { ...amount, corrected: amount.corrected || Boolean(match[4]) };
 }
 
-const isStamp = (text) => STAMP.test(String(text ?? '').trim());
-const isMonthHeader = (text) => MONTH_HEADER.test(String(text ?? '').trim());
+export const isStamp = (text: unknown): boolean => STAMP.test(String(text ?? '').trim());
+export const isMonthHeader = (text: unknown): boolean => MONTH_HEADER.test(String(text ?? '').trim());
 
-function parseWechatPay(rows, today) {
+export function parseWechatPay(rows: Row[], today: string): { drafts: ParserDraft[] } {
   const lines = rows.flatMap((row) => row.lines);
   const stamps = lines.filter((l) => isStamp(l.text));
-  const headers = lines
+  const headers: MonthHeader[] = lines
     .filter((l) => isMonthHeader(l.text))
-    .map((l) => ({ year: Number(MONTH_HEADER.exec(l.text.trim())[1]), y: l.box.y }));
+    // isMonthHeader(l.text) already proved this line matches MONTH_HEADER, so
+    // the re-exec below always succeeds; `match?.[1]` is just for the type.
+    .map((l) => ({ year: Number(MONTH_HEADER.exec(l.text.trim())?.[1]), y: l.box.y }));
 
-  const drafts = [];
+  const drafts: ParserDraft[] = [];
   for (const row of rows) {
     const amountLine = [...row.lines].reverse().find((l) => readWechatAmount(l.text));
     if (!amountLine) continue;
@@ -63,15 +73,22 @@ function parseWechatPay(rows, today) {
     const description = words.filter((w) => inColumn(stamp, w));
     if (description.length === 0) continue;
 
-    const [, month, date] = STAMP.exec(stamp.text.trim()).map(Number);
+    // stamp is drawn from `stamps`, already filtered by isStamp, so this
+    // re-exec always matches.
+    const stampMatch = STAMP.exec(stamp.text.trim());
+    if (!stampMatch) continue;
+    const [, monthText, dateText] = stampMatch;
+    const month = Number(monthText);
+    const date = Number(dateText);
     const header = headers.filter((h) => h.y < stamp.box.y).pop();
     const day = header ? { day: makeDay(header.year, month, date), inferredYear: false } : mostRecent(month, date, today);
     if (!day || !day.day) continue;
 
     const amount = readWechatAmount(amountLine.text);
+    if (!amount) continue; // amountLine was chosen because this was already truthy
     const label = description.map((l) => l.text).join(' ');
-    const flags = [];
-    let type;
+    const flags: DraftFlag[] = [];
+    let type: TransactionType;
     if (amount.sign === 1) type = 'income';
     else if (amount.sign === -1) type = 'expense';
     else {
@@ -99,7 +116,7 @@ function parseWechatPay(rows, today) {
   return { drafts };
 }
 
-function mostRecent(month, date, today) {
+function mostRecent(month: number, date: number, today: string): DateDetail | null {
   const thisYear = Number(today.slice(0, 4));
   for (let year = thisYear; year >= thisYear - 8; year--) {
     const day = makeDay(year, month, date);
@@ -109,13 +126,11 @@ function mostRecent(month, date, today) {
 }
 
 /** Left edges within a line's height of each other. */
-const inColumn = (a, b) => Math.abs(a.box.x - b.box.x) < Math.max(a.box.height, b.box.height);
+const inColumn = (a: OcrLine, b: OcrLine): boolean => Math.abs(a.box.x - b.box.x) < Math.max(a.box.height, b.box.height);
 
 /** `stamp` starts under `bottom`, less than one description line lower. */
-function isJustBelow(stamp, bottom, words) {
+function isJustBelow(stamp: OcrLine, bottom: number, words: OcrLine[]): boolean {
   const gap = stamp.box.y - bottom;
   const height = Math.max(...words.map((w) => w.box.height));
   return gap > -0.5 * stamp.box.height && gap < height;
 }
-
-module.exports = { parseWechatPay, readWechatAmount, isStamp, isMonthHeader };
