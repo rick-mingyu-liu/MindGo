@@ -186,3 +186,84 @@ describe('POST /import/parse', () => {
     assert.doesNotMatch(log, /SECRETMERCHANT|23\.47|1,?250/);
   });
 });
+
+describe('POST /transactions/import', () => {
+  const row = (overrides = {}) => ({
+    date: '2026-09-14',
+    amount: '23.47',
+    description: 'SECRETMERCHANT',
+    category: 'Groceries',
+    type: 'expense',
+    currency: 'CAD',
+    source: 'ocr',
+    edited: false,
+    ...overrides,
+  });
+
+  test('saves every row and the batch counts in one statement', async () => {
+    const res = await post('/transactions/import', {
+      rows: [row(), row({ amount: '5.00', edited: true }), row({ source: 'ocr_llm' })],
+    });
+    assert.equal(res.status, 201);
+    assert.deepEqual((await res.json()).ids, [100, 101, 102]);
+
+    assert.equal(queries.length, 1, 'rows and batch must be one statement');
+    const [{ text, params }] = queries;
+    assert.match(text, /INSERT INTO transactions/);
+    assert.match(text, /INSERT INTO import_batches/);
+    assert.equal(params.length, 3 * 8 + 4);
+    assert.deepEqual(params.slice(0, 8), [7, '23.47', 'SECRETMERCHANT', 'Groceries', 'expense', '2026-09-14', 'CAD', 'ocr']);
+    assert.deepEqual(params.slice(-4), [7, 3, 1, 1]);
+  });
+
+  test('trims descriptions before saving', async () => {
+    await post('/transactions/import', { rows: [row({ description: '  Sobeys  ' })] });
+    assert.equal(queries[0].params[2], 'Sobeys');
+  });
+
+  test('one bad row rejects the whole import and names it', async () => {
+    const res = await post('/transactions/import', {
+      rows: [row(), row({ amount: '-1.00' }), row(), row({ date: '2026-02-30', type: 'sideways' })],
+    });
+    assert.equal(res.status, 400);
+    assert.deepEqual((await res.json()).invalidRows, [1, 3]);
+    assert.equal(queries.length, 0);
+  });
+
+  describe('rejects', () => {
+    for (const [label, body] of [
+      ['no rows', { rows: [] }],
+      ['rows that are not an array', { rows: 'x' }],
+      ['more than 100 rows', { rows: Array.from({ length: 101 }, () => row()) }],
+      ['a numeric amount', { rows: [row({ amount: 23.47 })] }],
+      ['an amount without cents', { rows: [row({ amount: '23' })] }],
+      ['a zero amount', { rows: [row({ amount: '0.00' })] }],
+      ['an amount too large for the column', { rows: [row({ amount: '123456789.00' })] }],
+      ['a blank description', { rows: [row({ description: '   ' })] }],
+      ['a missing category', { rows: [row({ category: '' })] }],
+      ['a timestamp for a date', { rows: [row({ date: '2026-09-14T00:00:00Z' })] }],
+      ['an unknown currency', { rows: [row({ currency: 'XYZ' })] }],
+      ['a manual source', { rows: [row({ source: 'manual' })] }],
+      ['a string for edited', { rows: [row({ edited: 'false' })] }],
+    ]) {
+      test(label, async () => {
+        const res = await post('/transactions/import', body);
+        assert.equal(res.status, 400);
+        assert.equal(queries.length, 0);
+      });
+    }
+  });
+
+  test('never logs the rows, even when the insert fails', async () => {
+    mock.method(db, 'query', async () => {
+      const error = new Error('value "SECRETMERCHANT" violates something');
+      error.code = '23514';
+      throw error;
+    });
+    const res = await post('/transactions/import', { rows: [row()] });
+    assert.equal(res.status, 500);
+    const log = output();
+    assert.match(log, /Import transactions error/);
+    assert.doesNotMatch(log, /SECRETMERCHANT|23\.47/);
+  });
+});

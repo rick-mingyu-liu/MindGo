@@ -150,6 +150,63 @@ const transactionController = {
     }
   },
 
+  // Save the rows a user confirmed on the screenshot import screen
+  async importTransactions(req, res) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const list = errors.array();
+      const invalidRows = [...new Set(list
+        .map((e) => /^rows\[(\d+)\]/.exec(e.path))
+        .filter(Boolean)
+        .map((m) => Number(m[1])))].sort((a, b) => a - b);
+      return res.status(400).json({ errors: list.map(({ path, msg }) => ({ path, msg })), invalidRows });
+    }
+
+    try {
+      const userId = req.user.userId;
+      const { rows } = req.body;
+
+      const params = [];
+      const tuples = rows.map((row) => {
+        const first = params.length + 1;
+        params.push(userId, row.amount, row.description, row.category, row.type, row.date, row.currency, row.source);
+        return `(${Array.from({ length: 8 }, (_, i) => `$${first + i}`).join(', ')})`;
+      });
+      const batch = params.length + 1;
+      params.push(
+        userId,
+        rows.length,
+        rows.filter((row) => row.edited).length,
+        rows.filter((row) => row.source === 'ocr_llm').length
+      );
+
+      // One statement: every row and the batch record are written together or
+      // not at all. A data-modifying CTE runs whether or not the outer query
+      // reads it.
+      const result = await db.query(
+        `WITH inserted AS (
+           INSERT INTO transactions (user_id, amount, description, category, type, date, currency, source)
+           VALUES ${tuples.join(', ')}
+           RETURNING id
+         ), batch AS (
+           INSERT INTO import_batches (user_id, row_count, edited_count, llm_count)
+           VALUES ($${batch}, $${batch + 1}, $${batch + 2}, $${batch + 3})
+         )
+         SELECT id FROM inserted`,
+        params
+      );
+
+      res.status(201).json({
+        message: 'Transactions imported successfully',
+        ids: result.rows.map((row) => row.id),
+      });
+    } catch (error) {
+      // Name and code only: a database error can quote the value it rejected.
+      console.error('Import transactions error:', { userId: req.user.userId, error: error.name, code: error.code });
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
   // Update transaction
   async updateTransaction(req, res) {
     try {
