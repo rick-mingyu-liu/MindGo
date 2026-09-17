@@ -1,4 +1,5 @@
-const db = require('../../db/connection');
+import { query } from '../../db/connection';
+import type { Draft } from '../../types/import';
 
 /**
  * Marks drafts that match a transaction the user already has — same day, same
@@ -8,14 +9,23 @@ const db = require('../../db/connection');
  *
  * Mutates and returns `rows`.
  */
-async function flagDuplicates(userId, rows) {
-  const days = [...new Set(rows.map((row) => row.date).filter(Boolean))];
+
+interface ExistingTransaction {
+  date: string;
+  amount: string;
+  currency: string;
+}
+
+export async function flagDuplicates(userId: number, rows: Draft[]): Promise<Draft[]> {
+  const days = [...new Set(rows.map((row) => row.date).filter((d): d is string => Boolean(d)))];
   if (days.length === 0) return rows;
 
-  const { rows: existing } = await db.query(
+  // db/connection.js is not yet converted (a later step), so query()'s result
+  // is untyped; this is the shape the SELECT list above actually returns.
+  const { rows: existing } = await query(
     'SELECT date, amount, currency FROM transactions WHERE user_id = $1 AND date = ANY($2::date[])',
     [userId, days]
-  );
+  ) as { rows: ExistingTransaction[] };
   // DATE arrives as 'YYYY-MM-DD' (db/connection.js) and DECIMAL(10,2) as a
   // two-place string, so both compare exactly with the draft's strings.
   const seen = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.currency}`));
@@ -26,5 +36,3 @@ async function flagDuplicates(userId, rows) {
   }
   return rows;
 }
-
-module.exports = { flagDuplicates };

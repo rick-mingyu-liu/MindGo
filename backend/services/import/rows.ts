@@ -19,17 +19,31 @@
  * A line is `{ text, conf, box: { x, y, width, height } }` in image pixels.
  * A row is `{ text, conf, box, height, lines }`, lines in reading order.
  */
-const KEPT_SINGLE = /^[A-Za-z0-9\p{Sc}+\-−]$/u;
-const isIcon = (text) => [...text].length === 1 && !KEPT_SINGLE.test(text);
+import type { OcrLine, Row } from '../../types/import';
 
-function groupRows(lines) {
-  const usable = (lines || [])
-    .filter((line) => line && typeof line.text === 'string' && line.text.trim() && line.box)
+const KEPT_SINGLE = /^[A-Za-z0-9\p{Sc}+\-−]$/u;
+const isIcon = (text: string): boolean => [...text].length === 1 && !KEPT_SINGLE.test(text);
+
+// A line once it has passed the defensive checks below: a trimmed, non-icon
+// piece of OCR text with a real box.
+type UsableLine = OcrLine;
+
+export function groupRows(lines: readonly (OcrLine | null | undefined)[] | null | undefined): Row[] {
+  const usable: UsableLine[] = (lines || [])
+    .filter((line): line is OcrLine =>
+      Boolean(line && typeof line.text === 'string' && line.text.trim() && line.box))
     .map((line) => ({ text: line.text.trim(), conf: line.conf, box: line.box }))
     .filter((line) => !isIcon(line.text))
     .sort((a, b) => (a.box.y + a.box.height / 2) - (b.box.y + b.box.height / 2));
 
-  const groups = [];
+  interface Group {
+    lines: UsableLine[];
+    top: number;
+    bottom: number;
+    minHeight: number;
+  }
+
+  const groups: Group[] = [];
   for (const line of usable) {
     const top = line.box.y;
     const bottom = line.box.y + line.box.height;
@@ -66,9 +80,9 @@ function groupRows(lines) {
 }
 
 /** Splits a row into the lines it spans, top first, each left to right. */
-function readingOrder(members) {
+function readingOrder(members: UsableLine[]): UsableLine[] {
   const byMiddle = [...members].sort((a, b) => middleOf(a) - middleOf(b));
-  const bands = [];
+  const bands: UsableLine[][] = [];
   for (const line of byMiddle) {
     const band = bands[bands.length - 1];
     const previous = band && band[band.length - 1];
@@ -81,6 +95,4 @@ function readingOrder(members) {
   return bands.flatMap((band) => band.sort((a, b) => a.box.x - b.box.x));
 }
 
-const middleOf = (line) => line.box.y + line.box.height / 2;
-
-module.exports = { groupRows };
+const middleOf = (line: UsableLine): number => line.box.y + line.box.height / 2;

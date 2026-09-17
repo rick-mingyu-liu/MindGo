@@ -8,7 +8,9 @@
  * to it by test/demoData.test.js. test/importClassify.test.js checks this map
  * against that mirror.
  */
-const KEYWORDS = {
+import type { TransactionType } from '../../types/import';
+
+export const KEYWORDS: Record<TransactionType, Record<string, string[]>> = {
   expense: {
     Groceries: ['sobeys', 'loblaws', 'no frills', 'metro', 'freshco', 'food basics', 'zehrs',
       'fortinos', 't&t', 'farm boy', 'real canadian superstore', 'costco', 'safeway', 'longos'],
@@ -33,19 +35,24 @@ const KEYWORDS = {
   },
 };
 
-const normalize = (text) => ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9&]+/g, ' ').trim()} `;
+const normalize = (text: unknown): string =>
+  ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9&]+/g, ' ').trim()} `;
+
+interface KeywordEntry {
+  type: string;
+  category: string;
+  word: string;
+}
 
 // Longest keyword first, so "uber eats" is dining before "uber" is transport.
-const TABLE = Object.entries(KEYWORDS)
+const TABLE: KeywordEntry[] = Object.entries(KEYWORDS)
   .flatMap(([type, map]) => Object.entries(map)
     .flatMap(([category, words]) => words.map((word) => ({ type, category, word: normalize(word) }))))
   .sort((a, b) => b.word.length - a.word.length);
 
-/** @returns {string|null} a category from the canonical list, or null */
-function categorize(description, type) {
+/** A category from the canonical list, or null. */
+export function categorize(description: unknown, type: TransactionType): string | null {
   const text = normalize(description);
   const hit = TABLE.find((entry) => entry.type === type && text.includes(entry.word));
   return hit ? hit.category : null;
 }
-
-module.exports = { categorize, KEYWORDS };

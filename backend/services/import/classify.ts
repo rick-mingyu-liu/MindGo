@@ -1,7 +1,8 @@
-const { extractTrailingAmount, parseDate } = require('./tokens');
-const { splitDateTime } = require('./uberActivity');
-const { splitOrderLine } = require('./uberEats');
-const { isStamp, isMonthHeader } = require('./wechat');
+import { extractTrailingAmount, parseDate } from './tokens';
+import { splitDateTime } from './uberActivity';
+import { splitOrderLine } from './uberEats';
+import { isStamp, isMonthHeader } from './wechat';
+import type { Layout, Row } from '../../types/import';
 
 /**
  * Decides whether a screenshot is a receipt, a bank-app transaction list,
@@ -46,9 +47,14 @@ const WECHAT_SIGNALS = [
   /\b(expenditures?|incomes?)\b|支出|收入/i,
 ];
 
-const round2 = (n) => Math.round(n * 100) / 100;
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-function classifyLayout(rows, today) {
+export interface ClassifyResult {
+  layout: Layout;
+  confidence: number;
+}
+
+export function classifyLayout(rows: Row[], today: string): ClassifyResult {
   const text = rows.map((r) => r.text).join('\n');
   let receipt = RECEIPT_SIGNALS.filter((re) => re.test(text)).length;
   let bank = BANK_SIGNALS.filter((re) => re.test(text)).length;
@@ -81,12 +87,10 @@ function classifyLayout(rows, today) {
   const total = receipt + bank + uber + eats + wechat;
   if (total === 0) return { layout: 'unknown', confidence: 0 };
   const best = Math.max(receipt, bank, uber, eats, wechat);
-  let layout = 'wechat-pay';
+  let layout: Layout = 'wechat-pay';
   if (receipt === best) layout = 'receipt';
   else if (bank === best) layout = 'bank-list';
   else if (uber === best) layout = 'uber-activity';
   else if (eats === best) layout = 'uber-eats-orders';
   return { layout, confidence: round2(best / total) };
 }
-
-module.exports = { classifyLayout };
