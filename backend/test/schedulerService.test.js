@@ -339,3 +339,33 @@ describe('the demo refresh is opt-in', () => {
     }
   });
 });
+
+describe('scheduleWeeklyReports', () => {
+  // Real node-cron, on a UTC clock like the production host. node-cron 4.2
+  // answered "Sunday 19:00" with 2034-01-01, and its runner sleeps until that
+  // answer, so the weekly email never went out; and without a timezone the
+  // cron ran at 19:00 server time, 3 p.m. in Toronto.
+  const originalTz = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'UTC';
+    scheduler.jobs.clear();
+  });
+  afterEach(() => {
+    scheduler.stop();
+    process.env.TZ = originalTz;
+    if (originalTz === undefined) delete process.env.TZ;
+  });
+
+  test('next runs this coming Sunday at 7 p.m. Toronto time', () => {
+    scheduler.scheduleWeeklyReports();
+    const next = scheduler.jobs.get('weeklyReports').job.getNextRun();
+
+    const daysAway = (next.getTime() - Date.now()) / 86400000;
+    assert.ok(daysAway > 0 && daysAway <= 7, `next run ${next.toISOString()}`);
+
+    const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Toronto', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(next).map(({ type, value }) => [type, value]));
+    assert.deepEqual([parts.weekday, parts.hour, parts.minute], ['Sun', '19', '00']);
+  });
+});

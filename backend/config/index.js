@@ -109,7 +109,9 @@ const config = {
 
   // Cron jobs
   cron: {
-    weeklyReports: '0 19 * * 0', // Every Sunday at 7pm
+    weeklyReports: '0 19 * * 0', // Every Sunday at 7pm, in `timezone`
+    // Settings promises 7 p.m.; the host's clock is UTC, so say whose 7 p.m.
+    timezone: 'America/Toronto',
     aiPlanCleanup: 5 * 60 * 1000, // 5 minutes
     unverifiedAccountCleanup: 10 * 60 * 1000, // 10 minutes
     demoRefresh: 30 * 24 * 60 * 60 * 1000, // 30 days

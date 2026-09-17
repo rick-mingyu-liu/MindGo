@@ -73,6 +73,8 @@ class SchedulerService {
 
   // Schedule weekly report emails
   scheduleWeeklyReports() {
+    // node-cron must be 4.6 or later: 4.2 computed the next Sunday as 2034 and
+    // slept until then (test/schedulerService.test.js).
     const job = cron.schedule(config.cron.weeklyReports, async () => {
       try {
         logger.info('Starting weekly report generation...');
@@ -102,7 +104,7 @@ class SchedulerService {
       } catch (error) {
         logger.error('Error in weekly report scheduler', error);
       }
-    });
+    }, { timezone: config.cron.timezone });
 
     this.jobs.set('weeklyReports', { job, kind: 'cron' });
     logger.info('Weekly reports scheduled');

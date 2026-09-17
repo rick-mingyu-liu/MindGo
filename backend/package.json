@@ -22,7 +22,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "node-cron": "^4.2.0",
+    "node-cron": "^4.6.0",
     "nodemailer": "^7.0.4",
     "openai": "^4.20.1",
     "pg": "^8.11.3"
