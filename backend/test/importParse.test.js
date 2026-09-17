@@ -1,7 +1,9 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseOcr } = require('../services/import/parse');
-const { TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE } = require('./helpers/ocrLayouts');
+const {
+  TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
+} = require('./helpers/ocrLayouts');
 
 /**
  * The whole parser: confidence, flags, and when it asks for the fallback.
@@ -33,6 +35,16 @@ describe('parseOcr', () => {
       boxes: result.rows[0].boxes,
     }]);
     assert.equal(result.rows[0].boxes.length, 2);
+  });
+
+  test('a stacked bank list with chevrons comes back as its two transactions', () => {
+    const result = parseOcr({ lines: stackedBalanceLines(), image: STACKED_IMAGE, today: '2026-09-17' });
+    assert.equal(result.layout, 'bank-list');
+    assert.equal(result.needsFallback, false);
+    assert.deepEqual(result.rows.map((r) => [r.date, r.amount, r.type]), [
+      ['2026-09-16', '25.00', 'expense'],
+      ['2026-09-15', '32.00', 'expense'],
+    ]);
   });
 
   test('low OCR confidence is flagged at the threshold', () => {

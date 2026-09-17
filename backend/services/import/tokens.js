@@ -174,6 +174,10 @@ function parseDateDetail(text, today) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ')
+    // OCR squeezes out spaces: "SEP15,2026" is "sep 15, 2026".
+    .replace(/,(?=\d)/g, ', ')
+    .replace(/^([a-z]{3,9}\.?)(?=\d)/, '$1 ')
+    .replace(/^(\d{1,2})(?=[a-z]{3})/, '$1 ')
     .replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,? /, '');
 
   if (s === 'today') return found(today, false);

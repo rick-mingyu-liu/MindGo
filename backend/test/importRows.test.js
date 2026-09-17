@@ -24,6 +24,20 @@ describe('groupRows', () => {
     assert.equal(rows.length, 2);
   });
 
+  test('a tall box between two lines does not chain them into one row', () => {
+    // A chevron spanning an amount and the balance beneath it (measured).
+    const rows = groupRows([
+      line('ALEX', { y: 511, height: 47 }),
+      line('$32.00', { x: 896, y: 501, height: 62 }),
+      line('√', { x: 1036, y: 533, height: 90 }),
+      line('SAMPLE PERSON', { y: 588, height: 46 }),
+      line('$3,016.15', { x: 838, y: 580, height: 56 }),
+    ]);
+    assert.equal(rows[0].text, 'ALEX $32.00');
+    assert.ok(rows.every((r) => !(r.text.includes('$32.00') && r.text.includes('$3,016.15'))),
+      rows.map((r) => r.text).join(' | '));
+  });
+
   test('takes the lowest confidence of a row, and ignores blank lines', () => {
     const rows = groupRows([line('A', { conf: 0.9 }), line('B', { x: 300, conf: 0.6 }), line('  ')]);
     assert.equal(rows.length, 1);

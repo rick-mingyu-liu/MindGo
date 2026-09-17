@@ -100,6 +100,10 @@ describe('parseDate', () => {
     ['07/07/2026', '2026-07-07'],
     ['Today', '2026-09-16'],
     ['Yesterday', '2026-09-15'],
+    // OCR squeezes out spaces (measured 2026-09-17).
+    ['SEP 16,2026', '2026-09-16'],
+    ['SEP15,2026', '2026-09-15'],
+    ['14SEP', '2026-09-14'],
   ]) {
     test(`reads ${input}`, () => assert.equal(parseDate(input, TODAY), day));
   }

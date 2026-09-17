@@ -13,30 +13,56 @@ const { extractAmounts, parseDateDetail, splitLeadingDate, toCents } = require('
  * headers ("Yesterday" -> "Yer", measured) — and ends the previous header's
  * reach. A row with an unknown date is flagged; a row silently given the
  * previous section's date is not.
+ *
+ * Some apps stack an entry: the amount on the right with the running balance
+ * directly beneath it, and the description wrapping on the left. A row holding
+ * one amount that sits right under the previous entry's amount, right-aligned
+ * with it, is that entry's balance and the rest of its description. "Right
+ * under" is a gap of under 0.4 of the amount's height: measured 0.26 for a
+ * stacked balance, and never below 0.85 between single-line transactions.
+ * Rows of pure symbols — chevrons, icons — are skipped rather than read as
+ * headers.
  */
 const INCOME_WORDS = /\b(payroll|salary|deposit|e-?transfer (received|from)|refund|interest|dividend)\b/i;
 const STATUS_WORDS = /\b(pending|posted)\b/gi;
+const HAS_WORD = /[\p{L}\p{N}]/u;
+const STACKED_GAP = 0.4;
 
 function parseBankList(rows, today) {
   const drafts = [];
   let header = null;
+  let above = null; // the draft on the row just above, while it may still take a balance
 
   for (const row of rows) {
+    if (!HAS_WORD.test(row.text)) continue;
     const whole = parseDateDetail(row.text, today);
     if (whole) {
       header = { ...whole, conf: row.conf };
+      above = null;
       continue;
     }
 
     const amounts = [];
     const words = [];
     for (const line of row.lines) {
+      if (!HAS_WORD.test(line.text)) continue;
       const { amounts: found, label } = extractAmounts(line.text);
       if (label) words.push({ text: label, conf: line.conf });
       for (const amount of found) amounts.push({ ...amount, conf: line.conf, box: line.box });
     }
     if (amounts.length === 0) {
       if (drafts.length > 0) header = null;
+      above = null;
+      continue;
+    }
+
+    if (above && amounts.length === 1 && isBeneath(amounts[0].box, above.amountBox)) {
+      above.balance = amounts[0];
+      if (words.length) {
+        above.description = `${above.description} ${words.map((w) => w.text).join(' ')}`.trim();
+        above.conf.description = Math.min(above.conf.description || 1, ...words.map((w) => w.conf));
+      }
+      above = null;
       continue;
     }
 
@@ -66,7 +92,7 @@ function parseBankList(rows, today) {
     if (/\bpending\b/i.test(row.text)) flags.push('pending');
     if (txn.corrected) flags.push('corrected_chars');
 
-    drafts.push({
+    const draft = {
       date: date ? date.day : null,
       amount: txn.value,
       currency: txn.currency || 'CAD',
@@ -80,12 +106,23 @@ function parseBankList(rows, today) {
         type: flags.includes('type_guessed') ? 0.9 : 1,
       },
       balance,
+      amountBox: txn.box,
       boxes: row.lines.map((l) => l.box),
-    });
+    };
+    drafts.push(draft);
+    above = balance ? null : draft;
   }
 
   verifyBalances(drafts);
-  return { drafts: drafts.map(({ balance: _balance, ...draft }) => draft) };
+  return { drafts: drafts.map(({ balance: _balance, amountBox: _amountBox, ...draft }) => draft) };
+}
+
+/** `lower` sits directly beneath `upper`, right edges aligned. */
+function isBeneath(lower, upper) {
+  const height = Math.max(lower.height, upper.height);
+  const gap = lower.y - (upper.y + upper.height);
+  const rightEdges = Math.abs((lower.x + lower.width) - (upper.x + upper.width));
+  return gap >= 0 && gap < STACKED_GAP * height && rightEdges < 0.5 * height;
 }
 
 /**

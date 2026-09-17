@@ -3,6 +3,11 @@
  * vertical extents overlap by at least half the shorter one belong to the same
  * row. Everything downstream works on rows.
  *
+ * A box must also have its middle inside the row so far. Without that, a tall
+ * box straddling two lines — a chevron beside an amount and the balance under
+ * it, measured 2026-09-17 — widens the row until it swallows the next line,
+ * and the two amounts come back in the wrong order.
+ *
  * A line is `{ text, conf, box: { x, y, width, height } }` in image pixels.
  * A row is `{ text, conf, box, height, lines }`, lines sorted left to right.
  */
@@ -19,7 +24,9 @@ function groupRows(lines) {
     const last = groups[groups.length - 1];
     if (last) {
       const overlap = Math.min(bottom, last.bottom) - Math.max(top, last.top);
-      if (overlap >= 0.5 * Math.min(line.box.height, last.minHeight)) {
+      const middle = top + line.box.height / 2;
+      if (overlap >= 0.5 * Math.min(line.box.height, last.minHeight)
+        && middle >= last.top && middle <= last.bottom) {
         last.lines.push(line);
         last.top = Math.min(last.top, top);
         last.bottom = Math.max(last.bottom, bottom);

@@ -4,7 +4,7 @@ const { groupRows } = require('../services/import/rows');
 const { classifyLayout } = require('../services/import/classify');
 const { categorize, KEYWORDS } = require('../services/import/categorize');
 const { CATEGORIES } = require('../db/demoData');
-const { TODAY, line, bankScreenshot, receiptPhoto } = require('./helpers/ocrLayouts');
+const { TODAY, line, bankScreenshot, receiptPhoto, stackedBalanceLines } = require('./helpers/ocrLayouts');
 
 /**
  * Which parser a screenshot goes to, and the first-guess category of each row.
@@ -19,6 +19,12 @@ describe('classifyLayout', () => {
   test('a receipt', () => {
     const result = classifyLayout(receiptPhoto(), TODAY);
     assert.equal(result.layout, 'receipt');
+    assert.ok(result.confidence >= 0.6, `confidence ${result.confidence}`);
+  });
+
+  test('a bank list with squeezed dates, chevrons and INTERAC in every row', () => {
+    const result = classifyLayout(groupRows(stackedBalanceLines()), TODAY);
+    assert.equal(result.layout, 'bank-list');
     assert.ok(result.confidence >= 0.6, `confidence ${result.confidence}`);
   });
 

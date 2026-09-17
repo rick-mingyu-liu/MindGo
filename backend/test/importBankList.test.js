@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { groupRows } = require('../services/import/rows');
 const { parseBankList } = require('../services/import/bankList');
 const { parseOcr } = require('../services/import/parse');
-const { TODAY, line, at, bankScreenshot } = require('./helpers/ocrLayouts');
+const { TODAY, line, at, bankScreenshot, stackedBalanceLines } = require('./helpers/ocrLayouts');
 
 /**
  * Bank-app transaction lists. OCR can drop a minus sign without lowering its
@@ -147,6 +147,29 @@ describe('parseBankList', () => {
       assert.ok(drafts[1].flags.includes('arithmetic_verified'));
       assert.ok(drafts[2].flags.includes('arithmetic_verified'));
       assert.ok(!drafts[0].flags.includes('arithmetic_verified'));
+    });
+  });
+
+  describe('balance beneath the amount', () => {
+    test('reads the second amount of an entry as its balance, not a transaction', () => {
+      const { drafts } = parseBankList(groupRows(stackedBalanceLines()), TODAY);
+      assert.deepEqual(drafts.map((d) => [d.date, d.amount, d.description]), [
+        ['2026-09-16', '25.00', 'INTERAC ETRNSFR SENT CLINIC TORONTO 20260000001ABCDEF'],
+        ['2026-09-15', '32.00', 'INTERAC ETRNSFR SENT ALEX SAMPLE PERSON'],
+      ]);
+      // 3,016.15 - 2,991.15 is the newer entry's 25.00.
+      assert.ok(drafts[0].flags.includes('arithmetic_verified'), drafts[0].flags.join());
+      assert.ok(!drafts.some((d) => d.flags.includes('balance_mismatch')));
+    });
+
+    test('right-aligned amounts a normal row apart are separate transactions', () => {
+      const amount = (text, row) => line(text, { x: 760 - text.length * 16, y: at(row) });
+      const { drafts } = parseBankList(groupRows([
+        line('Sep 14', { y: at(0) }),
+        line('SOBEYS', { y: at(1) }), amount('$23.47', 1),
+        line('TIM HORTONS', { y: at(2) }), amount('$4.25', 2),
+      ]), TODAY);
+      assert.deepEqual(drafts.map((d) => d.amount), ['23.47', '4.25']);
     });
   });
 });
