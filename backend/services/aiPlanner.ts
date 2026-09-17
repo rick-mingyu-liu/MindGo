@@ -88,10 +88,7 @@ class AIPlanner {
     if (!this.openai) {
       this.openai = new OpenAI({ apiKey: config.apiKeys.openai });
     }
-    // TS does not carry the narrowing from the assignment above across to
-    // this read of a mutable class field — this.openai is guaranteed
-    // non-null here regardless.
-    return this.openai as ChatCompletionsClient;
+    return this.openai;
   }
 
   /**
