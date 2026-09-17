@@ -130,8 +130,57 @@ const uberActivityLines = () => [
 ];
 const UBER_IMAGE = { width: 920, height: 2000 };
 
+// Uber Eats' Past orders tab: store name, then "Mar 15 • $60.54 • 1 item",
+// then the first items, with the store's logo to the left — which the model
+// reads as text on the same rows — and a View store button to the right.
+// Boxes and key lines are the shipped model's output for a real screenshot
+// (2026-09-17), squeezed spaces and all; the items are not.
+const uberEatsOrderLines = () => [
+  line('10:231', { x: 82, y: 49, width: 169, height: 49, conf: 0.98 }),
+  line('94', { x: 642, y: 44, width: 213, height: 58 }),
+  line('Orders', { x: 380, y: 153, width: 160, height: 49 }),
+  line('Past items', { x: 112, y: 261, width: 234, height: 46 }),
+  line('Past orders', { x: 563, y: 257, width: 252, height: 54 }),
+  line('Shoppers Drug Mart', { x: 210, y: 382, width: 368, height: 46 }),
+  line('Mar15·$60.54·1item', { x: 213, y: 435, width: 344, height: 36 }),
+  line('SHOPPERS', { x: 23, y: 468, width: 168, height: 48 }),
+  line('Sample Item One', { x: 214, y: 483, width: 350, height: 34 }),
+  line('View store', { x: 688, y: 473, width: 178, height: 38, conf: 0.97 }),
+  line('Sample Item Two', { x: 211, y: 525, width: 410, height: 36, conf: 0.98 }),
+  line('LCBO', { x: 206, y: 657, width: 121, height: 48 }),
+  line('LCBO', { x: 36, y: 722, width: 141, height: 53 }),
+  line('Mar 14 ·$22.42·1 item', { x: 213, y: 714, width: 338, height: 36, conf: 0.98 }),
+  line('View store', { x: 688, y: 729, width: 179, height: 41, conf: 0.97 }),
+  line('IN-STORE PRICE', { x: 101, y: 767, width: 83, height: 24, conf: 0.95 }),
+  line('Sample Item Three', { x: 214, y: 762, width: 345, height: 35 }),
+  line('Food Basics', { x: 210, y: 896, width: 225, height: 43 }),
+  line('Bases', { x: 37, y: 961, width: 144, height: 74, conf: 0.46 }),
+  line('Dec 18· $76.33 · 23 item s', { x: 211, y: 949, width: 378, height: 38, conf: 0.94 }),
+  line('Sample Item Four', { x: 214, y: 997, width: 338, height: 35 }),
+  line('View store', { x: 688, y: 988, width: 178, height: 37 }),
+  line('Popeyes', { x: 209, y: 1174, width: 166, height: 48 }),
+  line('26', { x: 86, y: 1222, width: 104, height: 43, conf: 0.21 }),
+  line('OGOWE', { x: 25, y: 1246, width: 168, height: 53, conf: 0.72 }),
+  line('Dec 16 · $25.98 · 2 item s', { x: 213, y: 1229, width: 359, height: 36, conf: 0.95 }),
+  line('View store', { x: 688, y: 1243, width: 178, height: 42 }),
+  line('Sample Combo', { x: 210, y: 1275, width: 349, height: 38 }),
+  line('Papa John\'s Pizza', { x: 210, y: 1412, width: 318, height: 43 }),
+  line('PAN', { x: 89, y: 1435, width: 113, height: 78 }),
+  line('Dec 15 · $33.24 • 2 items', { x: 211, y: 1465, width: 361, height: 36, conf: 0.93 }),
+  line('View store', { x: 688, y: 1464, width: 178, height: 37 }),
+  line('Sample Pizza', { x: 211, y: 1516, width: 254, height: 36 }),
+  line('A&W', { x: 206, y: 1610, width: 112, height: 48 }),
+  line('ME', { x: 40, y: 1669, width: 48, height: 29, conf: 0.7 }),
+  line('Dec 15·$20.38 · 2 items', { x: 211, y: 1666, width: 361, height: 36, conf: 0.96 }),
+  line('View store', { x: 688, y: 1681, width: 178, height: 41, conf: 0.99 }),
+  line('Sample Burger', { x: 210, y: 1713, width: 342, height: 41 }),
+  line('Q Search', { x: 368, y: 1838, width: 187, height: 48, conf: 0.98 }),
+];
+const UBER_EATS_IMAGE = { width: 920, height: 2000 };
+
 
 module.exports = {
   TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
   iconListLines, ICON_IMAGE, uberActivityLines, UBER_IMAGE,
+  uberEatsOrderLines, UBER_EATS_IMAGE,
 };

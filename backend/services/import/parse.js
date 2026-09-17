@@ -3,6 +3,7 @@ const { classifyLayout } = require('./classify');
 const { parseBankList } = require('./bankList');
 const { parseReceipt } = require('./receipt');
 const { parseUberActivity } = require('./uberActivity');
+const { parseUberEatsOrders } = require('./uberEats');
 const { categorize } = require('./categorize');
 
 /**
@@ -30,6 +31,7 @@ function parseOcr({ lines, image, today }, { confidenceThreshold = 0.8 } = {}) {
   if (layout === 'receipt') drafts = parseReceipt(rows, image, today).drafts;
   if (layout === 'bank-list') drafts = parseBankList(rows, today).drafts;
   if (layout === 'uber-activity') drafts = parseUberActivity(rows, today).drafts;
+  if (layout === 'uber-eats-orders') drafts = parseUberEatsOrders(rows, today).drafts;
 
   const out = drafts.map((draft) => finalize(draft, confidenceThreshold));
   return {
@@ -58,7 +60,9 @@ function finalize(draft, threshold) {
     amount: draft.amount,
     currency: draft.currency,
     description: draft.description,
-    category: draft.category || categorize(draft.description, draft.type),
+    // A parser that knows the category — including that it cannot know —
+    // says so; the keyword guess is for the rest.
+    category: 'category' in draft ? draft.category : categorize(draft.description, draft.type),
     type: draft.type,
     confidence: round2(confidence),
     flags,

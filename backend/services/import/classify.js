@@ -1,10 +1,11 @@
 const { extractTrailingAmount, parseDate } = require('./tokens');
 const { splitDateTime } = require('./uberActivity');
+const { splitOrderLine } = require('./uberEats');
 
 /**
- * Decides whether a screenshot is a receipt, a bank-app transaction list or
- * Uber's trip activity by counting signals for each; a tie goes to receipt,
- * then bank list. `confidence` is the winner's share of all signals, so a
+ * Decides whether a screenshot is a receipt, a bank-app transaction list,
+ * Uber's trip activity or Uber Eats' past orders by counting signals for each;
+ * a tie goes to receipt, then bank list, then Uber trips. `confidence` is the winner's share of all signals, so a
  * screenshot with evidence for more than one scores low and is sent to the
  * fallback rather than parsed with false certainty.
  */
@@ -32,6 +33,12 @@ const UBER_SIGNALS = [
   /^activity$/im,
 ];
 
+// Uber Eats' Past orders tab: its tab and button labels, and order lines.
+const UBER_EATS_SIGNALS = [
+  /\bview store\b/i,
+  /\bpast orders\b/i,
+];
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 function classifyLayout(rows, today) {
@@ -51,12 +58,19 @@ function classifyLayout(rows, today) {
   let uber = UBER_SIGNALS.filter((re) => re.test(text)).length;
   uber += Math.min(rows.filter((r) => splitDateTime(r.text, today)).length, 3);
 
-  const total = receipt + bank + uber;
+  // The tab labels are on the Past items tab too, which holds no charges, so
+  // they count only beside an order line.
+  const orderLines = rows.flatMap((r) => r.lines).filter((l) => splitOrderLine(l.text, today)).length;
+  const eats = orderLines === 0 ? 0
+    : UBER_EATS_SIGNALS.filter((re) => re.test(text)).length + Math.min(orderLines, 3);
+
+  const total = receipt + bank + uber + eats;
   if (total === 0) return { layout: 'unknown', confidence: 0 };
-  const best = Math.max(receipt, bank, uber);
-  let layout = 'uber-activity';
+  const best = Math.max(receipt, bank, uber, eats);
+  let layout = 'uber-eats-orders';
   if (receipt === best) layout = 'receipt';
   else if (bank === best) layout = 'bank-list';
+  else if (uber === best) layout = 'uber-activity';
   return { layout, confidence: round2(best / total) };
 }
 
