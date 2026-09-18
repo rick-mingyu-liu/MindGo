@@ -1,30 +1,96 @@
-const { validationResult } = require('express-validator');
-const db = require('../db/connection');
-const { getExchangeRate } = require('../services/exchangeRateService');
-const {
+import { Request, Response } from 'express';
+import { validationResult } from 'express-validator';
+import { query } from '../db/connection';
+import { getExchangeRate } from '../services/exchangeRateService';
+import {
   boundsOf, labelOf, currentTerm, previousTerm,
   yearBoundsOf, yearLabelOf, currentYear, previousYear,
-} = require('../utils/terms');
-const { monthOf } = require('../utils/dates');
+} from '../utils/terms';
+import { monthOf } from '../utils/dates';
+import type { TransactionRow, TransactionType } from '../types/db';
 
 /** `(2026, 4, 1)` -> `'2026-05-01'`. month is 0-based, as in `Date`. */
-const isoDate = (year, month, day) =>
+const isoDate = (year: number, month: number, day: number): string =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+/** A transactions row, plus its amount converted to the caller's requested currency. */
+interface TransactionWithConversion extends TransactionRow {
+  convertedAmount: number;
+  convertedCurrency: string;
+}
+
+/** getMonthlySummary's per-category totals, keyed by category name. */
+interface MonthlyCategoryTotals {
+  income: number;
+  expenses: number;
+  transactions: TransactionWithConversion[];
+}
+
+/** getRollingSummary's per-category totals, keyed by category name. */
+interface RollingCategoryTotals {
+  total: number;
+  count: number;
+  average: number;
+}
+
+/** getRollingSummary's chosen window: a term, a year, or a rolling month count. */
+interface RollingWindow {
+  start: string;
+  end: string;
+  term: string | null;
+  year: string | null;
+  label: string | null;
+  period: string;
+}
+
+/** getRollingSummary's per-month breakdown, keyed by 'YYYY-MM'. */
+interface MonthlyBreakdownEntry {
+  month: string;
+  income: number;
+  expenses: number;
+  netIncome: number;
+  transactions: TransactionWithConversion[];
+}
+
+// The columns this aggregate SELECT names. EXTRACT, SUM and COUNT all return
+// Postgres numeric/bigint, which node-pg returns as strings by default to
+// avoid precision loss — never parsed here as JS numbers.
+interface TrendRow {
+  year: string;
+  month: string;
+  category: string;
+  type: TransactionType;
+  total_amount: string;
+  transaction_count: string;
+}
+
+/** getSpendingTrends's per-month breakdown, keyed by 'YYYY-MM'. */
+interface TrendMonth {
+  month: string;
+  categories: Record<string, { income: number; expenses: number; transactionCount: number }>;
+  totalIncome: number;
+  totalExpenses: number;
+}
 
 const summaryController = {
   // Get monthly summary
-  async getMonthlySummary(req, res) {
+  async getMonthlySummary(req: Request, res: Response) {
     try {
-      const { year, month, targetCurrency = 'CAD' } = req.query;
+      // getMonthlySummary has no express-validator chain (unlike /rolling), so
+      // these are read exactly as the original code read them off req.query:
+      // untyped strings when present.
+      const year = req.query.year as string | undefined;
+      const month = req.query.month as string | undefined;
+      const targetCurrency = (req.query.targetCurrency as string | undefined) ?? 'CAD';
       const currentDate = new Date();
       const targetYear = year || currentDate.getFullYear();
       const targetMonth = month || currentDate.getMonth() + 1;
 
       // Get transactions for the specified month
-      const transactions = await db.query(
-        `SELECT * FROM transactions 
-         WHERE user_id = $1 
-         AND EXTRACT(YEAR FROM date) = $2 
+      const transactions = await query<TransactionRow>(
+        `SELECT * FROM transactions
+         WHERE user_id = $1
+         AND EXTRACT(YEAR FROM date) = $2
          AND EXTRACT(MONTH FROM date) = $3
          ORDER BY date DESC`,
         [req.user.userId, targetYear, targetMonth]
@@ -32,17 +98,18 @@ const summaryController = {
 
       // Prepare for conversion
       const txs = transactions.rows;
-      const convertedTxs = [];
+      const convertedTxs: TransactionWithConversion[] = [];
       let totalIncome = 0;
       let totalExpenses = 0;
       let netIncome = 0;
-      const categories = {};
+      const categories: Record<string, MonthlyCategoryTotals> = {};
 
       // Cache for rates in this request
-      const rateCache = {};
-      async function getRate(from, to) {
+      const rateCache: Record<string, number> = {};
+      async function getRate(from: string, to: string): Promise<number> {
         const key = `${from}_${to}`;
-        if (rateCache[key]) return rateCache[key];
+        const cached = rateCache[key];
+        if (cached) return cached;
         const rate = await getExchangeRate(from, to);
         rateCache[key] = rate;
         return rate;
@@ -58,7 +125,7 @@ const summaryController = {
           convertedCurrency = targetCurrency;
         }
         // Add converted fields
-        const txWithConversion = {
+        const txWithConversion: TransactionWithConversion = {
           ...transaction,
           convertedAmount,
           convertedCurrency
@@ -80,18 +147,19 @@ const summaryController = {
             transactions: []
           };
         }
+        // The block above just ensured this key exists.
         if (transaction.type === 'income') {
-          categories[transaction.category].income += convertedAmount;
+          categories[transaction.category]!.income += convertedAmount;
         } else {
-          categories[transaction.category].expenses += convertedAmount;
+          categories[transaction.category]!.expenses += convertedAmount;
         }
-        categories[transaction.category].transactions.push(txWithConversion);
+        categories[transaction.category]!.transactions.push(txWithConversion);
       }
       netIncome = totalIncome - totalExpenses;
 
       const summary = {
-        year: parseInt(targetYear),
-        month: parseInt(targetMonth),
+        year: parseInt(String(targetYear)),
+        month: parseInt(String(targetMonth)),
         totalIncome,
         totalExpenses,
         netIncome,
@@ -121,17 +189,22 @@ const summaryController = {
    * the retention job will delete whole terms using the same module, and a view
    * and a deletion that disagree about where a term starts would fail silently.
    */
-  async getRollingSummary(req, res) {
+  async getRollingSummary(req: Request, res: Response) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { months = 4, term, year, targetCurrency = 'CAD' } = req.query;
+      // Validated in shape only (rollingValidation), still plain strings off
+      // req.query, as the original code read them.
+      const term = req.query.term as string | undefined;
+      const year = req.query.year as string | undefined;
+      const months = (req.query.months as string | undefined) ?? 4;
+      const targetCurrency = (req.query.targetCurrency as string | undefined) ?? 'CAD';
       const currentDate = new Date();
 
-      let window;
+      let window: RollingWindow;
       if (term !== undefined) {
         const termId =
           term === 'current' ? currentTerm(currentDate)
@@ -165,7 +238,7 @@ const summaryController = {
         // under TZ=Asia/Shanghai that expression yields '2026-04-30' for May 1,
         // shifting every boundary and putting a day's transactions in the wrong
         // month. It escaped only because the server runs UTC.
-        const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(months) + 1;
+        const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(String(months)) + 1;
         const endAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() + 1;
         window = {
           start: isoDate(Math.floor(startAbsolute / 12), startAbsolute % 12, 1),
@@ -178,10 +251,10 @@ const summaryController = {
       }
 
       // Get transactions for the window
-      const transactions = await db.query(
-        `SELECT * FROM transactions 
-         WHERE user_id = $1 
-         AND date >= $2 
+      const transactions = await query<TransactionRow>(
+        `SELECT * FROM transactions
+         WHERE user_id = $1
+         AND date >= $2
          AND date < $3
          ORDER BY date DESC`,
         [req.user.userId, window.start, window.end]
@@ -189,16 +262,17 @@ const summaryController = {
 
       // Prepare for conversion
       const txs = transactions.rows;
-      const convertedTxs = [];
+      const convertedTxs: TransactionWithConversion[] = [];
       let totalIncome = 0;
       let totalExpenses = 0;
       let netIncome = 0;
-      const categories = {};
+      const categories: Record<string, RollingCategoryTotals> = {};
       // Cache for rates in this request
-      const rateCache = {};
-      async function getRate(from, to) {
+      const rateCache: Record<string, number> = {};
+      async function getRate(from: string, to: string): Promise<number> {
         const key = `${from}_${to}`;
-        if (rateCache[key]) return rateCache[key];
+        const cached = rateCache[key];
+        if (cached) return cached;
         const rate = await getExchangeRate(from, to);
         rateCache[key] = rate;
         return rate;
@@ -214,7 +288,7 @@ const summaryController = {
           convertedCurrency = targetCurrency;
         }
         // Add converted fields
-        const txWithConversion = {
+        const txWithConversion: TransactionWithConversion = {
           ...transaction,
           convertedAmount,
           convertedCurrency
@@ -236,19 +310,24 @@ const summaryController = {
             average: 0
           };
         }
-        categories[transaction.category].total += convertedAmount;
-        categories[transaction.category].count += 1;
+        // The block above just ensured this key exists.
+        categories[transaction.category]!.total += convertedAmount;
+        categories[transaction.category]!.count += 1;
       }
 
       netIncome = totalIncome - totalExpenses;
 
       // Group by month (for monthlyBreakdown, use converted amounts)
-      const monthlyData = {};
+      const monthlyData: Record<string, MonthlyBreakdownEntry> = {};
       for (const tx of convertedTxs) {
         // Read the month off the day string. Rebuilding a Date to ask for its
         // month files every 1st-of-the-month under the month before, for any
         // reader west of UTC.
-        const monthKey = monthOf(tx.date);
+        // tx.date always came from a DATE column, which db/connection.ts's type
+        // parser always hands back as 'YYYY-MM-DD' — monthOf's null case is for
+        // arbitrary unknown input, not a stored transaction's own date, so this
+        // assertion matches what is actually possible here.
+        const monthKey = monthOf(tx.date)!;
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
             month: monthKey,
@@ -258,18 +337,20 @@ const summaryController = {
             transactions: []
           };
         }
+        // The block above just ensured this key exists.
         if (tx.type === 'income') {
-          monthlyData[monthKey].income += tx.convertedAmount;
+          monthlyData[monthKey]!.income += tx.convertedAmount;
         } else {
-          monthlyData[monthKey].expenses += tx.convertedAmount;
+          monthlyData[monthKey]!.expenses += tx.convertedAmount;
         }
-        monthlyData[monthKey].transactions.push(tx);
-        monthlyData[monthKey].netIncome = monthlyData[monthKey].income - monthlyData[monthKey].expenses;
+        monthlyData[monthKey]!.transactions.push(tx);
+        monthlyData[monthKey]!.netIncome = monthlyData[monthKey]!.income - monthlyData[monthKey]!.expenses;
       }
 
       // Calculate averages for categories
       Object.keys(categories).forEach(category => {
-        categories[category].average = categories[category].total / categories[category].count;
+        // category is drawn from Object.keys(categories), so it always exists.
+        categories[category]!.average = categories[category]!.total / categories[category]!.count;
       });
 
       const summary = {
@@ -304,26 +385,26 @@ const summaryController = {
   },
 
   // Get spending trends
-  async getSpendingTrends(req, res) {
+  async getSpendingTrends(req: Request, res: Response) {
     try {
-      const { months = 6 } = req.query;
+      const months = (req.query.months as string | undefined) ?? 6;
       const currentDate = new Date();
       // Integer arithmetic, not `new Date(y, m, 1).toISOString()`: that form is
       // off by a day east of UTC, which would drop the first day of the window.
-      const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(months) + 1;
+      const startAbsolute = currentDate.getFullYear() * 12 + currentDate.getMonth() - parseInt(String(months)) + 1;
       const startDate = isoDate(Math.floor(startAbsolute / 12), startAbsolute % 12, 1);
 
       // Get monthly spending by category
-      const trends = await db.query(
-        `SELECT 
+      const trends = await query<TrendRow>(
+        `SELECT
            EXTRACT(YEAR FROM date) as year,
            EXTRACT(MONTH FROM date) as month,
            category,
            type,
            SUM(amount) as total_amount,
            COUNT(*) as transaction_count
-         FROM transactions 
-         WHERE user_id = $1 
+         FROM transactions
+         WHERE user_id = $1
          AND date >= $2
          GROUP BY EXTRACT(YEAR FROM date), EXTRACT(MONTH FROM date), category, type
          ORDER BY year, month, category`,
@@ -331,11 +412,11 @@ const summaryController = {
       );
 
       // Process trends data
-      const processedTrends = {};
-      
+      const processedTrends: Record<string, TrendMonth> = {};
+
       trends.rows.forEach(row => {
         const monthKey = `${row.year}-${String(row.month).padStart(2, '0')}`;
-        
+
         if (!processedTrends[monthKey]) {
           processedTrends[monthKey] = {
             month: monthKey,
@@ -344,24 +425,28 @@ const summaryController = {
             totalExpenses: 0
           };
         }
+        // The block above just ensured this key exists.
+        const trendMonth = processedTrends[monthKey]!;
 
-        if (!processedTrends[monthKey].categories[row.category]) {
-          processedTrends[monthKey].categories[row.category] = {
+        if (!trendMonth.categories[row.category]) {
+          trendMonth.categories[row.category] = {
             income: 0,
             expenses: 0,
             transactionCount: 0
           };
         }
+        // The block above just ensured this key exists.
+        const categoryTotals = trendMonth.categories[row.category]!;
 
         if (row.type === 'income') {
-          processedTrends[monthKey].categories[row.category].income += parseFloat(row.total_amount);
-          processedTrends[monthKey].totalIncome += parseFloat(row.total_amount);
+          categoryTotals.income += parseFloat(row.total_amount);
+          trendMonth.totalIncome += parseFloat(row.total_amount);
         } else {
-          processedTrends[monthKey].categories[row.category].expenses += parseFloat(row.total_amount);
-          processedTrends[monthKey].totalExpenses += parseFloat(row.total_amount);
+          categoryTotals.expenses += parseFloat(row.total_amount);
+          trendMonth.totalExpenses += parseFloat(row.total_amount);
         }
 
-        processedTrends[monthKey].categories[row.category].transactionCount += parseInt(row.transaction_count);
+        categoryTotals.transactionCount += parseInt(row.transaction_count);
       });
 
       res.json({
@@ -376,4 +461,4 @@ const summaryController = {
   }
 };
 
-module.exports = summaryController;
+export = summaryController;
