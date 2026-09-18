@@ -86,8 +86,9 @@ class SchedulerService {
       try {
         logger.info('Starting weekly report generation...');
 
-        // db/connection.js is not yet converted (a later step), so query()'s
-        // result is untyped; this lists only the columns the SELECT names.
+        // query() is generic, but it cannot infer a row shape from a SQL
+        // string, so the shape is named here; this lists only the columns the
+        // SELECT names.
         const users = await query(
           'SELECT id, email FROM users WHERE email_notifications_enabled = true AND weekly_reports_enabled = true'
         ) as { rows: Array<{ id: number; email: string }> };
