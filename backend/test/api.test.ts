@@ -22,9 +22,10 @@
  * conversion and never calls the exchange-rate API. Conversion itself is
  * covered by exchangeRateService.test.js.
  */
-const { test, describe, before, after } = require('node:test');
-const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import type { Test, Response } from 'supertest';
 
 const HAVE_DB = Boolean(process.env.TEST_DATABASE_URL);
 
@@ -42,25 +43,37 @@ if (HAVE_DB) {
 }
 
 describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to run' }, () => {
-  let request, db, bcrypt, app;
+  let request: typeof import('supertest');
+  let db: typeof import('../db/connection');
+  let bcrypt: typeof import('bcryptjs');
+  let app: typeof import('../app');
   const PASSWORD = 'test-password-123';
-  const users = [];
-  let alice, bob, aliceToken, bobToken;
+  const users: number[] = [];
+
+  interface SeededUser {
+    id: number;
+    email: string;
+  }
+
+  let alice: SeededUser;
+  let bob: SeededUser;
+  let aliceToken: string;
+  let bobToken: string;
 
   /** Creates a verified user directly, bypassing registration's email round-trip. */
-  async function seedUser() {
+  async function seedUser(): Promise<SeededUser> {
     const email = `it-${crypto.randomUUID()}@example.invalid`;
     const hash = await bcrypt.hash(PASSWORD, 10);
-    const r = await db.query(
+    const r = await db.query<SeededUser>(
       `INSERT INTO users (email, password_hash, first_name, last_name, email_verified)
        VALUES ($1, $2, 'Integration', 'Test', TRUE) RETURNING id, email`,
       [email, hash]
     );
-    users.push(r.rows[0].id);
-    return r.rows[0];
+    users.push(r.rows[0]!.id);
+    return r.rows[0]!;
   }
 
-  async function login(email, password = PASSWORD) {
+  async function login(email: string, password: string = PASSWORD) {
     return request(app).post('/auth/login').send({ email, password });
   }
 
@@ -76,7 +89,11 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
     // authLimiter allows 5 attempts per 15 minutes per IP, and the whole suite
     // shares one. Log in once per user here and reuse the tokens; a test that
     // logs in on demand trips the limiter and fails with a 429.
-    for (const [user, assign] of [[alice, (t) => (aliceToken = t)], [bob, (t) => (bobToken = t)]]) {
+    const assignments: [SeededUser, (t: string) => void][] = [
+      [alice, (t) => { aliceToken = t; }],
+      [bob, (t) => { bobToken = t; }],
+    ];
+    for (const [user, assign] of assignments) {
       const res = await login(user.email);
       assert.equal(res.status, 200, `login failed: ${JSON.stringify(res.body)}`);
       assign(res.body.token);
@@ -92,7 +109,7 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
     if (pool) await pool.end();
   });
 
-  const auth = (req) => req.set('Authorization', `Bearer ${aliceToken}`);
+  const auth = (req: Test): Test => req.set('Authorization', `Bearer ${aliceToken}`);
 
   describe('authentication', () => {
     test('rejects a wrong password without saying which field was wrong', async () => {
@@ -129,8 +146,8 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       first_name: 'A',
       last_name: 'B',
     };
-    const post = (body) => request(app).post('/auth/register').send({ ...valid, ...body });
-    const messages = (res) => res.body.errors.map((e) => e.msg).join(' ');
+    const post = (body: Record<string, unknown>): Test => request(app).post('/auth/register').send({ ...valid, ...body });
+    const messages = (res: Response): string => res.body.errors.map((e: { msg: string }) => e.msg).join(' ');
 
     test('rejects a password shorter than the configured minimum', async () => {
       const res = await post({ password: 'short' });
@@ -152,9 +169,9 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
 
   describe('transactions', () => {
     const MONTH = { year: 2020, month: 6 }; // fixed, so the summary query is deterministic
-    const made = [];
+    const made: number[] = [];
 
-    const create = (body) =>
+    const create = (body: Record<string, unknown>): Test =>
       auth(request(app).post('/transactions')).send({
         date: '2020-06-15',
         currency: 'CAD',
@@ -226,7 +243,7 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       assert.equal(bobsView.status, 200);
 
       const rows = bobsView.body.transactions || bobsView.body;
-      const ids = (Array.isArray(rows) ? rows : []).map((t) => t.id);
+      const ids = (Array.isArray(rows) ? rows : []).map((t: { id: number }) => t.id);
       for (const id of made) {
         assert.ok(!ids.includes(id), `Bob can see Alice's transaction ${id}`);
       }
@@ -253,14 +270,14 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       const mine = await auth(request(app).get('/transactions'));
       const rows = mine.body.transactions || mine.body;
       assert.ok(
-        rows.some((t) => t.id === made[1]),
+        rows.some((t: { id: number }) => t.id === made[1]),
         "Bob's delete removed Alice's row"
       );
     });
   });
 
   describe('screenshot import', () => {
-    const row = (overrides = {}) => ({
+    const row = (overrides: Record<string, unknown> = {}) => ({
       date: '2021-03-10',
       amount: '12.34',
       description: 'Imported row',
@@ -271,11 +288,11 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       edited: false,
       ...overrides,
     });
-    const importRows = (rows, token = aliceToken) =>
+    const importRows = (rows: Record<string, unknown>[], token = aliceToken): Test =>
       request(app).post('/transactions/import').set('Authorization', `Bearer ${token}`).send({ rows });
-    const countImported = async (userId) => Number((await db.query(
+    const countImported = async (userId: number): Promise<number> => Number((await db.query<{ n: string }>(
       "SELECT COUNT(*) AS n FROM transactions WHERE user_id = $1 AND date = '2021-03-10'", [userId]
-    )).rows[0].n);
+    )).rows[0]!.n);
 
     test('saves the rows with their source, and one batch record', async () => {
       const res = await importRows([row(), row({ amount: '1.00', source: 'ocr_llm', edited: true })]);
@@ -323,7 +340,7 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
         ],
       });
       assert.equal(res.status, 200, JSON.stringify(res.body));
-      assert.deepEqual(res.body.rows.map((r) => [r.date, r.amount, r.flags]), [
+      assert.deepEqual(res.body.rows.map((r: { date: string; amount: string; flags: string[] }) => [r.date, r.amount, r.flags]), [
         ['2021-03-10', '12.34', ['possible_duplicate']],
       ]);
     });

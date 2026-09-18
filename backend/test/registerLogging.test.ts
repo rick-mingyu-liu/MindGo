@@ -1,9 +1,9 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const util = require('node:util');
-const axios = require('axios');
-const db = require('../db/connection');
-const config = require('../config');
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import util from 'node:util';
+import axios from 'axios';
+import db = require('../db/connection');
+import config = require('../config');
 
 /**
  * A regression guard for item 16: registration must not write the
@@ -25,6 +25,9 @@ const emailServicePath = require.resolve('../services/emailService');
 const authControllerPath = require.resolve('../controllers/authController');
 
 function loadControllerWithStubbedEmail() {
+  // A stub Module: only `exports` (the three functions authController
+  // destructures out of emailService at module load) is ever read back out of
+  // the cache here, so the rest of NodeJS.Module's shape is unused.
   require.cache[emailServicePath] = {
     id: emailServicePath,
     filename: emailServicePath,
@@ -34,23 +37,33 @@ function loadControllerWithStubbedEmail() {
       sendWeeklyReport: async () => {},
       generateWeeklyReport: async () => ({ text: '', html: '' }),
     },
-  };
+  } as NodeJS.Module;
   delete require.cache[authControllerPath];
   return require(authControllerPath);
 }
 
-function fakeRes() {
-  const res = { statusCode: null, body: null };
-  res.status = (code) => { res.statusCode = code; return res; };
-  res.json = (payload) => { res.body = payload; return res; };
+interface FakeRes {
+  statusCode: number | null;
+  body: unknown;
+  status(code: number): FakeRes;
+  json(payload: unknown): FakeRes;
+}
+
+function fakeRes(): FakeRes {
+  const res: FakeRes = {
+    statusCode: null,
+    body: null,
+    status(code) { res.statusCode = code; return res; },
+    json(payload) { res.body = payload; return res; },
+  };
   return res;
 }
 
 describe('POST /auth/register logging', () => {
   const EMAIL = 'john.doe@example.com';
-  let printed;
-  let insertedToken;
-  let savedKey;
+  let printed: unknown[][];
+  let insertedToken: string | null;
+  let savedKey: string | undefined;
 
   beforeEach(() => {
     printed = [];
@@ -65,17 +78,21 @@ describe('POST /auth/register logging', () => {
     savedKey = config.apiKeys.mailboxLayer;
     config.apiKeys.mailboxLayer = 'test-key-not-used-the-http-call-is-mocked';
 
-    mock.method(console, 'log', (...args) => printed.push(args));
-    mock.method(console, 'error', (...args) => printed.push(args));
+    mock.method(console, 'log', (...args: unknown[]) => printed.push(args));
+    mock.method(console, 'error', (...args: unknown[]) => printed.push(args));
 
     // MailboxLayer says the address is fine.
     mock.method(axios, 'get', async () => ({
       data: { format_valid: true, disposable: false, mx_found: true, smtp_check: true },
     }));
 
-    mock.method(db, 'query', async (sql, params) => {
+    mock.method(db, 'query', async (sql: string, params: unknown[]) => {
       if (/^SELECT/i.test(sql.trim())) return { rows: [] };          // no existing user
-      insertedToken = params[4];                                      // the token, as stored
+      // params[4] is the verification token authController.register generates
+      // via crypto.randomBytes(32).toString('hex') and binds fifth in the
+      // INSERT — always a string on this branch; db.query's mocked signature
+      // only knows params as unknown[].
+      insertedToken = params[4] as string;                             // the token, as stored
       return {
         rows: [{
           id: 7,
@@ -107,7 +124,7 @@ describe('POST /auth/register logging', () => {
     // argument as "[object Object]" under String(), so an address logged inside
     // an object would pass every assertion below while sitting in the log. A
     // mutation that did exactly that went undetected until this was fixed.
-    const render = (arg) => (typeof arg === 'string' ? arg : util.inspect(arg, { depth: 6 }));
+    const render = (arg: unknown): string => (typeof arg === 'string' ? arg : util.inspect(arg, { depth: 6 }));
     return { res, output: printed.map((a) => a.map(render).join(' ')).join('\n') };
   }
 
@@ -121,7 +138,7 @@ describe('POST /auth/register logging', () => {
 
   test('does not log the verification token', async () => {
     const { output } = await register();
-    assert.ok(!output.includes(insertedToken), 'the verification token was written to the log');
+    assert.ok(!output.includes(insertedToken!), 'the verification token was written to the log');
   });
 
   test('does not log any 64-character hex string', async () => {
@@ -163,7 +180,7 @@ describe('POST /auth/register logging', () => {
 
     const { output } = await register();
 
-    assert.ok(!output.includes(insertedToken), 'the verification token was written to the log');
+    assert.ok(!output.includes(insertedToken!), 'the verification token was written to the log');
     assert.ok(!output.includes(EMAIL), 'the raw address was written to the log');
     assert.match(output, /user 7/);
   });
