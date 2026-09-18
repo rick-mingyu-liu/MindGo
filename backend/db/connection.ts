@@ -50,12 +50,13 @@ const connectionOptions: PoolConfig = config.database.url
       password: config.database.password,
       host: config.database.host,
       // config.database.port is the raw DB_PORT string (or undefined).
-      // PoolConfig types port as a number, but pg's own ConnectionParameters
-      // re-parses it with parseInt(val('port', config), 10) regardless of what
-      // we hand it, and `val()` falls back through PGPORT/the default on any
-      // falsy value — NaN included — the same way it falls back on undefined.
-      // So converting here changes nothing pg does with it.
-      port: Number(config.database.port),
+      // PoolConfig types port as a number, but pg re-parses it itself with
+      // parseInt(val('port', config), 10), so the string is handed over
+      // exactly as before rather than pre-converted: Number() would turn a
+      // malformed DB_PORT (falsy as NaN) into a silent fallback to the
+      // default port instead of the loud connection failure a bad port
+      // produces today.
+      port: config.database.port as unknown as number,
       database: config.database.database,
     };
 

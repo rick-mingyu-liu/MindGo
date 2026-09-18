@@ -197,15 +197,9 @@ function coopMonth(monthStart: string, indexInTerm: number, rand: () => number):
  * Pure: no database, no clock of its own, no randomness that is not seeded.
  */
 function buildDemoData(now: Date = new Date()): DemoData {
-  const today = toDay(now);
-  if (today === null) {
-    // toDay only returns null for an invalid Date. The original JS crashed on
-    // the `today.split('-')` a few lines below this (`null.split is not a
-    // function`) the moment `now` was one; this is that same crash, made
-    // explicit, before `today` is treated as a string for the rest of the
-    // function.
-    throw new TypeError(`buildDemoData: not a valid date: ${String(now)}`);
-  }
+  // toDay only returns null for an invalid Date; every caller here passes a
+  // genuine one, and the default parameter is `new Date()`.
+  const today = toDay(now) as string;
   const terms: { id: string; offset: number }[] = [];
   let term = currentTerm(now);
   for (let i = 0; i < TERMS_OF_HISTORY; i++) {
