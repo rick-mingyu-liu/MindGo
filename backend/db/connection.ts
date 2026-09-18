@@ -1,5 +1,5 @@
-const { Pool, types } = require('pg');
-const config = require('../config');
+import { Pool, types, type QueryResult, type QueryResultRow, type PoolConfig } from 'pg';
+import config = require('../config');
 
 // A DATE column is a calendar day: no time, no zone. node-pg turns it into a
 // JS Date at local midnight, and res.json() then serialises that through
@@ -19,11 +19,11 @@ const config = require('../config');
 //
 // Handing back the raw 'YYYY-MM-DD' makes the wire format identical on every
 // host, and leaves the value the only thing it ever was: a day.
-types.setTypeParser(types.builtins.DATE, (value) => value);
+types.setTypeParser(types.builtins.DATE, (value: string) => value);
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
-let pool = null;
-let inactivityTimer = null;
+let pool: Pool | null = null;
+let inactivityTimer: NodeJS.Timeout | null = null;
 
 // Pin the schema explicitly. Every query in this codebase names tables
 // unqualified, which only resolves if search_path includes public. Neon's
@@ -39,7 +39,7 @@ const baseOptions = {
   idleTimeoutMillis: 30000, // 30 seconds
 };
 
-const connectionOptions = config.database.url
+const connectionOptions: PoolConfig = config.database.url
   ? {
       ...baseOptions,
       connectionString: config.database.url,
@@ -49,11 +49,17 @@ const connectionOptions = config.database.url
       user: config.database.user,
       password: config.database.password,
       host: config.database.host,
-      port: config.database.port,
+      // config.database.port is the raw DB_PORT string (or undefined).
+      // PoolConfig types port as a number, but pg's own ConnectionParameters
+      // re-parses it with parseInt(val('port', config), 10) regardless of what
+      // we hand it, and `val()` falls back through PGPORT/the default on any
+      // falsy value — NaN included — the same way it falls back on undefined.
+      // So converting here changes nothing pg does with it.
+      port: Number(config.database.port),
       database: config.database.database,
     };
 
-function createPool() {
+function createPool(): Pool {
   const newPool = new Pool(connectionOptions);
   newPool.on('connect', (client) => {
     // Queued before the client is handed out, so it runs ahead of any real
@@ -71,10 +77,11 @@ function createPool() {
   return newPool;
 }
 
-function getPool() {
+function getPool(): Pool {
   if (!pool) {
     pool = createPool();
   }
+  const activePool: Pool = pool;
   // Reset inactivity timer
   if (inactivityTimer) clearTimeout(inactivityTimer);
   inactivityTimer = setTimeout(() => {
@@ -89,15 +96,15 @@ function getPool() {
   // script or test that finishes its queries should exit immediately, not hang
   // for the remaining five minutes.
   inactivityTimer.unref();
-  return pool;
+  return activePool;
 }
 
-async function query(text, params) {
+async function query<R extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[]
+): Promise<QueryResult<R>> {
   const activePool = getPool();
-  return activePool.query(text, params);
+  return activePool.query<R>(text, params);
 }
 
-module.exports = {
-  query,
-  getPool
-}; 
+export { query, getPool };
