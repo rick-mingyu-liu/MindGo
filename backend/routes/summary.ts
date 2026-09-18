@@ -1,8 +1,8 @@
-const express = require('express');
-const { query } = require('express-validator');
-const summaryController = require('../controllers/summaryController');
-const auth = require('../middleware/auth');
-const { isTermId, isYearId } = require('../utils/terms');
+import express from 'express';
+import { query } from 'express-validator';
+import summaryController = require('../controllers/summaryController');
+import auth = require('../middleware/auth');
+import { isTermId, isYearId } from '../utils/terms';
 
 const router = express.Router();
 
@@ -36,7 +36,7 @@ const rollingValidation = [
   // Hung off `months` only because a validator has to hang off something; the
   // check is about the request as a whole.
   query('months').custom((_value, { req }) => {
-    const given = ['term', 'year', 'months'].filter((k) => req.query[k] !== undefined);
+    const given = ['term', 'year', 'months'].filter((k) => req.query?.[k] !== undefined);
     if (given.length > 1) {
       throw new Error(`pass one of term, year or months, not ${given.join(' and ')}`);
     }
@@ -49,4 +49,4 @@ router.get('/monthly', summaryController.getMonthlySummary);
 router.get('/rolling', rollingValidation, summaryController.getRollingSummary);
 router.get('/trends', summaryController.getSpendingTrends);
 
-module.exports = router; 
+export = router;

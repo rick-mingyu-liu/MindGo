@@ -1,7 +1,7 @@
-const express = require('express');
-const { body } = require('express-validator');
-const aiController = require('../controllers/aiController');
-const auth = require('../middleware/auth');
+import express, { Request, Response, NextFunction } from 'express';
+import { body } from 'express-validator';
+import aiController = require('../controllers/aiController');
+import auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,10 +18,10 @@ const planValidation = [
   body('timeline').optional().notEmpty().withMessage('Timeline cannot be empty if provided'),
   body('additionalContext').optional().isString().withMessage('Additional context must be a string'),
   // Custom validation to ensure either prompt or financialGoal is provided
-  (req, res, next) => {
+  (req: Request, res: Response, next: NextFunction) => {
     if (!req.body.prompt && !req.body.financialGoal) {
-      return res.status(400).json({ 
-        error: 'Either prompt or financialGoal is required' 
+      return res.status(400).json({
+        error: 'Either prompt or financialGoal is required'
       });
     }
     next();
@@ -42,4 +42,4 @@ router.get('/plans/:id', aiController.getPlan);
 router.post('/budget-recommendations', aiController.generateBudgetRecommendations);
 router.post('/investment-advice', investmentAdviceValidation, aiController.generateInvestmentAdvice);
 
-module.exports = router; 
+export = router;

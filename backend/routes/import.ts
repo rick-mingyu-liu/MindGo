@@ -1,10 +1,10 @@
-const express = require('express');
-const { body } = require('express-validator');
-const config = require('../config');
-const auth = require('../middleware/auth');
-const { importLimiter } = require('../middleware/rateLimiter');
-const importController = require('../controllers/importController');
-const { parseDate } = require('../services/import/tokens');
+import express from 'express';
+import { body } from 'express-validator';
+import config = require('../config');
+import auth = require('../middleware/auth');
+import { importLimiter } from '../middleware/rateLimiter';
+import importController = require('../controllers/importController');
+import { parseDate } from '../services/import/tokens';
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ const router = express.Router();
 router.use(auth);
 
 const { maxLines, maxLineLength } = config.import;
-const coordinate = (field) => body(`lines.*.box.${field}`)
+const coordinate = (field: string) => body(`lines.*.box.${field}`)
   .isFloat({ min: -10000, max: 100000 })
   .withMessage(`box.${field} must be a number`);
 
@@ -38,4 +38,4 @@ const parseValidation = [
 // Limiter after auth: it is keyed on the user.
 router.post('/parse', importLimiter, parseValidation, importController.parse);
 
-module.exports = router;
+export = router;

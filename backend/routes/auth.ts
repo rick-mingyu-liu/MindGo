@@ -1,27 +1,27 @@
-const express = require('express');
-const { body } = require('express-validator');
-const authController = require('../controllers/authController');
-const auth = require('../middleware/auth');
-const config = require('../config');
-const { authLimiter } = require('../middleware/rateLimiter');
+import express from 'express';
+import { body } from 'express-validator';
+import authController = require('../controllers/authController');
+import auth = require('../middleware/auth');
+import config = require('../config');
+import { authLimiter } from '../middleware/rateLimiter';
 
 const router = express.Router();
 
 // Enhanced email validation function
-const validateEmail = (email) => {
+const validateEmail = (email: string) => {
   // Basic format check
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(email)) {
     return false;
   }
-  
+
   // Additional checks
   if (email.length > config.validation.emailMaxLength) return false; // RFC 5321 limit
-  if (email.split('@')[0].length > 64) return false; // Local part limit
+  if ((email.split('@')[0] ?? '').length > 64) return false; // Local part limit
   if (email.includes('..')) return false; // No consecutive dots
   if (email.startsWith('.') || email.endsWith('.')) return false; // No leading/trailing dots
   if (email.includes('@.') || email.includes('.@')) return false; // No @ next to dots
-  
+
   return true;
 };
 
@@ -87,4 +87,4 @@ router.put('/profile', auth, updateProfileValidation, authController.updateProfi
 router.post('/test-email', authLimiter, auth, authController.sendTestEmail);
 router.put('/notifications', auth, authController.updateNotificationSettings);
 
-module.exports = router; 
+export = router;

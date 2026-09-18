@@ -1,8 +1,8 @@
-const express = require('express');
-const { body, query } = require('express-validator');
-const config = require('../config');
-const transactionController = require('../controllers/transactionController');
-const auth = require('../middleware/auth');
+import express from 'express';
+import { body, query } from 'express-validator';
+import config = require('../config');
+import transactionController = require('../controllers/transactionController');
+import auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -75,4 +75,4 @@ router.put('/:id', transactionValidation, transactionController.updateTransactio
 router.delete('/:id', transactionController.deleteTransaction);
 
 
-module.exports = router; 
+export = router;
