@@ -60,6 +60,15 @@ Client (frontend / axios)
         │  calls down into  →  services/cleanupService.ts
 ```
 
+Two of those arrows carry types. `auth.ts` sets `req.user`, and
+[types/express.d.ts](types/express.d.ts) merges `AuthUser` into Express's own
+`Request`, so every controller reads `req.user.userId` as a `number` without a
+cast or a guard. Controllers name the row shape where they query —
+`query<TransactionRow>(sql, params)` — because `query()` is generic but cannot
+infer a shape from a SQL string; the interfaces are one per table in
+[types/db.ts](types/db.ts). `types/` holds those two and
+[types/import.ts](types/import.ts), the screenshot parser's vocabulary.
+
 The global middleware runs in the order drawn, but two things sit outside it:
 `app.set('trust proxy', 1)` comes first — the rate limiters read
 `X-Forwarded-For`, and Render terminates TLS in front of the app — and

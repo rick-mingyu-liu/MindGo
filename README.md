@@ -125,7 +125,7 @@ The recorded OCR output is replayed through the parser in CI, so a parser change
 ```bash
 git clone <repository-url>
 cd MindGo
-(cd backend && npm install)
+(cd backend && npm install)   # also builds: `prepare` runs tsc into dist/
 (cd frontend && npm install)
 ```
 
@@ -218,12 +218,17 @@ backend/                        Express + PostgreSQL API (TypeScript)
 │   │   └── parse.ts            confidence, flags, output
 │   ├── schedulerService.ts     weekly email (cron, Toronto time) + cleanup intervals
 │   └── …                       email, AI, exchange rates, stock data
+├── types/
+│   ├── db.ts                   one interface per table — edit with schema.sql
+│   ├── express.d.ts            req.user, merged into Express’s own Request
+│   └── import.ts               the screenshot parser’s vocabulary
 ├── utils/
 │   ├── terms.ts                the term calendar — one definition
 │   ├── dates.ts                calendar-day helpers
 │   ├── logger.ts               info/warn/debug are dev-only; error/audit always print
 │   └── privacy.ts              maskEmail()
-└── test/                       30 files, 508 tests, node --test
+├── test/                       30 files, 508 tests, node --test
+└── dist/                       tsc output (CommonJS) — gitignored; what production runs
 
 frontend/                       Next.js 14, Pages Router, TypeScript
 ├── pages/                      one file per screen (import.tsx, settings.tsx, …)
@@ -269,7 +274,7 @@ docs/superpowers/               design spec and implementation plan for screensh
 
 ```bash
 # backend
-npm run dev              # tsx watch
+npm run dev              # tsx watch app.ts
 npm start                # production
 npm run build            # tsc → dist/
 npm test                 # builds, then node --test
