@@ -39,8 +39,9 @@
  * asserts the seed never invents one.
  */
 
-const { currentTerm, previousTerm, nextTerm, boundsOf, monthsOf, labelOf } = require('../utils/terms');
-const { toDay } = require('../utils/dates');
+import { currentTerm, previousTerm, nextTerm, boundsOf, monthsOf, labelOf } from '../utils/terms';
+import { toDay } from '../utils/dates';
+import type { TransactionType } from '../types/db';
 
 const DEMO_EMAIL = 'john.doe@example.com';
 
@@ -57,11 +58,49 @@ const CATEGORIES = {
 /** How many terms of history to generate — five is 20 months, so `year=previous` is full. */
 const TERMS_OF_HISTORY = 5;
 
+/** One row of the demo transaction list before `currency`/`term` are attached. */
+interface DemoTransactionInput {
+  date: string;
+  amount: number;
+  description: string;
+  category: string;
+  type: TransactionType;
+}
+
+/** A demo transaction, as inserted by `demoAccountService` — narrower than `TransactionRow`, which is a read shape. */
+interface DemoTransaction extends DemoTransactionInput {
+  currency: string;
+  term: string;
+}
+
+/** A demo savings goal, as inserted by `demoAccountService`. */
+interface DemoGoal {
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  target_date: string;
+  description: string;
+}
+
+/** A demo watchlist entry, as inserted by `demoAccountService`. */
+interface DemoWatchlistEntry {
+  symbol: string;
+  company_name: string;
+}
+
+interface DemoData {
+  email: string;
+  transactions: DemoTransaction[];
+  goals: DemoGoal[];
+  watchlist: DemoWatchlistEntry[];
+  terms: string[];
+}
+
 /**
  * A small deterministic generator. Keyed on a string so the same term and
  * category always produce the same jitter, and re-seeding is idempotent.
  */
-function seededRandom(key) {
+function seededRandom(key: string): () => number {
   let h = 2166136261;
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i);
@@ -75,12 +114,15 @@ function seededRandom(key) {
 }
 
 /** `amount` jittered by up to `spread`, rounded to cents. */
-const vary = (rand, amount, spread) =>
+const vary = (rand: () => number, amount: number, spread: number): number =>
   Math.round((amount + (rand() * 2 - 1) * spread) * 100) / 100;
 
 /** The `day`th day of the month beginning `monthStart`, clamped to the month. */
-function dayIn(monthStart, day) {
-  const [year, month] = monthStart.split('-').map(Number);
+function dayIn(monthStart: string, day: number): string {
+  // monthsOf() always hands this a 'YYYY-MM-01' string, so the split always
+  // has exactly 2 numeric parts; noUncheckedIndexedAccess would otherwise
+  // type each as `number | undefined` from the generic `.map(Number)` array.
+  const [year, month] = monthStart.split('-').map(Number) as [number, number];
   const lastDay = new Date(year, month, 0).getDate();
   return `${monthStart.slice(0, 8)}${String(Math.min(day, lastDay)).padStart(2, '0')}`;
 }
@@ -91,13 +133,14 @@ function dayIn(monthStart, day) {
  * only appears when a visitor clicks Last term. That is the more interesting
  * order to discover them in.
  */
-const isCoopTerm = (offsetFromCurrent) => offsetFromCurrent % 2 === 0;
+const isCoopTerm = (offsetFromCurrent: number): boolean => offsetFromCurrent % 2 === 0;
 
 /** One month of a study term: tuition and rent against a part-time income. */
-function studyMonth(monthStart, indexInTerm, rand) {
-  const rows = [];
-  const add = (day, amount, description, category, type) =>
+function studyMonth(monthStart: string, indexInTerm: number, rand: () => number): DemoTransactionInput[] {
+  const rows: DemoTransactionInput[] = [];
+  const add = (day: number, amount: number, description: string, category: string, type: TransactionType): void => {
     rows.push({ date: dayIn(monthStart, day), amount, description, category, type });
+  };
 
   if (indexInTerm === 0) {
     add(5, 4380.00, 'Tuition — term fees', 'Education', 'expense');
@@ -121,10 +164,11 @@ function studyMonth(monthStart, indexInTerm, rand) {
 }
 
 /** One month of a co-op term: a salary, a city rent, and room to save. */
-function coopMonth(monthStart, indexInTerm, rand) {
-  const rows = [];
-  const add = (day, amount, description, category, type) =>
+function coopMonth(monthStart: string, indexInTerm: number, rand: () => number): DemoTransactionInput[] {
+  const rows: DemoTransactionInput[] = [];
+  const add = (day: number, amount: number, description: string, category: string, type: TransactionType): void => {
     rows.push({ date: dayIn(monthStart, day), amount, description, category, type });
+  };
 
   add(15, vary(rand, 2010, 60), 'Co-op paycheque', 'Salary', 'income');
   add(30, vary(rand, 2010, 60), 'Co-op paycheque', 'Salary', 'income');
@@ -152,16 +196,24 @@ function coopMonth(monthStart, indexInTerm, rand) {
  * The demo account's whole dataset, as of `now`.
  * Pure: no database, no clock of its own, no randomness that is not seeded.
  */
-function buildDemoData(now = new Date()) {
+function buildDemoData(now: Date = new Date()): DemoData {
   const today = toDay(now);
-  const terms = [];
+  if (today === null) {
+    // toDay only returns null for an invalid Date. The original JS crashed on
+    // the `today.split('-')` a few lines below this (`null.split is not a
+    // function`) the moment `now` was one; this is that same crash, made
+    // explicit, before `today` is treated as a string for the rest of the
+    // function.
+    throw new TypeError(`buildDemoData: not a valid date: ${String(now)}`);
+  }
+  const terms: { id: string; offset: number }[] = [];
   let term = currentTerm(now);
   for (let i = 0; i < TERMS_OF_HISTORY; i++) {
     terms.unshift({ id: term, offset: i });
     term = previousTerm(term);
   }
 
-  const transactions = [];
+  const transactions: DemoTransaction[] = [];
   for (const { id, offset } of terms) {
     const coop = isCoopTerm(offset);
     monthsOf(id).forEach((monthStart, indexInTerm) => {
@@ -182,8 +234,11 @@ function buildDemoData(now = new Date()) {
   // Goals are dated forward from today, so none of them opens as Overdue —
   // which is exactly how the old seed greeted every visitor.
   const nextTermStart = boundsOf(currentTerm(now)).end;
-  const [y, m, d] = today.split('-').map(Number);
-  const plus = (months) => {
+  // toDay guarantees 'YYYY-MM-DD', so the split always has exactly 3 numeric
+  // parts; noUncheckedIndexedAccess would otherwise type each as
+  // `number | undefined` from the generic `.map(Number)` array.
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+  const plus = (months: number): string => {
     const absolute = y * 12 + (m - 1) + months;
     const year = Math.floor(absolute / 12);
     const month = absolute % 12;
@@ -193,7 +248,7 @@ function buildDemoData(now = new Date()) {
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   };
 
-  const goals = [
+  const goals: DemoGoal[] = [
     {
       name: `Tuition for ${labelOf(nextTerm(currentTerm(now)))}`,
       target_amount: 4800.00,
@@ -217,7 +272,7 @@ function buildDemoData(now = new Date()) {
     },
   ];
 
-  const watchlist = [
+  const watchlist: DemoWatchlistEntry[] = [
     { symbol: 'AAPL', company_name: 'Apple Inc.' },
     { symbol: 'MSFT', company_name: 'Microsoft Corporation' },
     { symbol: 'NVDA', company_name: 'NVIDIA Corporation' },
@@ -228,4 +283,4 @@ function buildDemoData(now = new Date()) {
   return { email: DEMO_EMAIL, transactions, goals, watchlist, terms: terms.map((t) => t.id) };
 }
 
-module.exports = { buildDemoData, CATEGORIES, DEMO_EMAIL, TERMS_OF_HISTORY, isCoopTerm };
+export { buildDemoData, CATEGORIES, DEMO_EMAIL, TERMS_OF_HISTORY, isCoopTerm };
