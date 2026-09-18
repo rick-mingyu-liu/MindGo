@@ -8,7 +8,7 @@ import config = require('./index');
  * after a user hits it. Without database credentials nothing that touches a
  * table responds. Both are worth a loud exit at boot instead.
  *
- * Kept out of config/index.js and called explicitly from app.js so that scripts
+ * Kept out of config/index.ts and called explicitly from app.ts so that scripts
  * importing `config` for a single value (docs generation, migrations) are not
  * killed by an unrelated missing key.
  */

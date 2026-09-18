@@ -6,7 +6,7 @@ import type { ScheduledTask } from 'node-cron';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
- * cleanupService.test.js.
+ * cleanupService.test.ts.
  *
  * Every case here is a bug that was actually present. The scheduler is the part
  * of this app nobody watches: it has no request to fail, no user to complain,
@@ -109,7 +109,7 @@ describe('scheduleInterval, on a real timer', () => {
   });
 
   test('does not hold the event loop open', () => {
-    // db/connection.js's inactivity timer had this exact problem: it kept the
+    // db/connection.ts's inactivity timer had this exact problem: it kept the
     // test runner alive with no output at all until it was unref'd.
     mock.method(logger, 'info', () => {});
     scheduler.jobs.clear();

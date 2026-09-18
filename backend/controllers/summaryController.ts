@@ -185,7 +185,7 @@ const summaryController = {
    * month of a co-op term, which is when someone sets a budget, three quarters
    * of a rolling window is the previous term's money.
    *
-   * Term boundaries come from `utils/terms.js` and are never computed here:
+   * Term boundaries come from `utils/terms.ts` and are never computed here:
    * the retention job will delete whole terms using the same module, and a view
    * and a deletion that disagree about where a term starts would fail silently.
    */

@@ -7,7 +7,7 @@ import { generateWeeklyReport } from '../services/emailService';
  * `generateWeeklyReport` returns `{ text, html }` on every path but one: a
  * user with no transactions in the past 7 days got back a bare string
  * instead. Both callers destructure `report.text` / `report.html`
- * unconditionally (controllers/authController.js's `/auth/test-email` and
+ * unconditionally (controllers/authController.ts's `/auth/test-email` and
  * schedulerService's Sunday job), so that user's email went out with
  * `text: undefined, html: undefined` — the "No transactions found" message
  * written for exactly this case has never reached anyone.

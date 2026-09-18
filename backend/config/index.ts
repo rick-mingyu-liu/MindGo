@@ -18,7 +18,7 @@ function intFromEnv(name: string, fallback: number): number {
  * Every environment variable this backend reads is declared in this file, and
  * only in this file.
  *
- * That one rule is what makes the rest possible: config/validate.js can fail the
+ * That one rule is what makes the rest possible: config/validate.ts can fail the
  * boot loudly when something required is missing, and `.env.example` can be a
  * complete list rather than a hopeful one. A `process.env` read from a
  * controller or service re-opens both holes — the variable becomes invisible to
@@ -36,7 +36,7 @@ const config = {
 
   // Database. `url` wins when set; the discrete parts are the fallback for
   // local setups that don't use a connection string. Consumed by
-  // db/connection.js, which owns the pool itself.
+  // db/connection.ts, which owns the pool itself.
   database: {
     url: process.env.DATABASE_URL,
     user: process.env.DB_USER,
@@ -45,7 +45,7 @@ const config = {
     port: process.env.DB_PORT,
     database: process.env.DB_DATABASE,
     // Queries name tables unqualified, so search_path has to include this.
-    // See the comment in db/connection.js for why it is set per connection.
+    // See the comment in db/connection.ts for why it is set per connection.
     schema: process.env.DB_SCHEMA || 'public',
   },
 
@@ -78,7 +78,7 @@ const config = {
   },
 
   // Rate limiting. Defaults are unchanged from when these were hardcoded in
-  // middleware/rateLimiter.js; they are here so they can be tuned per
+  // middleware/rateLimiter.ts; they are here so they can be tuned per
   // environment. `apiMax` in particular is worth watching: the dashboard fires
   // roughly five requests per load, so 100 per 15 minutes is about twenty page
   // loads, and everyone behind one NAT shares the bucket.
@@ -143,7 +143,7 @@ const config = {
   },
 
   validation: {
-    // Raised from the 6 that routes/auth.js used to enforce. This only gates
+    // Raised from the 6 that routes/auth.ts used to enforce. This only gates
     // registration — login checks the hash, and there is no password-change
     // endpoint — so existing shorter passwords keep working.
     passwordMinLength: 8,

@@ -51,7 +51,7 @@ class SchedulerService {
    * say.
    *
    * unref() so a retention timer never keeps the process alive on its own. The
-   * pool's inactivity timer in db/connection.js had exactly this problem, where
+   * pool's inactivity timer in db/connection.ts had exactly this problem, where
    * it silently held the test runner open.
    */
   scheduleInterval(name: string, intervalMs: number, task: () => Promise<number>): void {
@@ -81,7 +81,7 @@ class SchedulerService {
   // Schedule weekly report emails
   scheduleWeeklyReports(): void {
     // node-cron must be 4.6 or later: 4.2 computed the next Sunday as 2034 and
-    // slept until then (test/schedulerService.test.js).
+    // slept until then (test/schedulerService.test.ts).
     const job = cron.schedule(config.cron.weeklyReports, async () => {
       try {
         logger.info('Starting weekly report generation...');

@@ -34,7 +34,7 @@ import type { PoolClient } from 'pg';
 const DEMO_EMAIL = 'john.doe@example.com';
 // The credential every surface advertises — the login page, the README and the
 // line `db:seed` prints — and the hash it has to verify against. Both are
-// exported, and `test/demoAccountService.test.js` pins them to each other with
+// exported, and `test/demoAccountService.test.ts` pins them to each other with
 // a real bcrypt.compare.
 //
 // That test exists because the pair silently disagreed for the entire life of

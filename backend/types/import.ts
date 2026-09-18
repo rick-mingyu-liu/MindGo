@@ -3,7 +3,7 @@
  * `groupRows` turns it into, and what a parsed draft transaction looks like.
  *
  * Mirrors three sources that already agree: the JSDoc in
- * `services/import/*.js`, `frontend/lib/ocr/types.ts` (`OcrLine`), and
+ * `services/import/*.ts`, `frontend/lib/ocr/types.ts` (`OcrLine`), and
  * `frontend/lib/import/review.ts` (`DraftFlag`, `DraftRow`, `ParseResponse`).
  * Amounts stay two-decimal strings everywhere here, never numbers, exactly as
  * the parser produces them today.
@@ -25,7 +25,7 @@ export interface OcrLine {
 }
 
 /**
- * One visual row of a screenshot, as `groupRows` (services/import/rows.js)
+ * One visual row of a screenshot, as `groupRows` (services/import/rows.ts)
  * builds it from lines whose boxes overlap. `lines` is reading order: top
  * line first, then left to right within a line.
  */
@@ -90,7 +90,7 @@ export interface ParserDraft {
   boxes: Box[];
 }
 
-/** A row as `parseOcr` (services/import/parse.js) returns it in `ParseResult.rows`. */
+/** A row as `parseOcr` (services/import/parse.ts) returns it in `ParseResult.rows`. */
 export interface Draft {
   date: string | null;
   amount: string;

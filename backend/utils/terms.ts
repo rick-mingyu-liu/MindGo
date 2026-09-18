@@ -27,8 +27,8 @@
  * local midnight on May 1, which is `2026-04-30T16:00Z`, so `toISOString()`
  * yields **`2026-04-30`**. It happens not to bite because the server runs UTC.
  * Everything here is integer arithmetic formatted into a string, so the output
- * does not depend on the process timezone at all — `test/terms.test.js` is run
- * under three timezones to hold that.
+ * does not depend on the process timezone at all — `test/terms.test.ts` sweeps
+ * four timezones in-process to hold that.
  */
 
 interface Term {

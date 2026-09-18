@@ -59,7 +59,7 @@ describe('email validation', () => {
     });
 
     test('matches the domain case-insensitively', () => {
-      // normalizeEmail() in routes/auth.js lowercases today, so this is
+      // normalizeEmail() in routes/auth.ts lowercases today, so this is
       // defence against that changing rather than a live path.
       assert.equal(validateAgainstDomainList('a@MailInator.COM').valid, false);
     });

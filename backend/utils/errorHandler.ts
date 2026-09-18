@@ -4,7 +4,7 @@ import config = require('../config');
 
 /**
  * Only two of these are mounted: globalErrorHandler and notFoundHandler, both
- * in app.js. The rest are the helpers those two call. Controllers build their
+ * in app.ts. The rest are the helpers those two call. Controllers build their
  * own responses rather than going through this class.
  */
 class ErrorHandler {

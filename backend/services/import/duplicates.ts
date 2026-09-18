@@ -27,7 +27,7 @@ export async function flagDuplicates(userId: number, rows: Draft[]): Promise<Dra
     'SELECT date, amount, currency FROM transactions WHERE user_id = $1 AND date = ANY($2::date[])',
     [userId, days]
   ) as { rows: ExistingTransaction[] };
-  // DATE arrives as 'YYYY-MM-DD' (db/connection.js) and DECIMAL(10,2) as a
+  // DATE arrives as 'YYYY-MM-DD' (db/connection.ts) and DECIMAL(10,2) as a
   // two-place string, so both compare exactly with the draft's strings.
   const seen = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.currency}`));
   for (const row of rows) {

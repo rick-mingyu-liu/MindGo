@@ -17,7 +17,7 @@ class AiUnavailableError extends Error {
  * The one method this module calls on an OpenAI client, declared
  * structurally rather than as `OpenAI` itself. A real `OpenAI` instance has
  * far more surface than this and still satisfies it; so does the fake client
- * `test/aiUnavailable.test.js` swaps in
+ * `test/aiUnavailable.test.ts` swaps in
  * (`{ chat: { completions: { create: async () => { throw failWith; } } } }`).
  * Typing `openai` as `OpenAI | null` would reject that fake once the test
  * itself is converted to TypeScript (step 8) even though it works fine at
@@ -73,7 +73,7 @@ interface FinancialData {
 }
 
 class AIPlanner {
-  // Public and writable, not readonly: test/aiUnavailable.test.js reassigns
+  // Public and writable, not readonly: test/aiUnavailable.test.ts reassigns
   // this directly in beforeEach.
   openai: ChatCompletionsClient | null;
 
@@ -87,7 +87,7 @@ class AIPlanner {
    * It cannot be built in the constructor: this module is exported as an
    * instance, so the constructor runs at require time, and the SDK throws when
    * OPENAI_API_KEY is absent. That turned a missing optional key into a crash
-   * before app.js could even listen — the whole API, not just /ai — and it made
+   * before app.ts could even listen — the whole API, not just /ai — and it made
    * the "OpenAI API key not configured" guard in generatePlan unreachable.
    * Building it lazily lets that guard do its job.
    */
@@ -191,7 +191,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
 
       // Duck-typed rather than narrowed to Error/AxiosError: the real failure
       // this exists for is OpenAI's SDK error, but
-      // test/aiUnavailable.test.js throws a plain Error with .status/.code
+      // test/aiUnavailable.test.ts throws a plain Error with .status/.code
       // bolted on (Object.assign(new Error(...), { status, code })), which is
       // exactly what this reads and nothing more.
       const err = error as { status?: unknown; code?: unknown; message: string };
