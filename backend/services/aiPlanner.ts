@@ -49,8 +49,15 @@ interface FormData {
 
 interface GoalSummary {
   name: string;
-  current: number;
-  target: number;
+  // savings_goals.current_amount/target_amount are DECIMAL columns and
+  // arrive as strings (current_amount is nullable -- no NOT NULL, just a
+  // DEFAULT 0 -- so its type carries that too; target_amount is NOT NULL).
+  // This interface only ever interpolates them into a template literal
+  // (below), so keeping them string here is what keeps '12.50' from becoming
+  // '12.5' -- parsing to a number would compile clean but silently reformat
+  // every plan's dollar amounts.
+  current: string | null;
+  target: string;
   progress: number;
 }
 

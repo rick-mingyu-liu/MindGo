@@ -5,11 +5,19 @@ import aiPlanner = require('../services/aiPlanner');
 import { monthOf, monthSpan } from '../utils/dates';
 import type { TransactionRow, TransactionType, AiPlanRow } from '../types/db';
 
-/** getUserFinancialData's per-goal summary, as aiPlanner's prompt builder reads it. */
+/**
+ * getUserFinancialData's per-goal summary, as aiPlanner's prompt builder
+ * reads it. current/target are DECIMAL columns and arrive as strings
+ * (current_amount is nullable -- no NOT NULL, just a DEFAULT 0 -- so its type
+ * carries that too; target_amount is NOT NULL).
+ * aiPlanner.buildFinancialContext only ever interpolates them into a
+ * template literal, so keeping them string here (matching aiPlanner.ts's own
+ * GoalSummary) is what keeps '12.50' from becoming '12.5'.
+ */
 interface GoalSummary {
   name: string;
-  target: number;
-  current: number;
+  target: string;
+  current: string | null;
   progress: number;
 }
 
@@ -341,15 +349,14 @@ const aiController = {
         goals: goals.rows.map(goal => ({
           name: goal.name,
           // goal.target_amount / current_amount are DECIMAL columns and
-          // arrive as strings (see types/db.ts); this summary is only ever
-          // interpolated into a template literal in aiPlanner's
-          // buildFinancialContext (`$${goal.current} / $${goal.target}`), so
+          // arrive as strings (see types/db.ts); GoalSummary types them
+          // string (not number) for exactly this reason, since this summary
+          // is only ever interpolated into a template literal in aiPlanner's
+          // buildFinancialContext (`$${goal.current} / $${goal.target}`), and
           // passing the string through unchanged is what keeps '12.50' from
-          // becoming '12.5'. Casting rather than parsing to a number is
-          // deliberate: parseFloat would compile clean but silently reformat
-          // every plan's dollar amounts.
-          target: goal.target_amount as unknown as number,
-          current: goal.current_amount as unknown as number,
+          // becoming '12.5'.
+          target: goal.target_amount,
+          current: goal.current_amount,
           // '/' coerces null to 0 and a numeric string to its number exactly
           // like Number() does -- this reproduces that coercion rather than
           // parseFloat's (which differs on trailing non-numeric characters).
