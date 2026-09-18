@@ -1,15 +1,15 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const db = require('../db/connection');
-const logger = require('../utils/logger');
-const bcrypt = require('bcryptjs');
-const {
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import db = require('../db/connection');
+import logger = require('../utils/logger');
+import bcrypt from 'bcryptjs';
+import {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
   DEMO_PASSWORD,
   DEMO_PASSWORD_HASH,
   OWNED_TABLES,
-} = require('../services/demoAccountService');
+} from '../services/demoAccountService';
 
 /**
  * The demo refresh runs unattended on a timer and deletes every row belonging
@@ -23,9 +23,20 @@ const {
  * exposure is bounded — a human is present. On a timer it is not.
  */
 
-let queries;
-let client;
-let demoRows;
+interface Query {
+  text: string;
+  params?: unknown[];
+}
+
+interface FakeClient {
+  query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>;
+  release: () => void;
+  released: boolean;
+}
+
+let queries: Query[];
+let client: FakeClient;
+let demoRows: Array<{ id: number }>;
 
 beforeEach(() => {
   queries = [];
@@ -49,7 +60,7 @@ beforeEach(() => {
 afterEach(() => mock.restoreAll());
 
 const sql = () => queries.map((q) => q.text);
-const ran = (pattern) => sql().some((t) => pattern.test(t));
+const ran = (pattern: RegExp) => sql().some((t) => pattern.test(t));
 
 describe('what it identifies the demo account by', () => {
   test('resolves its target by the is_demo flag, never by an email address', () => {
@@ -100,19 +111,19 @@ describe('when no account is flagged', () => {
     const result = await refreshDemoAccount({ create: true });
     assert.equal(result.status, 'created');
     assert.ok(ran(/INSERT INTO users/));
-    assert.match(sql().find((t) => /INSERT INTO users/.test(t)), /is_demo/);
+    assert.match(sql().find((t) => /INSERT INTO users/.test(t))!, /is_demo/);
   });
 
   test('the scheduled form says so where production can see it', async () => {
     // logger.warn prints nothing in production, and a refresh that silently
     // does nothing forever is exactly what needs saying out loud.
-    const lines = [];
-    mock.method(logger, 'error', (msg) => lines.push(msg));
+    const lines: string[] = [];
+    mock.method(logger, 'error', (msg: string) => lines.push(msg));
     const deleted = await refreshDemoAccountOnSchedule();
     assert.equal(deleted, 0);
     assert.equal(lines.length, 1);
-    assert.match(lines[0], /is_demo/);
-    assert.match(lines[0], /db:seed/, 'did not say how to fix it');
+    assert.match(lines[0]!, /is_demo/);
+    assert.match(lines[0]!, /db:seed/, 'did not say how to fix it');
   });
 });
 

@@ -1,6 +1,6 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const logger = require('../utils/logger');
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import logger = require('../utils/logger');
 
 /**
  * The logger's contract, which until now was only implied by its callers.
@@ -14,15 +14,15 @@ const logger = require('../utils/logger');
  * is worth having in the environment where it actually happens (item 17).
  */
 describe('logger', () => {
-  let out;
-  let saved;
+  let out: unknown[][];
+  let saved: boolean;
 
   beforeEach(() => {
     out = [];
     saved = logger.enabled;
-    mock.method(console, 'log', (...a) => out.push(['log', ...a]));
-    mock.method(console, 'warn', (...a) => out.push(['warn', ...a]));
-    mock.method(console, 'error', (...a) => out.push(['error', ...a]));
+    mock.method(console, 'log', (...a: unknown[]) => out.push(['log', ...a]));
+    mock.method(console, 'warn', (...a: unknown[]) => out.push(['warn', ...a]));
+    mock.method(console, 'error', (...a: unknown[]) => out.push(['error', ...a]));
   });
 
   afterEach(() => {

@@ -1,11 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { buildDemoData, CATEGORIES, isCoopTerm, TERMS_OF_HISTORY } = require('../db/demoData');
-const { currentTerm, previousTerm, boundsOf, termOf } = require('../utils/terms');
-const { monthOf } = require('../utils/dates');
-const { packageRoot } = require('../utils/packageRoot');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { buildDemoData, CATEGORIES, isCoopTerm, TERMS_OF_HISTORY } from '../db/demoData';
+import { currentTerm, previousTerm, boundsOf, termOf } from '../utils/terms';
+import { monthOf } from '../utils/dates';
+import { packageRoot } from '../utils/packageRoot';
 
 /**
  * The demo account is generated relative to today rather than hardcoded, so
@@ -24,7 +24,7 @@ const DAYS = [
   '2028-02-29', '2027-03-31', '2030-07-15', '2026-04-30',
 ];
 
-const at = (day) => buildDemoData(new Date(`${day}T12:00:00`));
+const at = (day: string) => buildDemoData(new Date(`${day}T12:00:00`));
 
 describe('the demo account is evergreen', () => {
   for (const day of DAYS) {
@@ -91,7 +91,7 @@ describe('the demo data is deterministic', () => {
 
 describe('the story the demo tells', () => {
   const data = at('2026-08-29');
-  const net = (termId) => data.transactions
+  const net = (termId: string) => data.transactions
     .filter((t) => termOf(t.date) === termId)
     .reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0);
 
@@ -111,8 +111,8 @@ describe('the story the demo tells', () => {
   });
 
   test('a study term is dominated by tuition and rent', () => {
-    const study = data.terms.find((id, i) => !isCoopTerm(data.terms.length - 1 - i));
-    const byCategory = {};
+    const study = data.terms.find((_id, i) => !isCoopTerm(data.terms.length - 1 - i));
+    const byCategory: Record<string, number> = {};
     for (const t of data.transactions.filter((t) => termOf(t.date) === study && t.type === 'expense')) {
       byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
     }
@@ -123,7 +123,7 @@ describe('the story the demo tells', () => {
   test('the current term is truncated at today, so it reads as live', () => {
     const now = new Date('2026-08-29T12:00:00');
     const { end } = boundsOf(currentTerm(now));
-    const latest = at('2026-08-29').transactions.at(-1).date;
+    const latest = at('2026-08-29').transactions.at(-1)!.date;
     assert.ok(latest < end, 'the current term looks finished');
     assert.ok(latest >= '2026-08-01', `the newest transaction is stale: ${latest}`);
   });
@@ -139,14 +139,14 @@ describe('categories stay in step with the frontend', () => {
    */
   const FRONTEND = path.join(packageRoot(__dirname), '..', 'frontend', 'pages', 'transactions', 'new.tsx');
 
-  function frontendCategories() {
+  function frontendCategories(): { income: string[]; expense: string[] } {
     const source = fs.readFileSync(FRONTEND, 'utf8');
     const block = /export const categories\s*=\s*\{([\s\S]*?)\n\}/.exec(source);
     assert.ok(block, 'could not find the exported categories object — has it moved?');
-    const listOf = (key) => {
-      const list = new RegExp(`${key}:\\s*\\[([\\s\\S]*?)\\]`).exec(block[1]);
+    const listOf = (key: string): string[] => {
+      const list = new RegExp(`${key}:\\s*\\[([\\s\\S]*?)\\]`).exec(block[1]!);
       assert.ok(list, `no ${key} list in the categories object`);
-      return [...list[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+      return [...list[1]!.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
     };
     return { income: listOf('income'), expense: listOf('expense') };
   }
