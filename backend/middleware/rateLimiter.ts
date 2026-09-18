@@ -1,5 +1,5 @@
-const rateLimit = require('express-rate-limit');
-const config = require('../config');
+import rateLimit from 'express-rate-limit';
+import config = require('../config');
 
 // General API rate limiter
 const apiLimiter = rateLimit({
@@ -46,9 +46,4 @@ const importLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-module.exports = {
-  apiLimiter,
-  authLimiter,
-  aiLimiter,
-  importLimiter
-};
+export { apiLimiter, authLimiter, aiLimiter, importLimiter };
