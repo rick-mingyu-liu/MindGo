@@ -1,11 +1,12 @@
-const { test, describe, before, after, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const express = require('express');
-const db = require('../db/connection');
-const {
+import { test, describe, before, after, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Server } from 'node:http';
+import express from 'express';
+import db = require('../db/connection');
+import {
   boundsOf, currentTerm, previousTerm,
   yearBoundsOf, currentYear, previousYear, termsOfYear,
-} = require('../utils/terms');
+} from '../utils/terms';
 
 /**
  * `/summary/rolling?term=` — the term-aligned window.
@@ -24,31 +25,53 @@ const {
 const authPath = require.resolve('../middleware/auth');
 const routerPath = require.resolve('../routes/summary');
 
-let server;
-let baseUrl;
-let queries;
-let savedTZ;
+interface Query {
+  text: string;
+  params: unknown[];
+}
+
+// res.json() is typed Promise<unknown> (undici-types); this mirrors the
+// fields summaryController's getRollingSummary res.json()s that the tests
+// below actually read.
+interface RollingSummaryResponse {
+  period: string;
+  term: string | null;
+  year: string | null;
+  periodLabel: string | null;
+  termLabel: string | null;
+  startDate: string;
+  endDate: string;
+}
+
+let server: Server;
+let baseUrl: string;
+let queries: Query[];
+let savedTZ: string | undefined;
 
 before(async () => {
+  // A stub Module: only `exports` (the auth middleware itself) is ever read
+  // back out of the cache here, so the rest of NodeJS.Module's shape is unused.
   require.cache[authPath] = {
     id: authPath,
     filename: authPath,
     loaded: true,
-    exports: (req, _res, next) => { req.user = { userId: 7 }; next(); },
-  };
+    exports: (req: { user?: unknown }, _res: unknown, next: () => void) => { req.user = { userId: 7 }; next(); },
+  } as NodeJS.Module;
   delete require.cache[routerPath];
 
   const app = express();
   app.use('/summary', require(routerPath));
   server = app.listen(0);
-  await new Promise((resolve) => server.once('listening', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('expected a bound TCP address');
+  baseUrl = `http://127.0.0.1:${address.port}`;
   savedTZ = process.env.TZ;
 });
 
 after(async () => {
   process.env.TZ = savedTZ;
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   delete require.cache[authPath];
   delete require.cache[routerPath];
 });
@@ -57,7 +80,7 @@ beforeEach(() => {
   queries = [];
   // Every row is CAD and the default target is CAD, so no rate lookup happens
   // and this test never touches the network.
-  mock.method(db, 'query', async (text, params) => {
+  mock.method(db, 'query', async (text: string, params: unknown[]) => {
     queries.push({ text, params });
     return { rows: [], rowCount: 0 };
   });
@@ -65,8 +88,15 @@ beforeEach(() => {
 
 afterEach(() => mock.restoreAll());
 
-const get = (qs) => fetch(`${baseUrl}/summary/rolling${qs}`);
-const boundsUsed = () => ({ start: queries[0].params[1], end: queries[0].params[2] });
+const get = (qs: string) => fetch(`${baseUrl}/summary/rolling${qs}`);
+
+const boundsUsed = (): { start: string; end: string } => {
+  // The router always builds these two bind params from utils/terms.ts's
+  // string-returning helpers (boundsOf/yearBoundsOf/the months window) —
+  // db.query's mocked signature only knows params as unknown[].
+  const [, start, end] = queries[0]!.params as [unknown, string, string];
+  return { start, end };
+};
 
 describe('GET /summary/rolling?term=', () => {
   test('an explicit term selects exactly that term', async () => {
@@ -104,7 +134,7 @@ describe('GET /summary/rolling?term=', () => {
   test('the response says which window it served', async () => {
     // So a client never computes a date or a term name, and so a bug report
     // says which window was served — `months=4` does not tell you which four.
-    const body = await (await get('?term=2026-spring')).json();
+    const body = await (await get('?term=2026-spring')).json() as RollingSummaryResponse;
     assert.equal(body.term, '2026-spring');
     assert.equal(body.termLabel, 'Spring 2026');
     assert.equal(body.period, 'Spring 2026');
@@ -153,7 +183,7 @@ describe('GET /summary/rolling?months= still works', () => {
   });
 
   test('the response marks it as rolling, with no term', async () => {
-    const body = await (await get('?months=4')).json();
+    const body = await (await get('?months=4')).json() as RollingSummaryResponse;
     assert.equal(body.period, '4-month rolling');
     assert.equal(body.term, null);
     assert.equal(body.termLabel, null);
@@ -215,15 +245,15 @@ describe('GET /summary/rolling?year=', () => {
     const year = boundsUsed();
     const terms = termsOfYear('2026').map((id) => boundsOf(id));
 
-    assert.equal(terms[0].start, year.start, 'the year starts where Winter does');
-    assert.equal(terms[2].end, year.end, 'the year ends where Fall does');
+    assert.equal(terms[0]!.start, year.start, 'the year starts where Winter does');
+    assert.equal(terms[2]!.end, year.end, 'the year ends where Fall does');
     for (let i = 1; i < terms.length; i++) {
-      assert.equal(terms[i - 1].end, terms[i].start, 'the terms tile without a gap');
+      assert.equal(terms[i - 1]!.end, terms[i]!.start, 'the terms tile without a gap');
     }
   });
 
   test('the response says it served a year, and names it', async () => {
-    const body = await (await get('?year=2026')).json();
+    const body = await (await get('?year=2026')).json() as RollingSummaryResponse;
     assert.equal(body.year, '2026');
     assert.equal(body.term, null);
     assert.equal(body.periodLabel, '2026');
@@ -233,7 +263,7 @@ describe('GET /summary/rolling?year=', () => {
   });
 
   test('a term response reports no year, so the two are never confused', async () => {
-    const body = await (await get('?term=2026-spring')).json();
+    const body = await (await get('?term=2026-spring')).json() as RollingSummaryResponse;
     assert.equal(body.year, null);
     assert.equal(body.term, '2026-spring');
   });
