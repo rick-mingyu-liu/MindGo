@@ -429,9 +429,9 @@ const investmentController = {
       const finnhubData = await finnhubService.getFinancials(symbol);
       const annualReports: FinancialReportRow[] = [];
       const quarterlyReports: FinancialReportRow[] = [];
-      const reports = finnhubData.data;
 
-      if (finnhubData && Array.isArray(reports)) {
+      if (finnhubData && Array.isArray(finnhubData.data)) {
+        const reports = finnhubData.data;
         for (const report of reports) {
           const reportData = report.report || {};
           const bs = reportData.bs || {};
