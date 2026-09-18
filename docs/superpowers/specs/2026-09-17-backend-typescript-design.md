@@ -1,6 +1,6 @@
 # Backend TypeScript Conversion: Design
 
-**Date:** 2026-09-17 · **Status:** implemented 2026-09-18, PRs #36–#43 (steps 1–8) plus this step’s · **First branch:** `chore/ts-1-tooling` · **Plan:** [`docs/superpowers/plans/2026-09-17-backend-typescript.md`](../plans/2026-09-17-backend-typescript.md)
+**Date:** 2026-09-17 · **Status:** implemented 2026-09-18, PRs #36–#43 (steps 1–8) plus this step’s · **First branch:** `chore/ts-1-tooling` · **Plan:** `docs/superpowers/plans/2026-09-17-backend-typescript.md` — untracked; recoverable from git history
 
 ## 1. Goal
 

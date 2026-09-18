@@ -20,3 +20,6 @@ Thumbs.db
 
 # Dependencies (also covered by subproject .gitignore files)
 node_modules/
+
+# Implementation plans — kept locally, not in the repo (specs stay tracked)
+docs/superpowers/plans/

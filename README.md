@@ -249,7 +249,7 @@ eval/                           screenshot-import benchmark (separate npm projec
 ├── exportFixtures.mjs          records OCR output for the backend tests
 └── private/                    real screenshots — gitignored, never committed
 
-docs/superpowers/               design spec and implementation plan for screenshot import
+docs/superpowers/specs/         design specs for screenshot import and the TypeScript backend
 ```
 
 **Request flow:** route → auth middleware → validation → controller → service/db.
