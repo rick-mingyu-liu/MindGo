@@ -1,7 +1,7 @@
 import config = require('../config');
 
 class Logger {
-  private readonly enabled: boolean;
+  enabled: boolean;
 
   constructor() {
     this.enabled = config.logging.enableConsoleLogs;

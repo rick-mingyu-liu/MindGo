@@ -1,4 +1,5 @@
-const { groupRows } = require('../../services/import/rows');
+import { groupRows } from '../../services/import/rows';
+import type { ImageSize, OcrLine, Row } from '../../types/import';
 
 /**
  * Hand-built OCR output for the screenshot-parser tests.
@@ -8,14 +9,22 @@ const { groupRows } = require('../../services/import/rows');
  * its own.
  */
 
-const TODAY = '2026-09-16';
+export const TODAY = '2026-09-16';
+
+interface LineOptions {
+  x?: number;
+  y?: number;
+  conf?: number;
+  width?: number;
+  height?: number;
+}
 
 // One OCR line. Rows are laid out 60px apart; amounts sit at x = 600.
-const line = (text, { x = 20, y = 0, conf = 0.99, width = text.length * 16, height = 40 } = {}) =>
+export const line = (text: string, { x = 20, y = 0, conf = 0.99, width = text.length * 16, height = 40 }: LineOptions = {}): OcrLine =>
   ({ text, conf, box: { x, y, width, height } });
-const at = (row) => row * 60;
+export const at = (row: number): number => row * 60;
 
-const bankScreenshot = () => groupRows([
+export const bankScreenshot = (): Row[] => groupRows([
   line('Transactions', { y: at(0) }),
   line('Sep 14', { y: at(1) }),
   line('SOBEYS #1234', { y: at(2) }), line('-$23.47', { x: 600, y: at(2) }),
@@ -24,7 +33,7 @@ const bankScreenshot = () => groupRows([
   line('Pending TIM HORTONS', { y: at(5) }), line('$4.25', { x: 600, y: at(5) }),
 ]);
 
-const receiptPhoto = () => groupRows([
+export const receiptPhoto = (): Row[] => groupRows([
   line('SOBEYS', { y: 10, height: 70 }),
   line('450 Columbia St W', { y: at(2) }),
   line('(519) 555-0100', { y: at(3) }),
@@ -36,13 +45,13 @@ const receiptPhoto = () => groupRows([
   line('TOTAL', { y: at(9) }), line('7.67', { x: 600, y: at(9) }),
   line('VISA ****1234', { y: at(10) }),
 ]);
-const RECEIPT_IMAGE = { width: 800, height: 900 };
+export const RECEIPT_IMAGE: ImageSize = { width: 800, height: 900 };
 
 // A bank app that stacks each entry: description on the left over one to three
 // lines, the amount on the right with the running balance directly beneath it,
 // and one tall chevron spanning both. Boxes are the shipped model's output for
 // a real screenshot (2026-09-17); the names and reference numbers are not.
-const stackedBalanceLines = () => [
+export const stackedBalanceLines = (): OcrLine[] => [
   line('SEP 16,2026', { x: 38, y: 39, width: 251, height: 44, conf: 0.92 }),
   line('INTERAC ETRNSFR SENT CLINIC', { x: 48, y: 156, width: 673, height: 46 }),
   line('$25.00', { x: 897, y: 147, width: 175, height: 62 }),
@@ -60,13 +69,13 @@ const stackedBalanceLines = () => [
   line('Pay & Transfer Bank services', { x: 319, y: 933, width: 562, height: 47 }),
   line('Offers', { x: 977, y: 925, width: 142, height: 57 }),
 ];
-const STACKED_IMAGE = { width: 1206, height: 1103 };
+export const STACKED_IMAGE: ImageSize = { width: 1206, height: 1103 };
 
 // A dark-theme card list: a round icon left of every entry, which the model
 // reads as a single CJK character — at up to 0.96 confidence — and a merchant
 // name that wraps to a second line. Boxes are the shipped model's output for a
 // real screenshot (2026-09-17); the merchants are not.
-const iconListLines = () => [
+export const iconListLines = (): OcrLine[] => [
   line('Wed, Sep 16', { x: 31, y: 30, width: 247, height: 55 }),
   line('凸', { x: 51, y: 149, width: 94, height: 79, conf: 0.51 }),
   line('Noodle House', { x: 164, y: 165, width: 263, height: 50, conf: 0.94 }),
@@ -90,13 +99,13 @@ const iconListLines = () => [
   line('Home', { x: 128, y: 1711, width: 118, height: 47 }),
   line('Trade', { x: 549, y: 1707, width: 124, height: 54 }),
 ];
-const ICON_IMAGE = { width: 1206, height: 1848 };
+export const ICON_IMAGE: ImageSize = { width: 1206, height: 1848 };
 
 // Uber's Activity screen: a map card for the latest trip, then one card per
 // trip — destination (which can wrap), "Sep 16 • 6:14 p.m." beside a Rebook
 // button, and the fare on its own line. Boxes are the shipped model's output
 // for a real screenshot (2026-09-17); the places are not.
-const uberActivityLines = () => [
+export const uberActivityLines = (): OcrLine[] => [
   line('9:371', { x: 88, y: 47, width: 157, height: 54, conf: 0.98 }),
   line('96', { x: 644, y: 51, width: 208, height: 49, conf: 0.93 }),
   line('Activity', { x: 9, y: 150, width: 309, height: 96 }),
@@ -129,14 +138,14 @@ const uberActivityLines = () => [
   line(' Rebook', { x: 676, y: 1860, width: 195, height: 54, conf: 0.94 }),
   line('$8.40', { x: 207, y: 1915, width: 106, height: 46 }),
 ];
-const UBER_IMAGE = { width: 920, height: 2000 };
+export const UBER_IMAGE: ImageSize = { width: 920, height: 2000 };
 
 // Uber Eats' Past orders tab: store name, then "Mar 15 • $60.54 • 1 item",
 // then the first items, with the store's logo to the left — which the model
 // reads as text on the same rows — and a View store button to the right.
 // Boxes and key lines are the shipped model's output for a real screenshot
 // (2026-09-17), squeezed spaces and all; the items are not.
-const uberEatsOrderLines = () => [
+export const uberEatsOrderLines = (): OcrLine[] => [
   line('10:231', { x: 82, y: 49, width: 169, height: 49, conf: 0.98 }),
   line('94', { x: 642, y: 44, width: 213, height: 58 }),
   line('Orders', { x: 380, y: 153, width: 160, height: 49 }),
@@ -177,14 +186,14 @@ const uberEatsOrderLines = () => [
   line('Sample Burger', { x: 210, y: 1713, width: 342, height: 41 }),
   line('Q Search', { x: 368, y: 1838, width: 187, height: 48, conf: 0.98 }),
 ];
-const UBER_EATS_IMAGE = { width: 920, height: 2000 };
+export const UBER_EATS_IMAGE: ImageSize = { width: 920, height: 2000 };
 
 // WeChat Pay's Transactions list: a "2026/9" month header with ¥ totals, then
 // per transaction a description with the signed amount on the right and
 // "9/13 20:23" beneath. Amounts carry no currency, and the model tacks stray
 // characters onto some ("+150.00.", "+4.801"). Boxes and amounts are the
 // shipped model's output for a real screenshot (2026-09-17); the names are not.
-const wechatPayLines = () => [
+export const wechatPayLines = (): OcrLine[] => [
   line('10:32', { x: 88, y: 51, width: 165, height: 46 }),
   line('X', { x: 8, y: 141, width: 104, height: 78, conf: 0.92 }),
   line('Transactions', { x: 336, y: 156, width: 248, height: 42 }),
@@ -222,11 +231,4 @@ const wechatPayLines = () => [
   line('+110.001', { x: 737, y: 1914, width: 163, height: 49, conf: 0.96 }),
   line('7/15.18:36', { x: 176, y: 1976, width: 168, height: 24, conf: 0.96 }),
 ];
-const WECHAT_IMAGE = { width: 920, height: 2000 };
-
-
-module.exports = {
-  TODAY, line, at, bankScreenshot, receiptPhoto, RECEIPT_IMAGE, stackedBalanceLines, STACKED_IMAGE,
-  iconListLines, ICON_IMAGE, uberActivityLines, UBER_IMAGE,
-  uberEatsOrderLines, UBER_EATS_IMAGE, wechatPayLines, WECHAT_IMAGE,
-};
+export const WECHAT_IMAGE: ImageSize = { width: 920, height: 2000 };

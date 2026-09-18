@@ -1,12 +1,13 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { parseWechatPay, readWechatAmount } = require('../services/import/wechat');
-const { classifyLayout } = require('../services/import/classify');
-const { parseOcr } = require('../services/import/parse');
-const {
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { parseWechatPay, readWechatAmount } from '../services/import/wechat';
+import { classifyLayout } from '../services/import/classify';
+import { parseOcr } from '../services/import/parse';
+import {
   line, wechatPayLines, WECHAT_IMAGE, uberActivityLines, uberEatsOrderLines, bankScreenshot, receiptPhoto,
-} = require('./helpers/ocrLayouts');
+} from './helpers/ocrLayouts';
+import type { ParserDraft } from '../types/import';
 
 /**
  * WeChat Pay's transaction list. Amounts are yuan with no symbol, the year is
@@ -27,7 +28,7 @@ describe('readWechatAmount', () => {
   ]) {
     test(`reads ${input}`, () => {
       const amount = readWechatAmount(input);
-      assert.deepEqual([amount.value, amount.sign, amount.corrected], [value, sign, corrected]);
+      assert.deepEqual([amount!.value, amount!.sign, amount!.corrected], [value, sign, corrected]);
     });
   }
 
@@ -52,38 +53,40 @@ describe('parseWechatPay', () => {
   });
 
   test('a sign decides the direction; without one, the words guess and say so', () => {
-    const byAmount = Object.fromEntries(drafts().map((d) => [d.amount, d]));
-    assert.equal(byAmount['120.00'].type, 'income');
-    assert.equal(byAmount['485.00'].type, 'expense');
-    assert.deepEqual(byAmount['485.00'].flags, []);
-    assert.equal(byAmount['56.26'].type, 'income', '到零钱: into the wallet');
-    assert.deepEqual(byAmount['56.26'].flags, ['type_guessed']);
+    const byAmount: Record<string, ParserDraft> = Object.fromEntries(drafts().map((d) => [d.amount, d]));
+    assert.equal(byAmount['120.00']!.type, 'income');
+    assert.equal(byAmount['485.00']!.type, 'expense');
+    assert.deepEqual(byAmount['485.00']!.flags, []);
+    assert.equal(byAmount['56.26']!.type, 'income', '到零钱: into the wallet');
+    assert.deepEqual(byAmount['56.26']!.flags, ['type_guessed']);
   });
 
   test('an amount repaired from a stray character is flagged', () => {
-    const byAmount = Object.fromEntries(drafts().map((d) => [d.amount, d]));
-    assert.deepEqual(byAmount['4.80'].flags, ['corrected_chars']);
-    assert.ok(byAmount['4.80'].conf.amount < 0.8);
+    const byAmount: Record<string, ParserDraft> = Object.fromEntries(drafts().map((d) => [d.amount, d]));
+    assert.deepEqual(byAmount['4.80']!.flags, ['corrected_chars']);
+    assert.ok(byAmount['4.80']!.conf.amount < 0.8);
   });
 
   test('an unsigned amount with words that point out is a guessed expense', () => {
-    const { drafts: [draft] } = parseWechatPay(groupRows([
+    const { drafts: rows } = parseWechatPay(groupRows([
       line('2026/9', { x: 25, y: 400, height: 48 }),
       line('扫二维码付款-给某商店', { x: 174, y: 550, height: 47 }),
       line('36.00', { x: 771, y: 550, height: 47 }),
       line('9/3 12:01', { x: 174, y: 614, height: 41 }),
     ]), TODAY);
+    const draft = rows[0]!;
     assert.deepEqual([draft.type, draft.flags], ['expense', ['type_guessed']]);
   });
 
   test('a date line grouped into the description row is still the date, not description', () => {
     // A taller amount box pulls the date line onto the row (seen in a browser run).
-    const { drafts: [draft] } = parseWechatPay(groupRows([
+    const { drafts: rows } = parseWechatPay(groupRows([
       line('2026/9', { x: 25, y: 400, height: 48 }),
       line('转账-来自张三', { x: 174, y: 1287, height: 43 }),
       line('+150.00', { x: 733, y: 1287, height: 80 }),
       line('9/1 14:25', { x: 172, y: 1345, height: 43 }),
     ]), TODAY);
+    const draft = rows[0]!;
     assert.equal(groupRows([
       line('转账-来自张三', { x: 174, y: 1287, height: 43 }),
       line('+150.00', { x: 733, y: 1287, height: 80 }),
@@ -93,11 +96,12 @@ describe('parseWechatPay', () => {
   });
 
   test('a transaction above any month header takes the most recent such day', () => {
-    const { drafts: [draft] } = parseWechatPay(groupRows([
+    const { drafts: rows } = parseWechatPay(groupRows([
       line('转账-来自张三', { x: 174, y: 550, height: 47 }),
       line('+20.00', { x: 733, y: 550, height: 47 }),
       line('12/30 09:00', { x: 174, y: 614, height: 41 }),
     ]), TODAY);
+    const draft = rows[0]!;
     assert.equal(draft.date, '2025-12-30');
     assert.ok(draft.conf.date < 1, 'an inferred year lowers date confidence');
   });

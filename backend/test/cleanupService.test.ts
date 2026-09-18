@@ -1,8 +1,8 @@
-const { test, describe, beforeEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const db = require('../db/connection');
-const config = require('../config');
-const cleanupService = require('../services/cleanupService');
+import { test, describe, beforeEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import db = require('../db/connection');
+import config = require('../config');
+import { deleteOldAIPlans, deleteUnverifiedAccounts } from '../services/cleanupService';
 
 /**
  * Unit tests for the scheduled deletions. No database: db.query is mocked.
@@ -13,8 +13,8 @@ const cleanupService = require('../services/cleanupService');
  * fails.
  */
 
-function queryReturning(rowCount) {
-  return mock.method(db, 'query', async () => ({ rowCount, rows: [] }));
+function queryReturning(rowCount: number) {
+  return mock.method(db, 'query', async (_text: string, _params?: unknown[]) => ({ rowCount, rows: [] }));
 }
 
 describe('deleteOldAIPlans', () => {
@@ -22,15 +22,15 @@ describe('deleteOldAIPlans', () => {
 
   test('returns the number of rows deleted', async () => {
     queryReturning(7);
-    assert.equal(await cleanupService.deleteOldAIPlans(), 7);
+    assert.equal(await deleteOldAIPlans(), 7);
   });
 
   test('deletes from ai_plans, bounded by the configured retention', async () => {
     const query = queryReturning(0);
 
-    await cleanupService.deleteOldAIPlans();
+    await deleteOldAIPlans();
 
-    const [sql, params] = query.mock.calls[0].arguments;
+    const [sql, params] = query.mock.calls[0]!.arguments;
     assert.match(sql, /^DELETE FROM ai_plans\b/);
     assert.match(sql, /created_at < NOW\(\) - make_interval\(mins => \$1\)/);
     assert.deepEqual(params, [config.dataRetention.aiPlanMinutes]);
@@ -44,7 +44,7 @@ describe('deleteOldAIPlans', () => {
       throw new Error('connection terminated');
     });
 
-    await assert.rejects(() => cleanupService.deleteOldAIPlans(), /connection terminated/);
+    await assert.rejects(() => deleteOldAIPlans(), /connection terminated/);
   });
 });
 
@@ -53,7 +53,7 @@ describe('deleteUnverifiedAccounts', () => {
 
   test('returns the number of rows deleted', async () => {
     queryReturning(3);
-    assert.equal(await cleanupService.deleteUnverifiedAccounts(), 3);
+    assert.equal(await deleteUnverifiedAccounts(), 3);
   });
 
   test('only ever deletes accounts that are both unverified and expired', async () => {
@@ -61,9 +61,9 @@ describe('deleteUnverifiedAccounts', () => {
     // timer. Worth asserting rather than assuming.
     const query = queryReturning(0);
 
-    await cleanupService.deleteUnverifiedAccounts();
+    await deleteUnverifiedAccounts();
 
-    const [sql, params] = query.mock.calls[0].arguments;
+    const [sql, params] = query.mock.calls[0]!.arguments;
     assert.match(sql, /^DELETE FROM users\b/);
     assert.match(sql, /email_verified = FALSE/);
     assert.match(sql, /created_at < NOW\(\) - make_interval\(mins => \$1\)/);
@@ -76,9 +76,9 @@ describe('deleteUnverifiedAccounts', () => {
     // is all the caller needs.
     const query = queryReturning(0);
 
-    await cleanupService.deleteUnverifiedAccounts();
+    await deleteUnverifiedAccounts();
 
-    assert.doesNotMatch(query.mock.calls[0].arguments[0], /RETURNING/i);
+    assert.doesNotMatch(query.mock.calls[0]!.arguments[0], /RETURNING/i);
   });
 
   test('propagates a database error instead of swallowing it', async () => {
@@ -86,6 +86,6 @@ describe('deleteUnverifiedAccounts', () => {
       throw new Error('connection terminated');
     });
 
-    await assert.rejects(() => cleanupService.deleteUnverifiedAccounts(), /connection terminated/);
+    await assert.rejects(() => deleteUnverifiedAccounts(), /connection terminated/);
   });
 });

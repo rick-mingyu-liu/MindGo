@@ -1,7 +1,7 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { line, at } = require('./helpers/ocrLayouts');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { line, at } from './helpers/ocrLayouts';
 
 /**
  * OCR returns loose text boxes; the parser works on visual rows. These pin how
@@ -16,7 +16,7 @@ describe('groupRows', () => {
       line('Sep 14', { y: at(0) }),
     ]);
     assert.deepEqual(rows.map((r) => r.text), ['Sep 14', 'SOBEYS #1234 -$23.47']);
-    assert.equal(rows[1].lines[0].text, 'SOBEYS #1234');
+    assert.equal(rows[1]!.lines[0]!.text, 'SOBEYS #1234');
   });
 
   test('keeps rows apart when boxes barely touch', () => {
@@ -33,7 +33,7 @@ describe('groupRows', () => {
       line('SAMPLE PERSON', { y: 588, height: 46 }),
       line('$3,016.15', { x: 838, y: 580, height: 56 }),
     ]);
-    assert.equal(rows[0].text, 'ALEX $32.00');
+    assert.equal(rows[0]!.text, 'ALEX $32.00');
     assert.ok(rows.every((r) => !(r.text.includes('$32.00') && r.text.includes('$3,016.15'))),
       rows.map((r) => r.text).join(' | '));
   });
@@ -64,7 +64,7 @@ describe('groupRows', () => {
   test('takes the lowest confidence of a row, and ignores blank lines', () => {
     const rows = groupRows([line('A', { conf: 0.9 }), line('B', { x: 300, conf: 0.6 }), line('  ')]);
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].conf, 0.6);
+    assert.equal(rows[0]!.conf, 0.6);
   });
 
   test('handles no input', () => {

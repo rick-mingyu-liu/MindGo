@@ -1,6 +1,6 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { maskEmail } = require('../utils/privacy');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { maskEmail } from '../utils/privacy';
 
 /**
  * Unit tests for the log-masking helper.
@@ -41,7 +41,7 @@ describe('maskEmail', () => {
   describe('never throws, whatever it is handed', () => {
     // Each of these reaches it only through a bug elsewhere, which is exactly
     // when the log line matters most.
-    const junk = [
+    const junk: Array<[unknown, string]> = [
       [undefined, '<no address>'],
       [null, '<no address>'],
       ['', '<no address>'],

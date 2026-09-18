@@ -1,7 +1,8 @@
-const { test, describe, before, after, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const express = require('express');
-const db = require('../db/connection');
+import { test, describe, before, after, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Server } from 'node:http';
+import express from 'express';
+import db = require('../db/connection');
 
 /**
  * `DELETE /transactions/auto-delete` deletes rows and cannot be undone, and it
@@ -25,19 +26,27 @@ const db = require('../db/connection');
 const authPath = require.resolve('../middleware/auth');
 const routerPath = require.resolve('../routes/transactions');
 
-let server;
-let baseUrl;
-let queries;
+interface Query {
+  text: string;
+  params: unknown[];
+}
+
+let server: Server;
+let baseUrl: string;
+let queries: Query[];
 
 before(async () => {
   // The router applies auth at module load, so it is replaced before the
   // require rather than mocked afterwards.
+  //
+  // A stub Module: only `exports` (the auth middleware itself) is ever read
+  // back out of the cache here, so the rest of NodeJS.Module's shape is unused.
   require.cache[authPath] = {
     id: authPath,
     filename: authPath,
     loaded: true,
-    exports: (req, _res, next) => { req.user = { userId: 7 }; next(); },
-  };
+    exports: (req: { user?: unknown }, _res: unknown, next: () => void) => { req.user = { userId: 7 }; next(); },
+  } as NodeJS.Module;
   delete require.cache[routerPath];
 
   const app = express();
@@ -45,19 +54,21 @@ before(async () => {
   app.use('/transactions', require(routerPath));
 
   server = app.listen(0);
-  await new Promise((resolve) => server.once('listening', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('expected a bound TCP address');
+  baseUrl = `http://127.0.0.1:${address.port}`;
 });
 
 after(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   delete require.cache[authPath];
   delete require.cache[routerPath];
 });
 
 beforeEach(() => {
   queries = [];
-  mock.method(db, 'query', async (text, params) => {
+  mock.method(db, 'query', async (text: string, params: unknown[]) => {
     queries.push({ text, params });
     return { rowCount: 0, rows: [] };
   });
@@ -65,11 +76,11 @@ beforeEach(() => {
 
 afterEach(() => mock.restoreAll());
 
-const del = (qs) => fetch(`${baseUrl}/transactions/auto-delete${qs}`, { method: 'DELETE' });
+const del = (qs: string) => fetch(`${baseUrl}/transactions/auto-delete${qs}`, { method: 'DELETE' });
 
 describe('DELETE /transactions/auto-delete', () => {
   describe('rejects a months it cannot honour, without touching the table', () => {
-    for (const [label, qs] of [
+    const cases: [string, string][] = [
       ['zero — the cutoff would be today', '?months=0'],
       ['negative — the cutoff would be in the future', '?months=-6'],
       ['empty — the default does not apply to it', '?months='],
@@ -77,7 +88,8 @@ describe('DELETE /transactions/auto-delete', () => {
       ['fractional', '?months=1.5'],
       ['past the 60 the settings API allows', '?months=61'],
       ['absurd, which used to throw', '?months=999999999'],
-    ]) {
+    ];
+    for (const [label, qs] of cases) {
       test(label, async () => {
         const res = await del(qs);
         assert.equal(res.status, 400, `${qs} was not rejected`);
@@ -95,7 +107,7 @@ describe('DELETE /transactions/auto-delete', () => {
       assert.equal(res.status, 200);
       assert.equal(queries.length, 1);
 
-      const { text, params } = queries[0];
+      const { text, params } = queries[0]!;
       assert.match(text, /^DELETE FROM transactions WHERE user_id = \$1 AND date < \$2$/);
       assert.equal(params[0], 7);
 

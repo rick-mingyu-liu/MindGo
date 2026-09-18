@@ -1,10 +1,12 @@
-const { test, describe, before, after, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const express = require('express');
-const { types } = require('pg');
-const db = require('../db/connection');
-const { toDay, monthOf, formatDay, monthSpan } = require('../utils/dates');
-const aiController = require('../controllers/aiController');
+import { test, describe, before, after, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Server } from 'node:http';
+import express from 'express';
+import { types } from 'pg';
+import db = require('../db/connection');
+import { toDay, monthOf, formatDay, monthSpan } from '../utils/dates';
+import aiController = require('../controllers/aiController');
+import type { TransactionRow } from '../types/db';
 
 /**
  * A DATE column is a calendar day. Everything here exists because the code
@@ -129,14 +131,32 @@ describe('monthSpan', () => {
 });
 
 describe('getMonthCount', () => {
+  // getMonthCount only ever reads .date (confirmed by reading
+  // controllers/aiController.ts), so a fixture built from just the dates
+  // still needs the rest of TransactionRow's fields filled with placeholder,
+  // correctly-typed values rather than the field the test actually varies.
+  const txn = (date: string): TransactionRow => ({
+    id: 0,
+    user_id: null,
+    amount: '0.00',
+    description: '',
+    category: '',
+    type: 'expense',
+    date,
+    currency: 'CAD',
+    source: 'manual',
+    created_at: null,
+    updated_at: null,
+  });
+
   test('counts the months a set of transactions spans', () => {
     assert.equal(aiController.getMonthCount([
-      { date: '2026-08-28' }, { date: '2026-05-01' }, { date: '2026-07-15' },
+      txn('2026-08-28'), txn('2026-05-01'), txn('2026-07-15'),
     ]), 4);
   });
 
   test('is 1 for a single month, and 0 for nothing', () => {
-    assert.equal(aiController.getMonthCount([{ date: '2026-08-28' }, { date: '2026-08-01' }]), 1);
+    assert.equal(aiController.getMonthCount([txn('2026-08-28'), txn('2026-08-01')]), 1);
     assert.equal(aiController.getMonthCount([]), 0);
   });
 
@@ -145,7 +165,7 @@ describe('getMonthCount', () => {
     // month too many understates the average and the plan built on it.
     const saved = process.env.TZ;
     process.env.TZ = 'America/Toronto';
-    assert.equal(aiController.getMonthCount([{ date: '2026-06-01' }, { date: '2026-08-01' }]), 3);
+    assert.equal(aiController.getMonthCount([txn('2026-06-01'), txn('2026-08-01')]), 3);
     process.env.TZ = saved;
   });
 });
@@ -158,9 +178,9 @@ describe('getMonthCount', () => {
 describe('monthlyBreakdown keys', () => {
   const authPath = require.resolve('../middleware/auth');
   const routerPath = require.resolve('../routes/summary');
-  let server;
-  let baseUrl;
-  let savedTZ;
+  let server: Server;
+  let baseUrl: string;
+  let savedTZ: string | undefined;
 
   const rows = [
     { id: 1, type: 'expense', amount: '100.00', currency: 'CAD', category: 'Rent', date: '2026-06-01' },
@@ -168,26 +188,41 @@ describe('monthlyBreakdown keys', () => {
     { id: 3, type: 'expense', amount: '25.00', currency: 'CAD', category: 'Food', date: '2026-08-15' },
   ];
 
+  // res.json() is typed Promise<unknown> (undici-types); this mirrors the
+  // fields summaryController's getRollingSummary res.json()s that the test
+  // below actually reads.
+  interface MonthlyBreakdownEntry {
+    month: string;
+    expenses: number;
+  }
+  interface RollingSummaryResponse {
+    monthlyBreakdown: MonthlyBreakdownEntry[];
+  }
+
   before(async () => {
     savedTZ = process.env.TZ;
+    // A stub Module: only `exports` (the auth middleware itself) is ever read
+    // back out of the cache here, so the rest of NodeJS.Module's shape is unused.
     require.cache[authPath] = {
       id: authPath,
       filename: authPath,
       loaded: true,
-      exports: (req, _res, next) => { req.user = { userId: 7 }; next(); },
-    };
+      exports: (req: { user?: unknown }, _res: unknown, next: () => void) => { req.user = { userId: 7 }; next(); },
+    } as NodeJS.Module;
     delete require.cache[routerPath];
 
     const app = express();
     app.use('/summary', require(routerPath));
     server = app.listen(0);
-    await new Promise((resolve) => server.once('listening', resolve));
-    baseUrl = `http://127.0.0.1:${server.address().port}`;
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('expected a bound TCP address');
+    baseUrl = `http://127.0.0.1:${address.port}`;
   });
 
   after(async () => {
     process.env.TZ = savedTZ;
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
     delete require.cache[authPath];
     delete require.cache[routerPath];
   });
@@ -205,7 +240,7 @@ describe('monthlyBreakdown keys', () => {
       process.env.TZ = tz;
       const res = await fetch(`${baseUrl}/summary/rolling?term=2026-spring`);
       assert.equal(res.status, 200);
-      const body = await res.json();
+      const body = await res.json() as RollingSummaryResponse;
       assert.deepEqual(
         body.monthlyBreakdown.map((m) => m.month),
         ['2026-06', '2026-07', '2026-08'],
@@ -216,7 +251,7 @@ describe('monthlyBreakdown keys', () => {
   test('the row dated the first of the month is not filed under May', async () => {
     process.env.TZ = 'America/Toronto';
     const res = await fetch(`${baseUrl}/summary/rolling?term=2026-spring`);
-    const body = await res.json();
+    const body = await res.json() as RollingSummaryResponse;
     const june = body.monthlyBreakdown.find((m) => m.month === '2026-06');
     assert.ok(june, 'the 2026-06-01 row went missing from June');
     assert.equal(june.expenses, 100);

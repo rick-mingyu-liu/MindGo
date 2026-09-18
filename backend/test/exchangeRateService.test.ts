@@ -1,6 +1,6 @@
-const { test, describe, beforeEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const axios = require('axios');
+import { test, describe, beforeEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import axios from 'axios';
 
 /**
  * Unit tests for currency conversion.
@@ -14,15 +14,19 @@ const axios = require('axios');
  * No network: axios.get is mocked. No database.
  */
 
+interface ExchangeRateService {
+  getExchangeRate(from: string, to: string): Promise<number>;
+}
+
 // The service holds module-level cache state, so each test re-requires it from
 // a clean module registry rather than sharing a warm cache.
-function freshService() {
+function freshService(): ExchangeRateService {
   delete require.cache[require.resolve('../services/exchangeRateService')];
   return require('../services/exchangeRateService');
 }
 
-function respondWith(rates) {
-  return mock.method(axios, 'get', async () => ({ data: { rates } }));
+function respondWith(rates: Record<string, unknown>) {
+  return mock.method(axios, 'get', async (_url: string) => ({ data: { rates } }));
 }
 
 describe('getExchangeRate', () => {
@@ -41,7 +45,7 @@ describe('getExchangeRate', () => {
 
     await getExchangeRate('USD', 'CAD');
 
-    const url = get.mock.calls[0].arguments[0];
+    const url = get.mock.calls[0]!.arguments[0];
     assert.match(url, /base=USD/);
     assert.match(url, /symbols=CAD/);
   });
@@ -61,7 +65,7 @@ describe('getExchangeRate', () => {
     // The cache key is `${from}_${to}`. If it were ever reduced to an unordered
     // pair, every converted amount in the app would be inverted, and still look
     // like money.
-    const get = mock.method(axios, 'get', async (url) => ({
+    const get = mock.method(axios, 'get', async (url: string) => ({
       data: { rates: url.includes('base=USD') ? { CAD: 1.37 } : { USD: 0.73 } },
     }));
     const { getExchangeRate } = freshService();

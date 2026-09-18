@@ -1,9 +1,10 @@
-const { test, describe, before, after, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const express = require('express');
-const db = require('../db/connection');
-const config = require('../config');
-const aiPlanner = require('../services/aiPlanner');
+import { test, describe, before, after, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Server } from 'node:http';
+import express from 'express';
+import db = require('../db/connection');
+import config = require('../config');
+import aiPlanner = require('../services/aiPlanner');
 
 /**
  * When OpenAI will not answer — the account is out of credit (measured
@@ -19,31 +20,40 @@ const aiPlanner = require('../services/aiPlanner');
 const authPath = require.resolve('../middleware/auth');
 const routerPath = require.resolve('../routes/ai');
 
-let server;
-let baseUrl;
-let failWith;
+interface AiErrorResponse {
+  error: string;
+  code?: string;
+}
+
+let server: Server;
+let baseUrl: string;
+let failWith: Error;
 const originalKey = config.apiKeys.openai;
 const originalClient = aiPlanner.openai;
 
 before(async () => {
+  // A stub Module: only `exports` (the auth middleware itself) is ever read
+  // back out of the cache here, so the rest of NodeJS.Module's shape is unused.
   require.cache[authPath] = {
     id: authPath,
     filename: authPath,
     loaded: true,
-    exports: (req, _res, next) => { req.user = { userId: 7 }; next(); },
-  };
+    exports: (req: { user?: unknown }, _res: unknown, next: () => void) => { req.user = { userId: 7 }; next(); },
+  } as NodeJS.Module;
   delete require.cache[routerPath];
 
   const app = express();
   app.use(express.json());
   app.use('/ai', require(routerPath));
   server = app.listen(0);
-  await new Promise((resolve) => server.once('listening', resolve));
-  baseUrl = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('expected a bound TCP address');
+  baseUrl = `http://127.0.0.1:${address.port}`;
 });
 
 after(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   delete require.cache[authPath];
   delete require.cache[routerPath];
   config.apiKeys.openai = originalKey;
@@ -61,29 +71,32 @@ beforeEach(() => {
 
 afterEach(() => mock.restoreAll());
 
-const openAiError = (status, code) => Object.assign(new Error(`${status} ${code}`), { status, code });
-const post = (path, body) => fetch(`${baseUrl}/ai${path}`, {
+const openAiError = (status: number, code: string): Error =>
+  Object.assign(new Error(`${status} ${code}`), { status, code });
+const post = (path: string, body: unknown) => fetch(`${baseUrl}/ai${path}`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
 
 describe('AI endpoints when OpenAI will not answer', () => {
-  for (const [label, error] of [
+  const errors: [string, Error][] = [
     ['out of credit', openAiError(429, 'credit_balance_exhausted')],
     ['out of quota', openAiError(429, 'insufficient_quota')],
     ['rate-limited', openAiError(429, 'rate_limit_exceeded')],
-  ]) {
-    for (const [path, body] of [
-      ['/plan', { financialGoal: 'Save $1,000', includeFinancialData: false }],
-      ['/budget-recommendations', {}],
-      ['/investment-advice', {}],
-    ]) {
+  ];
+  const endpoints: [string, Record<string, unknown>][] = [
+    ['/plan', { financialGoal: 'Save $1,000', includeFinancialData: false }],
+    ['/budget-recommendations', {}],
+    ['/investment-advice', {}],
+  ];
+  for (const [label, error] of errors) {
+    for (const [path, body] of endpoints) {
       test(`${label}: ${path} answers 503 ai_unavailable`, async () => {
         failWith = error;
         const res = await post(path, body);
         assert.equal(res.status, 503);
-        const json = await res.json();
+        const json = await res.json() as AiErrorResponse;
         assert.equal(json.code, 'ai_unavailable');
         assert.match(json.error, /temporarily unavailable/);
       });
@@ -94,6 +107,6 @@ describe('AI endpoints when OpenAI will not answer', () => {
     failWith = openAiError(500, 'server_error');
     const res = await post('/plan', { financialGoal: 'Save $1,000', includeFinancialData: false });
     assert.equal(res.status, 500);
-    assert.notEqual((await res.json()).code, 'ai_unavailable');
+    assert.notEqual((await res.json() as AiErrorResponse).code, 'ai_unavailable');
   });
 });

@@ -1,10 +1,10 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { parseUberActivity, splitDateTime } = require('../services/import/uberActivity');
-const { classifyLayout } = require('../services/import/classify');
-const { parseOcr } = require('../services/import/parse');
-const { line, at, uberActivityLines, UBER_IMAGE, bankScreenshot, receiptPhoto } = require('./helpers/ocrLayouts');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { parseUberActivity, splitDateTime } from '../services/import/uberActivity';
+import { classifyLayout } from '../services/import/classify';
+import { parseOcr } from '../services/import/parse';
+import { line, at, uberActivityLines, UBER_IMAGE, bankScreenshot, receiptPhoto } from './helpers/ocrLayouts';
 
 /**
  * Uber's Activity screen: one card per trip, the destination stacked over a
@@ -22,7 +22,7 @@ describe('splitDateTime', () => {
     ['Yesterday • 9:02 a.m.', '2026-09-16'],
     ['Dec 30, 2025 • 11:40 p.m.', '2025-12-30'],
   ]) {
-    test(`reads ${input}`, () => assert.equal(splitDateTime(input, TODAY).day, day));
+    test(`reads ${input}`, () => assert.equal(splitDateTime(input, TODAY)!.day, day));
   }
 
   for (const input of ['Sep 16', 'Rebook', '7:16 p.m.', 'Canceled • $0.00', '']) {

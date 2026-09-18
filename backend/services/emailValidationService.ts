@@ -84,7 +84,7 @@ function domainOf(email: unknown): string | undefined {
  * malformed addresses before the controller runs — and cannot check
  * deliverability, which is the part that needs a service.
  */
-function validateAgainstDomainList(email: string): ValidationResult {
+function validateAgainstDomainList(email: unknown): ValidationResult {
   const domain = domainOf(email);
   if (domain && DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
     return { valid: false, reason: 'Disposable email addresses are not allowed', source: 'domain-list' };

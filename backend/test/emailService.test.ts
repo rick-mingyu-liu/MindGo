@@ -1,7 +1,7 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const db = require('../db/connection');
-const { generateWeeklyReport } = require('../services/emailService');
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import db = require('../db/connection');
+import { generateWeeklyReport } from '../services/emailService';
 
 /**
  * `generateWeeklyReport` returns `{ text, html }` on every path but one: a

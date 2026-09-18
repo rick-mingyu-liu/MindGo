@@ -1,9 +1,9 @@
-const { test, describe, after } = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import { test, describe, after } from 'node:test';
+import assert from 'node:assert/strict';
+import {
   isTermId, termOf, boundsOf, labelOf,
   currentTerm, previousTerm, nextTerm, lastNTerms,
-} = require('../utils/terms');
+} from '../utils/terms';
 
 /**
  * The term calendar. Two callers will depend on this agreeing with itself: the
@@ -122,7 +122,7 @@ describe('lastNTerms', () => {
   test('six terms is two years', () => {
     // The retention number from item 20. The cutoff is the first term's start.
     const terms = lastNTerms(6, AUG_2026);
-    assert.equal(boundsOf(terms[0]).start, '2024-09-01');
+    assert.equal(boundsOf(terms[0]!).start, '2024-09-01');
     assert.equal(termOf(AUG_2026), terms[terms.length - 1]);
   });
 
@@ -134,7 +134,7 @@ describe('lastNTerms', () => {
     const terms = lastNTerms(12, AUG_2026);
     assert.equal(new Set(terms).size, 12);
     for (let i = 1; i < terms.length; i++) {
-      assert.equal(nextTerm(terms[i - 1]), terms[i]);
+      assert.equal(nextTerm(terms[i - 1]!), terms[i]);
     }
   });
 

@@ -1,7 +1,8 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const scheduler = require('../services/schedulerService');
-const logger = require('../utils/logger');
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import scheduler = require('../services/schedulerService');
+import logger = require('../utils/logger');
+import type { ScheduledTask } from 'node-cron';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
@@ -17,7 +18,7 @@ const logger = require('../utils/logger');
  */
 
 // Lets the awaits inside the interval callback settle after a tick.
-const drain = () => new Promise((resolve) => setImmediate(resolve));
+const drain = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 describe('scheduleInterval', () => {
   beforeEach(() => {
@@ -47,10 +48,10 @@ describe('scheduleInterval', () => {
     // around a promise-returning call. The catch was unreachable and the
     // success line fired the instant the task *started*, so a cleanup that
     // threw every single time looked healthy in the log.
-    const errors = [];
-    mock.method(logger, 'error', (msg) => errors.push(msg));
-    const infos = [];
-    mock.method(logger, 'info', (msg) => infos.push(msg));
+    const errors: string[] = [];
+    mock.method(logger, 'error', (msg: string) => errors.push(msg));
+    const infos: string[] = [];
+    mock.method(logger, 'info', (msg: string) => infos.push(msg));
 
     scheduler.scheduleInterval('test', 1000, async () => {
       throw new Error('database is down');
@@ -60,7 +61,7 @@ describe('scheduleInterval', () => {
     await drain();
 
     assert.equal(errors.length, 1);
-    assert.match(errors[0], /test failed/);
+    assert.match(errors[0]!, /test failed/);
     assert.equal(infos.filter((m) => /deleted/.test(m)).length, 0);
   });
 
@@ -85,9 +86,9 @@ describe('scheduleInterval', () => {
     // NODE_ENV=production; which channel, and why, is asserted in "what the
     // retention jobs report" below. What this one still pins is that the
     // number logged is the number the task returned.
-    const logged = [];
-    mock.method(logger, 'audit', (msg) => logged.push(msg));
-    mock.method(logger, 'info', (msg) => logged.push(msg));
+    const logged: string[] = [];
+    mock.method(logger, 'audit', (msg: string) => logged.push(msg));
+    mock.method(logger, 'info', (msg: string) => logged.push(msg));
 
     scheduler.scheduleInterval('aiCleanup', 1000, async () => 42);
 
@@ -115,7 +116,9 @@ describe('scheduleInterval, on a real timer', () => {
 
     scheduler.scheduleInterval('test', 60_000, async () => 0);
 
-    assert.equal(scheduler.jobs.get('test').job.hasRef(), false);
+    const entry = scheduler.jobs.get('test');
+    assert.ok(entry && entry.kind === 'interval', 'test was not registered as an interval job');
+    assert.equal(entry.job.hasRef(), false);
   });
 });
 
@@ -150,9 +153,12 @@ describe('stop', () => {
   });
 
   test('stops a cron job through its own API', () => {
-    const stopped = [];
+    const stopped: string[] = [];
+    // Only stop() is exercised by scheduler.stop() for a cron job; the rest of
+    // ScheduledTask's two dozen methods are irrelevant to this fake.
+    const fakeCronJob = { stop: () => { stopped.push('weeklyReports'); } } as unknown as ScheduledTask;
     scheduler.jobs.set('weeklyReports', {
-      job: { stop: () => stopped.push('weeklyReports') },
+      job: fakeCronJob,
       kind: 'cron',
     });
 
@@ -184,7 +190,7 @@ describe('getStatus', () => {
     // The old version read job.running, which is undefined on both job types,
     // so `job.running !== false` reported every job as active forever.
     scheduler.scheduleInterval('test', 1000, async () => 0);
-    assert.equal(scheduler.getStatus().test.scheduled, true);
+    assert.equal(scheduler.getStatus().test!.scheduled, true);
 
     scheduler.stop();
 
@@ -193,17 +199,20 @@ describe('getStatus', () => {
 
   test('reads the next run from the node-cron 4 API', () => {
     const when = new Date('2030-01-01T00:00:00.000Z');
+    // getNextRun() is the only ScheduledTask method getStatus() calls for a
+    // cron job; the rest of the interface is irrelevant to this fake.
+    const fakeCronJob = { getNextRun: () => when, stop: () => {} } as unknown as ScheduledTask;
     scheduler.jobs.set('weeklyReports', {
-      job: { getNextRun: () => when, stop: () => {} },
+      job: fakeCronJob,
       kind: 'cron',
     });
 
-    assert.equal(scheduler.getStatus().weeklyReports.nextRun, when.toISOString());
+    assert.equal(scheduler.getStatus().weeklyReports!.nextRun, when.toISOString());
   });
 
   test('an interval has no next run to report', () => {
     scheduler.scheduleInterval('test', 1000, async () => 0);
-    assert.equal(scheduler.getStatus().test.nextRun, null);
+    assert.equal(scheduler.getStatus().test!.nextRun, null);
   });
 });
 
@@ -222,11 +231,11 @@ describe('what the retention jobs report', () => {
     mock.restoreAll();
   });
 
-  async function runOnce(rowCount) {
-    const audits = [];
-    const infos = [];
-    mock.method(logger, 'audit', (msg) => audits.push(msg));
-    mock.method(logger, 'info', (msg) => infos.push(msg));
+  async function runOnce(rowCount: number): Promise<{ audits: string[]; infos: string[] }> {
+    const audits: string[] = [];
+    const infos: string[] = [];
+    mock.method(logger, 'audit', (msg: string) => audits.push(msg));
+    mock.method(logger, 'info', (msg: string) => infos.push(msg));
 
     scheduler.scheduleInterval('accountCleanup', 1000, async () => rowCount);
     mock.timers.tick(1000);
@@ -238,7 +247,7 @@ describe('what the retention jobs report', () => {
   test('a real deletion is an audit event', async () => {
     const { audits, infos } = await runOnce(3);
     assert.equal(audits.length, 1);
-    assert.match(audits[0], /accountCleanup: deleted 3 row\(s\)/);
+    assert.match(audits[0]!, /accountCleanup: deleted 3 row\(s\)/);
     assert.equal(infos.length, 0);
   });
 
@@ -248,16 +257,16 @@ describe('what the retention jobs report', () => {
     const { audits, infos } = await runOnce(0);
     assert.equal(audits.length, 0);
     assert.equal(infos.length, 1);
-    assert.match(infos[0], /deleted 0 row\(s\)/);
+    assert.match(infos[0]!, /deleted 0 row\(s\)/);
   });
 
   test('the count reaches the console in production, end to end', async () => {
     // The point of the whole change, asserted through the real logger rather
     // than a mock of it: with console logging off, the deletion still prints.
-    const printed = [];
+    const printed: string[] = [];
     const savedEnabled = logger.enabled;
     logger.enabled = false;
-    mock.method(console, 'log', (...a) => printed.push(a.map(String).join(' ')));
+    mock.method(console, 'log', (...a: unknown[]) => printed.push(a.map(String).join(' ')));
 
     scheduler.scheduleInterval('accountCleanup', 1000, async () => 7);
     mock.timers.tick(1000);
@@ -270,15 +279,15 @@ describe('what the retention jobs report', () => {
   test('scheduling the jobs is itself audited, so an idle log is not ambiguous', async () => {
     // With zero-row runs silent, a production log containing no deletion lines
     // cannot otherwise be told apart from one where the jobs never mounted.
-    const audits = [];
-    mock.method(logger, 'audit', (msg) => audits.push(msg));
+    const audits: string[] = [];
+    mock.method(logger, 'audit', (msg: string) => audits.push(msg));
     mock.method(logger, 'info', () => {});
 
     scheduler.scheduleCleanupTasks();
 
     assert.equal(audits.length, 1);
-    assert.match(audits[0], /aiCleanup/);
-    assert.match(audits[0], /accountCleanup/);
+    assert.match(audits[0]!, /aiCleanup/);
+    assert.match(audits[0]!, /accountCleanup/);
   });
 });
 
@@ -288,8 +297,8 @@ describe('the demo refresh is opt-in', () => {
    * destructive job that mounts itself by default in whatever environment
    * happens to load this config is not something to opt out of.
    */
-  const config = require('../config');
-  let saved;
+  const config: typeof import('../config') = require('../config');
+  let saved: boolean;
 
   beforeEach(() => {
     saved = config.demo.refreshEnabled;
@@ -317,9 +326,9 @@ describe('the demo refresh is opt-in', () => {
   });
 
   test('mounting it is audited, like the retention jobs', () => {
-    const audits = [];
+    const audits: string[] = [];
     mock.restoreAll();
-    mock.method(logger, 'audit', (msg) => audits.push(msg));
+    mock.method(logger, 'audit', (msg: string) => audits.push(msg));
     mock.method(logger, 'info', () => {});
     config.demo.refreshEnabled = true;
 
@@ -358,7 +367,9 @@ describe('scheduleWeeklyReports', () => {
 
   test('next runs this coming Sunday at 7 p.m. Toronto time', () => {
     scheduler.scheduleWeeklyReports();
-    const next = scheduler.jobs.get('weeklyReports').job.getNextRun();
+    const entry = scheduler.jobs.get('weeklyReports');
+    assert.ok(entry && entry.kind === 'cron', 'weeklyReports was not registered as a cron job');
+    const next = entry.job.getNextRun()!;
 
     const daysAway = (next.getTime() - Date.now()) / 86400000;
     assert.ok(daysAway > 0 && daysAway <= 7, `next run ${next.toISOString()}`);

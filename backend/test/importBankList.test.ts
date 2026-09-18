@@ -1,47 +1,49 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { parseBankList } = require('../services/import/bankList');
-const { parseOcr } = require('../services/import/parse');
-const {
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { parseBankList } from '../services/import/bankList';
+import { parseOcr } from '../services/import/parse';
+import {
   TODAY, line, at, bankScreenshot, stackedBalanceLines, iconListLines,
-} = require('./helpers/ocrLayouts');
+} from './helpers/ocrLayouts';
+import type { ParserDraft } from '../types/import';
 
 /**
  * Bank-app transaction lists. OCR can drop a minus sign without lowering its
  * confidence, so the rules about direction are the ones that matter most here.
  */
 describe('parseBankList', () => {
-  const byDescription = (drafts) => Object.fromEntries(drafts.map((d) => [d.description, d]));
+  const byDescription = (drafts: ParserDraft[]): Record<string, ParserDraft> =>
+    Object.fromEntries(drafts.map((d) => [d.description, d]));
 
   test('reads each row with its header date and sign', () => {
     const drafts = byDescription(parseBankList(bankScreenshot(), TODAY).drafts);
     assert.deepEqual(Object.keys(drafts), ['SOBEYS #1234', 'Payroll Deposit', 'TIM HORTONS']);
 
-    assert.equal(drafts['SOBEYS #1234'].date, '2026-09-14');
-    assert.equal(drafts['SOBEYS #1234'].amount, '23.47');
-    assert.equal(drafts['SOBEYS #1234'].type, 'expense');
-    assert.deepEqual(drafts['SOBEYS #1234'].flags, []);
+    assert.equal(drafts['SOBEYS #1234']!.date, '2026-09-14');
+    assert.equal(drafts['SOBEYS #1234']!.amount, '23.47');
+    assert.equal(drafts['SOBEYS #1234']!.type, 'expense');
+    assert.deepEqual(drafts['SOBEYS #1234']!.flags, []);
 
-    assert.equal(drafts['Payroll Deposit'].type, 'income');
-    assert.equal(drafts['Payroll Deposit'].amount, '1250.00');
+    assert.equal(drafts['Payroll Deposit']!.type, 'income');
+    assert.equal(drafts['Payroll Deposit']!.amount, '1250.00');
   });
 
   test('an unsigned amount is a guess, never a confirmed expense', () => {
     const tim = byDescription(parseBankList(bankScreenshot(), TODAY).drafts)['TIM HORTONS'];
-    assert.equal(tim.date, '2026-09-12');
-    assert.equal(tim.type, 'expense');
-    assert.ok(tim.flags.includes('type_guessed'));
-    assert.ok(tim.flags.includes('pending'));
+    assert.equal(tim!.date, '2026-09-12');
+    assert.equal(tim!.type, 'expense');
+    assert.ok(tim!.flags.includes('type_guessed'));
+    assert.ok(tim!.flags.includes('pending'));
   });
 
   test('income words make an unsigned amount a guessed income', () => {
     const [draft] = parseBankList(groupRows([
       line('Sep 1 E-TRANSFER RECEIVED'), line('$40.00', { x: 600 }),
     ]), TODAY).drafts;
-    assert.equal(draft.type, 'income');
-    assert.equal(draft.date, '2026-09-01');
-    assert.deepEqual(draft.flags, ['type_guessed']);
+    assert.equal(draft!.type, 'income');
+    assert.equal(draft!.date, '2026-09-01');
+    assert.deepEqual(draft!.flags, ['type_guessed']);
   });
 
   test('an unreadable header ends the previous date instead of extending it', () => {
@@ -51,9 +53,9 @@ describe('parseBankList', () => {
       line('Yer', { y: at(2) }),
       line('NETFLIX', { y: at(3) }), line('-$2.00', { x: 600, y: at(3) }),
     ]), TODAY);
-    assert.equal(drafts[0].date, TODAY);
-    assert.equal(drafts[1].date, null);
-    assert.ok(drafts[1].flags.includes('missing_date'));
+    assert.equal(drafts[0]!.date, TODAY);
+    assert.equal(drafts[1]!.date, null);
+    assert.ok(drafts[1]!.flags.includes('missing_date'));
   });
 
   test('a title above the first transaction does not end the first header', () => {
@@ -62,13 +64,13 @@ describe('parseBankList', () => {
       line('Chequing account', { y: at(1) }),
       line('SOBEYS', { y: at(2) }), line('-$1.00', { x: 600, y: at(2) }),
     ]), TODAY);
-    assert.equal(drafts[0].date, '2026-09-14');
+    assert.equal(drafts[0]!.date, '2026-09-14');
   });
 
   test('a row with no date anywhere is flagged', () => {
     const [draft] = parseBankList(groupRows([line('SOBEYS'), line('-$1.00', { x: 600 })]), TODAY).drafts;
-    assert.equal(draft.date, null);
-    assert.ok(draft.flags.includes('missing_date'));
+    assert.equal(draft!.date, null);
+    assert.ok(draft!.flags.includes('missing_date'));
   });
 
   test('skips zero amounts and rows without an amount', () => {
@@ -82,7 +84,7 @@ describe('parseBankList', () => {
 
   describe('running balance', () => {
     // Newest first: each balance is the one before it plus the transaction.
-    const withBalances = (rows) => groupRows(rows.flatMap(([text, amount, balance], i) => [
+    const withBalances = (rows: [string, string, string][]) => groupRows(rows.flatMap(([text, amount, balance], i) => [
       line(`Sep ${14 - i} ${text}`, { y: at(i) }),
       line(amount, { x: 500, y: at(i) }),
       line(balance, { x: 650, y: at(i) }),
@@ -94,12 +96,12 @@ describe('parseBankList', () => {
         ['SOBEYS', '$23.47', '$976.53'],
         ['OPENING', '$5.00', '$1,000.00'],
       ]), TODAY);
-      assert.equal(drafts[0].type, 'income');
-      assert.deepEqual(drafts[0].flags, ['type_guessed', 'arithmetic_verified']);
-      assert.equal(drafts[1].type, 'expense');
-      assert.deepEqual(drafts[1].flags, ['type_guessed', 'arithmetic_verified']);
+      assert.equal(drafts[0]!.type, 'income');
+      assert.deepEqual(drafts[0]!.flags, ['type_guessed', 'arithmetic_verified']);
+      assert.equal(drafts[1]!.type, 'expense');
+      assert.deepEqual(drafts[1]!.flags, ['type_guessed', 'arithmetic_verified']);
       // The oldest row has nothing below it to check against.
-      assert.deepEqual(drafts[2].flags, ['type_guessed']);
+      assert.deepEqual(drafts[2]!.flags, ['type_guessed']);
     });
 
     test('verifies a credit card list, whose balance rises with purchases', () => {
@@ -108,9 +110,9 @@ describe('parseBankList', () => {
         ['NETFLIX', '-$16.99', '$500.00'],
         ['OPENING', '-$1.00', '$483.01'],
       ]), TODAY);
-      assert.equal(drafts[0].type, 'expense');
-      assert.deepEqual(drafts[0].flags, ['arithmetic_verified']);
-      assert.deepEqual(drafts[1].flags, ['arithmetic_verified']);
+      assert.equal(drafts[0]!.type, 'expense');
+      assert.deepEqual(drafts[0]!.flags, ['arithmetic_verified']);
+      assert.deepEqual(drafts[1]!.flags, ['arithmetic_verified']);
     });
 
     test('flags a row the balances contradict', () => {
@@ -119,8 +121,8 @@ describe('parseBankList', () => {
         ['PAYROLL', '$1,000.00', '$1,000.00'],
         ['OPENING', '$1,000.00', '$0.00'],
       ]), TODAY);
-      assert.ok(drafts[0].flags.includes('balance_mismatch'));
-      assert.ok(!drafts[0].flags.includes('arithmetic_verified'));
+      assert.ok(drafts[0]!.flags.includes('balance_mismatch'));
+      assert.ok(!drafts[0]!.flags.includes('arithmetic_verified'));
     });
 
     test('a verified amount does not make a guessed direction confident', () => {
@@ -134,10 +136,10 @@ describe('parseBankList', () => {
         today: TODAY,
       });
       const sobeys = result.rows[0];
-      assert.ok(sobeys.flags.includes('arithmetic_verified'));
-      assert.ok(sobeys.flags.includes('type_guessed'));
+      assert.ok(sobeys!.flags.includes('arithmetic_verified'));
+      assert.ok(sobeys!.flags.includes('type_guessed'));
       // Header year inferred (x0.9 on 0.99) and direction guessed (0.9): 0.891.
-      assert.equal(sobeys.confidence, 0.89);
+      assert.equal(sobeys!.confidence, 0.89);
     });
 
     test('works on an oldest-first list', () => {
@@ -146,9 +148,9 @@ describe('parseBankList', () => {
         ['SOBEYS', '$23.47', '$976.53'],
         ['PAYROLL', '$1,000.00', '$1,976.53'],
       ]), TODAY);
-      assert.ok(drafts[1].flags.includes('arithmetic_verified'));
-      assert.ok(drafts[2].flags.includes('arithmetic_verified'));
-      assert.ok(!drafts[0].flags.includes('arithmetic_verified'));
+      assert.ok(drafts[1]!.flags.includes('arithmetic_verified'));
+      assert.ok(drafts[2]!.flags.includes('arithmetic_verified'));
+      assert.ok(!drafts[0]!.flags.includes('arithmetic_verified'));
     });
   });
 
@@ -156,7 +158,7 @@ describe('parseBankList', () => {
     test('joins the line tucked under it instead of ending the date', () => {
       const { drafts } = parseBankList(groupRows(iconListLines()), TODAY);
       const bakery = drafts.find((d) => d.amount === '45.03');
-      assert.equal(bakery.description, 'Sq *Corner Bakery Annex');
+      assert.equal(bakery!.description, 'Sq *Corner Bakery Annex');
       assert.deepEqual(drafts.slice(-2).map((d) => d.date), ['2026-09-14', '2026-09-14']);
     });
 
@@ -180,12 +182,12 @@ describe('parseBankList', () => {
         ['2026-09-15', '32.00', 'INTERAC ETRNSFR SENT ALEX SAMPLE PERSON'],
       ]);
       // 3,016.15 - 2,991.15 is the newer entry's 25.00.
-      assert.ok(drafts[0].flags.includes('arithmetic_verified'), drafts[0].flags.join());
+      assert.ok(drafts[0]!.flags.includes('arithmetic_verified'), drafts[0]!.flags.join());
       assert.ok(!drafts.some((d) => d.flags.includes('balance_mismatch')));
     });
 
     test('right-aligned amounts a normal row apart are separate transactions', () => {
-      const amount = (text, row) => line(text, { x: 760 - text.length * 16, y: at(row) });
+      const amount = (text: string, row: number) => line(text, { x: 760 - text.length * 16, y: at(row) });
       const { drafts } = parseBankList(groupRows([
         line('Sep 14', { y: at(0) }),
         line('SOBEYS', { y: at(1) }), amount('$23.47', 1),

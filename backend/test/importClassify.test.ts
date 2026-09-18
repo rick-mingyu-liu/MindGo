@@ -1,10 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { classifyLayout } = require('../services/import/classify');
-const { categorize, KEYWORDS } = require('../services/import/categorize');
-const { CATEGORIES } = require('../db/demoData');
-const { TODAY, line, bankScreenshot, receiptPhoto, stackedBalanceLines } = require('./helpers/ocrLayouts');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { classifyLayout } from '../services/import/classify';
+import { categorize, KEYWORDS } from '../services/import/categorize';
+import { CATEGORIES } from '../db/demoData';
+import { TODAY, line, bankScreenshot, receiptPhoto, stackedBalanceLines } from './helpers/ocrLayouts';
+import type { TransactionType } from '../types/import';
 
 /**
  * Which parser a screenshot goes to, and the first-guess category of each row.
@@ -52,7 +53,10 @@ describe('categorize', () => {
   });
 
   test('every category it can answer is one the picker offers', () => {
-    for (const [type, map] of Object.entries(KEYWORDS)) {
+    // Object.entries's type widens KEYWORDS's keys to string (TS7053 without
+    // this), though KEYWORDS is declared Record<TransactionType, ...> and only
+    // ever has the two.
+    for (const [type, map] of Object.entries(KEYWORDS) as [TransactionType, Record<string, string[]>][]) {
       for (const category of Object.keys(map)) {
         assert.ok(CATEGORIES[type].includes(category), `${category} is not a ${type} category`);
       }

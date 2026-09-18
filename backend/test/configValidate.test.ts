@@ -1,9 +1,9 @@
-const { test, describe, before, after } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 /**
  * The startup check exits the process, so it is exercised in a child rather
@@ -15,7 +15,7 @@ const path = require('node:path');
  */
 
 const VALIDATE = path.join(__dirname, '..', 'config', 'validate.js');
-let cwd;
+let cwd: string;
 
 before(() => {
   cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mindgo-config-'));
@@ -29,7 +29,7 @@ after(() => fs.rmSync(cwd, { recursive: true, force: true }));
  * spawnSync rather than execFileSync because the warnings go to stderr, which
  * execFileSync discards on a zero exit.
  */
-function runWith(env) {
+function runWith(env: NodeJS.ProcessEnv): { code: number | null; output: string } {
   const result = spawnSync(process.execPath, ['-e', `require(${JSON.stringify(VALIDATE)})()`], {
     cwd,
     env: { PATH: process.env.PATH, ...env },
