@@ -1,9 +1,9 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { packageRoot } = require('../utils/packageRoot');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { packageRoot } from '../utils/packageRoot';
 
 /**
  * Compiled code runs from dist/, one level below the source it came from, so

@@ -1,6 +1,6 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { errorSummary } = require('../utils/errorSummary');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { errorSummary } from '../utils/errorSummary';
 
 /**
  * The one shape a caught error may take in a log line: its name and its code.
