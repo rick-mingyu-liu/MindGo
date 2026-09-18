@@ -10,7 +10,7 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-17-backend-typescript-design.md`](../specs/2026-09-17-backend-typescript-design.md)
 
-**Status of this plan:** Step 1 (Tasks 1–6) and the conversion recipe (§ *Converting a file*) were built and run in a throwaway worktree on 2026-09-17: 507 tests passed from `dist/`, lint was clean, `node dist/app.js` and `tsx app.js` both served `/health`, and a clean `npm ci` built `dist/` through `prepare`. Code blocks in those tasks are copied from that run.
+**Status of this plan:** Step 1 (Tasks 1–6) and the conversion recipe (§ *Converting a file*) were built and run in a throwaway worktree on 2026-09-17: 508 tests passed from `dist/`, lint was clean, `node dist/app.js` and `tsx app.js` both served `/health`, and a clean `npm ci` built `dist/` through `prepare`. Code blocks in those tasks are copied from that run.
 
 ## Global Constraints
 
@@ -31,12 +31,12 @@
 | Command | What it proves |
 |---|---|
 | `npm run build` | `tsc` compiles with no errors |
-| `npm test` | Builds, then runs every `dist/test/**/*.test.js`. Expected after step 1: `ℹ tests 507`, `ℹ fail 0` |
+| `npm test` | Builds, then runs every `dist/test/**/*.test.js`. Expected after step 1: `ℹ tests 508`, `ℹ fail 0` |
 | `npm run lint` | ESLint, JavaScript and TypeScript rules, no problems |
 | `PORT=3099 node dist/app.js`, then `curl -s localhost:3099/health` | The compiled server starts, and `/health` returns `{"status":"OK",…}` |
 | `PORT=3098 npx tsx app.js`, then `curl -s localhost:3098/health` | The source runs in dev (`app.ts` from step 7) |
 
-The count is 507 because the old count of 500 counted `test/helpers/ocrLayouts.js` as a test file, which the new glob skips (−1), and step 1 adds 3 `packageRoot` tests and 5 `errorSummary` tests (+8).
+The count is 508 because the old count of 500 already excluded `test/helpers/ocrLayouts.js`, which the new glob skips too, and step 1 adds 3 `packageRoot` tests and 5 `errorSummary` tests (+8). (This paragraph said 507 while the plan was being written, subtracting a further 1 for `ocrLayouts`; the measured count has been 508 from step 1 onward.)
 
 ---
 
@@ -437,7 +437,7 @@ export function errorSummary(e: unknown): ErrorSummary {
 - [ ] **Step 4: Run it to see it pass**
 
 Run: `npm run build && node --test dist/test/errorSummary.test.js`
-Expected: `ℹ pass 5`, `ℹ fail 0`. Then `npm test`: `ℹ tests 507`, `ℹ fail 0`.
+Expected: `ℹ pass 5`, `ℹ fail 0`. Then `npm test`: `ℹ tests 508`, `ℹ fail 0`.
 
 - [ ] **Step 5: Commit**
 
@@ -720,7 +720,7 @@ The `db:setup` and `db:seed` lines stay as they are, since the scripts now run f
 
 - [ ] **Step 2: Run the step checklist**
 
-`npm run build` · `npm test` (507/0) · `npm run lint` · both `/health` checks from Task 1 Step 9. With the local backend on 3001 and frontend on 3000, log in, open the dashboard, and import `eval/synthetic/bank-balance-01.png` through to the review step without saving. If port 3001 is taken by an old nodemon, see the memory note on the orphaned parent process.
+`npm run build` · `npm test` (508/0) · `npm run lint` · both `/health` checks from Task 1 Step 9. With the local backend on 3001 and frontend on 3000, log in, open the dashboard, and import `eval/synthetic/bank-balance-01.png` through to the review step without saving. If port 3001 is taken by an old nodemon, see the memory note on the orphaned parent process.
 
 - [ ] **Step 3: Commit, push and open PR 1**, when the user says so
 
@@ -731,7 +731,7 @@ git push -u origin chore/ts-1-tooling
 gh pr create --base main --title "Build the backend with TypeScript (step 1 of 9)" --body-file <scratchpad>/pr1.md
 ```
 
-The PR body covers: what changed (tooling only, no source converted), the new scripts, why `prepare`, `eval/` needing a built backend, the test count change (500 → 507, and why), the test plan with the checks above, the Render check the user must do after merging, and the footer.
+The PR body covers: what changed (tooling only, no source converted), the new scripts, why `prepare`, `eval/` needing a built backend, the test count change (500 → 508, and why), the test plan with the checks above, the Render check the user must do after merging, and the footer.
 
 - [ ] **Step 4: After the user merges, check the deploy with them**
 
@@ -741,7 +741,7 @@ In Render's deploy log, look for `> npm run build` and `> tsc` during `npm insta
 
 # Converting a file
 
-Every file in steps 2–8 is converted the same way. The two worked examples were converted and verified in the prototype (build, 507 tests, lint, both `/health` checks).
+Every file in steps 2–8 is converted the same way. The two worked examples were converted and verified in the prototype (build, 508 tests, lint, both `/health` checks).
 
 1. `git mv x.js x.ts`.
 2. Replace requires:
@@ -859,7 +859,7 @@ Per-step notes:
 - **Step 4:** also send yourself the report email (`POST /auth/test-email` while signed in) and compare it with one sent before the step.
 - **Step 5:** also run `createdb mindgo_ts_check && DATABASE_URL=postgresql://localhost/mindgo_ts_check npm run db:setup && … npm run db:seed`, then `TEST_DATABASE_URL=… npm test` (the `api.test.js` suite), then `dropdb mindgo_ts_check`. Never against Neon.
 - **Step 6:** the largest step. If the controllers diff goes past about 1,500 lines, split it into 6a (middleware + routes + the three smallest controllers) and 6b (auth, investment, summary, transaction, ai), and say so in the PR.
-- **Step 8:** the count stays 507. Compare `node --test` output test names before and after (`npm test 2>&1 | grep -E '^# Subtest|✔|✖' | sort`), and they must match exactly.
+- **Step 8:** the count stays 508. Compare `node --test` output test names before and after (`npm test 2>&1 | grep -E '^# Subtest|✔|✖' | sort`), and they must match exactly.
 
 Each of steps 2–8 follows the same task sequence:
 
@@ -881,7 +881,7 @@ Each of steps 2–8 follows the same task sequence:
 - [ ] `git ls-files backend | grep -E '\.js$'` prints nothing. If it prints a file, that file was missed; go back to its step.
 - [ ] Remove `"allowJs": true` from `tsconfig.json`. `npm run build` must still pass.
 - [ ] In `eslint.config.mjs`, delete the `files: ['**/*.js']` block and replace the header paragraph about "both kinds of file" with one saying the backend is TypeScript. `npm run lint` must be clean.
-- [ ] `npm test`: 507 pass, 0 fail. Commit: `Drop JavaScript support from the backend build`.
+- [ ] `npm test`: 508 pass, 0 fail. Commit: `Drop JavaScript support from the backend build`.
 
 ### Task 9.2: Update the docs
 
@@ -897,7 +897,7 @@ Each of steps 2–8 follows the same task sequence:
   - the architecture tree shows `.ts` files, `types/` and `dist/` (ignored);
   - the stack line says TypeScript on both sides;
   - development commands: `npm run build`;
-  - the tests section: the count is 507.
+  - the tests section: the count is 508.
 - [ ] **`backend/ARCHITECTURE.md`:** the request flow mentions typed `req.user` (`types/express.d.ts`) and typed rows (`db.query<Row>`), and every file reference ends in `.ts`.
 - [ ] **Spec status:** `implemented <date>, PRs #…`.
 - [ ] Commit: `Describe the TypeScript backend in the docs`, then push, open the PR, merge and check the deploy, as in every step.
@@ -926,4 +926,4 @@ Each of steps 2–8 follows the same task sequence:
   - `dev` is `tsx watch app.js` from step 1, and `nodemon` is removed;
   - TypeScript is pinned to `~6.0.3`;
   - the test glob is `'dist/test/**/*.test.js'`;
-  - the test count is 507.
+  - the test count is 508.

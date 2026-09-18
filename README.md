@@ -43,7 +43,7 @@ So the dashboard's windows are term-aligned:
 | A named term | `?term=2026-spring` |
 | Rolling months | `?months=4` |
 
-The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–Dec, defined once in [`backend/utils/terms.js`](backend/utils/terms.js). Those three tile Jan–Dec exactly, so a calendar year *is* three terms and a yearly total can never disagree with the terms inside it. Bounds are half-open `[start, end)`.
+The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–Dec, defined once in [`backend/utils/terms.ts`](backend/utils/terms.ts). Those three tile Jan–Dec exactly, so a calendar year *is* three terms and a yearly total can never disagree with the terms inside it. Bounds are half-open `[start, end)`.
 
 ---
 
@@ -188,42 +188,42 @@ The alternation is the point: a study term is tuition and rent against part-time
 
 `npm run db:seed` is **re-runnable** and is how the demo stays current — it replaces the demo user's rows rather than adding to them. Amounts vary month to month but come from a generator seeded on the term and category, so re-seeding on the same day is byte-identical.
 
-To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true` to mount a 30-day refresh job. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.js`](backend/services/demoAccountService.js). The refresh discards anything a visitor adds while trying the demo.
+To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true` to mount a 30-day refresh job. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.ts`](backend/services/demoAccountService.ts). The refresh discards anything a visitor adds while trying the demo.
 
 ---
 
 ## Architecture
 
 ```
-backend/                        Express + PostgreSQL API (plain JavaScript)
-├── app.js                      helmet, morgan, cors, routers, error handlers
-├── config/index.js             ALL configuration — read env vars here, not process.env
-├── config/validate.js          startup check; exits on a missing secret
+backend/                        Express + PostgreSQL API (TypeScript)
+├── app.ts                      helmet, morgan, cors, routers, error handlers
+├── config/index.ts             ALL configuration — read env vars here, not process.env
+├── config/validate.ts          startup check; exits on a missing secret
 ├── controllers/                request handling and orchestration
 ├── db/
-│   ├── connection.js           lazy pool, auto-closes after 5 min idle
+│   ├── connection.ts           lazy pool, auto-closes after 5 min idle
 │   ├── schema.sql              desired end state
 │   ├── migrations/             numbered, applied by hand
-│   └── demoData.js             the demo account, generated from today
-├── middleware/                 auth.js (JWT), rateLimiter.js
+│   └── demoData.ts             the demo account, generated from today
+├── middleware/                 auth.ts (JWT), rateLimiter.ts
 ├── routes/                     express-validator chains + mounting
 ├── services/
 │   ├── import/                 screenshot parser — pure functions, no I/O
-│   │   ├── rows.js             OCR boxes → visual rows (drops icons)
-│   │   ├── tokens.js           amounts and days out of text
-│   │   ├── classify.js         which layout a screenshot is
-│   │   ├── bankList.js         receipt.js  uberActivity.js  uberEats.js  wechat.js
-│   │   ├── categorize.js       first-guess category from the merchant
-│   │   ├── duplicates.js       possible_duplicate lookup
-│   │   └── parse.js            confidence, flags, output
-│   ├── schedulerService.js     weekly email (cron, Toronto time) + cleanup intervals
+│   │   ├── rows.ts             OCR boxes → visual rows (drops icons)
+│   │   ├── tokens.ts           amounts and days out of text
+│   │   ├── classify.ts         which layout a screenshot is
+│   │   ├── bankList.ts         receipt.ts  uberActivity.ts  uberEats.ts  wechat.ts
+│   │   ├── categorize.ts       first-guess category from the merchant
+│   │   ├── duplicates.ts       possible_duplicate lookup
+│   │   └── parse.ts            confidence, flags, output
+│   ├── schedulerService.ts     weekly email (cron, Toronto time) + cleanup intervals
 │   └── …                       email, AI, exchange rates, stock data
 ├── utils/
-│   ├── terms.js                the term calendar — one definition
-│   ├── dates.js                calendar-day helpers
-│   ├── logger.js               info/warn/debug are dev-only; error/audit always print
-│   └── privacy.js              maskEmail()
-└── test/                       27 files, 500 tests, node --test
+│   ├── terms.ts                the term calendar — one definition
+│   ├── dates.ts                calendar-day helpers
+│   ├── logger.ts               info/warn/debug are dev-only; error/audit always print
+│   └── privacy.ts              maskEmail()
+└── test/                       30 files, 508 tests, node --test
 
 frontend/                       Next.js 14, Pages Router, TypeScript
 ├── pages/                      one file per screen (import.tsx, settings.tsx, …)
@@ -252,12 +252,12 @@ docs/superpowers/               design spec and implementation plan for screensh
 
 ### Conventions worth knowing
 
-- **All config is centralized** in `config/index.js`. Read env vars from there.
+- **All config is centralized** in `config/index.ts`. Read env vars from there.
 - **Controllers read the user id as `req.user.userId`.** Protected routers apply `router.use(auth)` at the top.
 - **Validation** is `express-validator` arrays in the route file, checked with `validationResult(req)` at the top of the controller.
 - **Always use parameterized queries.** Every query naming a user-owned table is scoped by `user_id`.
 - **Amounts are two-decimal strings** in the import path, from OCR to INSERT — never floats.
-- **Dates are calendar days, not instants.** A `pg` type parser hands `DATE` columns back as `'YYYY-MM-DD'`. Never `new Date(day).getMonth()` — a plain `'2026-08-01'` parses as UTC midnight and answers July west of UTC. Use `utils/dates.js` and `lib/date.ts`.
+- **Dates are calendar days, not instants.** A `pg` type parser hands `DATE` columns back as `'YYYY-MM-DD'`. Never `new Date(day).getMonth()` — a plain `'2026-08-01'` parses as UTC midnight and answers July west of UTC. Use `utils/dates.ts` and `lib/date.ts`.
 - **Never log a credential** — no tokens, JWTs or password hashes — and **never log screenshot text, row values or request bodies**. Log a user id where one exists, a masked address only where one does not.
 - **`logger.audit` is for destroying user data.** `info`/`warn`/`debug` print nothing in production.
 - **Test fixtures from real screenshots** keep the OCR boxes and replace every name, place and reference number.
@@ -297,7 +297,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 
 ### Tests
 
-[`backend/test/`](backend/test/) holds the application's tests — **500 across 27 files**, run by `node --test`. No test framework is installed and none is needed.
+[`backend/test/`](backend/test/) holds the application's tests — **508 across 30 files**, run by `node --test`. No test framework is installed and none is needed.
 
 **Unit tests always run**, with no database and no network. They cover the things that fail silently:
 
@@ -309,9 +309,9 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
 
-**Recorded OCR fixtures** (`importFixtures.test.js`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
+**Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
-**`api.test.js` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`:
+**`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`:
 
 ```bash
 TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
@@ -412,7 +412,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `OPENAI_API_KEY` and the email credentials in Render, and keep the OpenAI account in credit — AI planning reports itself unavailable otherwise.
 
-**Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.js` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
+**Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
 **Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus interval jobs that delete expired AI plans and unverified accounts. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
@@ -420,7 +420,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 ## Stack
 
-**Backend** — Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai`.
+**Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai`.
 
 **Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
 
