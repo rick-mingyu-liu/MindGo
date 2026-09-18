@@ -17,6 +17,9 @@ const validateEmail = (email: string) => {
 
   // Additional checks
   if (email.length > config.validation.emailMaxLength) return false; // RFC 5321 limit
+  // String.prototype.split always returns at least one element, so
+  // email.split('@')[0] is never actually undefined; the ?? '' is only to
+  // satisfy noUncheckedIndexedAccess and never actually takes the '' branch.
   if ((email.split('@')[0] ?? '').length > 64) return false; // Local part limit
   if (email.includes('..')) return false; // No consecutive dots
   if (email.startsWith('.') || email.endsWith('.')) return false; // No leading/trailing dots

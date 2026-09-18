@@ -36,6 +36,11 @@ const rollingValidation = [
   // Hung off `months` only because a validator has to hang off something; the
   // check is about the request as a whole.
   query('months').custom((_value, { req }) => {
+    // express-validator's own Meta type declares `req.query?: Record<string,
+    // any>` (optional) rather than Express's actual Request type, so without
+    // the ?. this is TS18048 "'req.query' is possibly 'undefined'" — Express
+    // itself always sets req.query to an object, so this never actually goes
+    // through the undefined branch.
     const given = ['term', 'year', 'months'].filter((k) => req.query?.[k] !== undefined);
     if (given.length > 1) {
       throw new Error(`pass one of term, year or months, not ${given.join(' and ')}`);

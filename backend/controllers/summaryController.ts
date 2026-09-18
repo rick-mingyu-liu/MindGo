@@ -387,6 +387,10 @@ const summaryController = {
   // Get spending trends
   async getSpendingTrends(req: Request, res: Response) {
     try {
+      // getSpendingTrends has no express-validator chain, so this reads
+      // req.query exactly as the old `const { months = 6 } = req.query`
+      // destructuring did: ?? 6 fires on the same input the old default
+      // fired on — undefined only, never ''.
       const months = (req.query.months as string | undefined) ?? 6;
       const currentDate = new Date();
       // Integer arithmetic, not `new Date(y, m, 1).toISOString()`: that form is
