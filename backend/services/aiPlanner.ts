@@ -19,9 +19,8 @@ class AiUnavailableError extends Error {
  * far more surface than this and still satisfies it; so does the fake client
  * `test/aiUnavailable.test.ts` swaps in
  * (`{ chat: { completions: { create: async () => { throw failWith; } } } }`).
- * Typing `openai` as `OpenAI | null` would reject that fake once the test
- * itself is converted to TypeScript (step 8) even though it works fine at
- * runtime today.
+ * Typing `openai` as `OpenAI | null` would reject that fake, even though it
+ * works fine at runtime.
  */
 interface ChatCompletionsClient {
   chat: {
