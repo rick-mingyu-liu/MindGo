@@ -1,7 +1,9 @@
-const { validationResult } = require('express-validator');
-const config = require('../config');
-const { parseOcr } = require('../services/import/parse');
-const { flagDuplicates } = require('../services/import/duplicates');
+import { Request, Response } from 'express';
+import { validationResult, FieldValidationError } from 'express-validator';
+import config = require('../config');
+import { parseOcr } from '../services/import/parse';
+import { flagDuplicates } from '../services/import/duplicates';
+import { errorSummary } from '../utils/errorSummary';
 
 /**
  * Screenshot import, server side. The browser has already run OCR; this turns
@@ -12,10 +14,16 @@ const { flagDuplicates } = require('../services/import/duplicates');
  * and code only, because a database error message can quote a value.
  */
 const importController = {
-  async parse(req, res) {
+  async parse(req: Request, res: Response) {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array().map(({ path, msg }) => ({ path, msg })) });
+      // This file only ever validates with body()/query() chains, never
+      // oneOf() or checkSchema(), so every error here is a field error and
+      // carries .path — the wider ValidationError union express-validator's
+      // .array() returns doesn't reflect that.
+      return res.status(400).json({
+        errors: (errors.array() as FieldValidationError[]).map(({ path, msg }) => ({ path, msg })),
+      });
     }
 
     try {
@@ -39,10 +47,11 @@ const importController = {
         unparsedLines: result.unparsedLines,
       });
     } catch (error) {
-      console.error('Import parse error:', { userId: req.user.userId, error: error.name, code: error.code });
+      const userId = req.user.userId;
+      console.error('Import parse error:', { userId, ...errorSummary(error) });
       return res.status(500).json({ error: 'Server error' });
     }
   },
 };
 
-module.exports = importController;
+export = importController;

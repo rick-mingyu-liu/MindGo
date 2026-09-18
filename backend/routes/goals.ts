@@ -1,7 +1,7 @@
-const express = require('express');
-const { body } = require('express-validator');
-const goalController = require('../controllers/goalController');
-const auth = require('../middleware/auth');
+import express from 'express';
+import { body } from 'express-validator';
+import goalController = require('../controllers/goalController');
+import auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -30,4 +30,4 @@ router.delete('/:id', goalController.deleteGoal);
 router.put('/:id/progress', progressValidation, goalController.updateProgress);
 router.post('/from-ai-plan', goalController.createGoalFromAIPlan);
 
-module.exports = router; 
+export = router;

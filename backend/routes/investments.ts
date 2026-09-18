@@ -1,7 +1,7 @@
-const express = require('express');
-const { body } = require('express-validator');
-const investmentController = require('../controllers/investmentController');
-const auth = require('../middleware/auth');
+import express from 'express';
+import { body } from 'express-validator';
+import investmentController = require('../controllers/investmentController');
+import auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -28,4 +28,4 @@ router.get('/watchlist/ai-summary', investmentController.getWatchlistAISummary);
 router.get('/search', investmentController.searchStocks);
 router.get('/analysis/:symbol', investmentController.getStockAnalysis);
 
-module.exports = router; 
+export = router;
