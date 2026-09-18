@@ -1,12 +1,12 @@
-const { test, describe, beforeEach, afterEach, mock } = require('node:test');
-const assert = require('node:assert/strict');
-const axios = require('axios');
-const config = require('../config');
-const {
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import axios from 'axios';
+import config = require('../config');
+import {
   validateEmail,
   validateAgainstDomainList,
   DISPOSABLE_EMAIL_DOMAINS,
-} = require('../services/emailValidationService');
+} from '../services/emailValidationService';
 
 /**
  * Decision C: registration must work without MAILBOXLAYER_API_KEY.
@@ -27,15 +27,15 @@ const NO_KEY = undefined;
 const KEY = 'test-key-the-http-call-is-mocked';
 
 describe('email validation', () => {
-  let savedKey;
-  let printed;
+  let savedKey: string | undefined;
+  let printed: unknown[][];
 
   beforeEach(() => {
     savedKey = config.apiKeys.mailboxLayer;
     printed = [];
-    mock.method(console, 'log', (...a) => printed.push(a));
-    mock.method(console, 'warn', (...a) => printed.push(a));
-    mock.method(console, 'error', (...a) => printed.push(a));
+    mock.method(console, 'log', (...a: unknown[]) => printed.push(a));
+    mock.method(console, 'warn', (...a: unknown[]) => printed.push(a));
+    mock.method(console, 'error', (...a: unknown[]) => printed.push(a));
   });
 
   afterEach(() => {
@@ -115,7 +115,7 @@ describe('email validation', () => {
     beforeEach(() => { config.apiKeys.mailboxLayer = KEY; });
 
     const ok = { format_valid: true, disposable: false, mx_found: true, smtp_check: true };
-    const reply = (over) => mock.method(axios, 'get', async () => ({ data: { ...ok, ...over } }));
+    const reply = (over: Partial<typeof ok>) => mock.method(axios, 'get', async () => ({ data: { ...ok, ...over } }));
 
     test('accepts a clean verdict', async () => {
       reply({});
