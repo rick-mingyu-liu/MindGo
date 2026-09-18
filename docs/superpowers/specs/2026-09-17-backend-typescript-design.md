@@ -130,7 +130,7 @@ getting exactly what it gets today. The rules:
 | Today | After conversion |
 |---|---|
 | `module.exports = { a, b }` (22 modules) | `export { a, b }` / `export function a` |
-| `module.exports = <single value>`: a class instance, router, function or config object (23 modules) | `export = value` |
+| `module.exports = <single value>`: a class instance, router, function or config object (26 modules — this said 23 when the spec was written, an undercount; the pre-conversion tree had 27, one of which was `eslint.config.js`, never destined to be `.ts`) | `export = value` |
 | `module.exports.X = …` added to a single value (`aiPlanner.AiUnavailableError`) | `export = Object.assign(value, { X })`, the same object with the same property. TypeScript cannot merge a namespace with an instance |
 
 `export default` is not used anywhere during the conversion. Changing export
