@@ -1,22 +1,41 @@
-const { validationResult } = require('express-validator');
-const db = require('../db/connection');
-const { getExchangeRate } = require('../services/exchangeRateService');
+import { Request, Response } from 'express';
+import { validationResult } from 'express-validator';
+import { query } from '../db/connection';
+import { getExchangeRate } from '../services/exchangeRateService';
+import type { SavingsGoalRow, AiPlanRow } from '../types/db';
+
+/** SELECT id FROM savings_goals — the ownership check before an update/delete. */
+interface GoalIdRow {
+  id: number;
+}
+
+/** A savings_goals row, plus the amounts converted to the caller's requested currency. */
+interface GoalWithConversion extends SavingsGoalRow {
+  convertedCurrentAmount?: number;
+  convertedTargetAmount?: number;
+  convertedCurrency?: string;
+}
 
 const goalController = {
   // Get all goals for user
-  async getGoals(req, res) {
+  async getGoals(req: Request, res: Response) {
     try {
-      const { targetCurrency } = req.query;
-      const goals = await db.query(
+      // req.query is unvalidated here, as it always has been: a non-string
+      // value would already have broken getExchangeRate below at runtime.
+      const targetCurrency = req.query.targetCurrency as string | undefined;
+      const goals = await query<SavingsGoalRow>(
         'SELECT * FROM savings_goals WHERE user_id = $1 ORDER BY created_at DESC',
         [req.user.userId]
       );
-      let resultGoals = goals.rows;
+      const resultGoals: GoalWithConversion[] = goals.rows;
       if (targetCurrency) {
         // Convert each goal's amounts to target currency if needed
-        const rateCache = {};
+        const rateCache: Record<string, number> = {};
         for (const goal of resultGoals) {
-          let convertedCurrent = parseFloat(goal.current_amount);
+          // current_amount can be null; parseFloat coerces its argument to a
+          // string internally, so String(...) here matches parseFloat(null)'s
+          // existing NaN rather than silently defaulting to 0.
+          let convertedCurrent = parseFloat(String(goal.current_amount));
           let convertedTarget = parseFloat(goal.target_amount);
           let convertedCurrency = goal.currency;
           if (goal.currency && goal.currency !== targetCurrency) {
@@ -44,7 +63,7 @@ const goalController = {
   },
 
   // Create new goal
-  async createGoal(req, res) {
+  async createGoal(req: Request, res: Response) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -53,7 +72,7 @@ const goalController = {
 
       const { name, target_amount, current_amount, target_date, description, currency } = req.body;
 
-      const newGoal = await db.query(
+      const newGoal = await query<SavingsGoalRow>(
         'INSERT INTO savings_goals (user_id, name, target_amount, current_amount, target_date, description, currency) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
         [req.user.userId, name, target_amount, current_amount || 0, target_date, description, currency || 'CAD']
       );
@@ -70,7 +89,7 @@ const goalController = {
   },
 
   // Update goal
-  async updateGoal(req, res) {
+  async updateGoal(req: Request, res: Response) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -81,7 +100,7 @@ const goalController = {
       const { name, target_amount, current_amount, target_date, description, currency } = req.body;
 
       // Check if goal belongs to user
-      const existingGoal = await db.query(
+      const existingGoal = await query<GoalIdRow>(
         'SELECT id FROM savings_goals WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -90,7 +109,7 @@ const goalController = {
         return res.status(404).json({ error: 'Goal not found' });
       }
 
-      const updatedGoal = await db.query(
+      const updatedGoal = await query<SavingsGoalRow>(
         'UPDATE savings_goals SET name = $1, target_amount = $2, current_amount = $3, target_date = $4, description = $5, currency = $6 WHERE id = $7 AND user_id = $8 RETURNING *',
         [name, target_amount, current_amount, target_date, description, currency || 'CAD', id, req.user.userId]
       );
@@ -107,12 +126,12 @@ const goalController = {
   },
 
   // Delete goal
-  async deleteGoal(req, res) {
+  async deleteGoal(req: Request, res: Response) {
     try {
       const { id } = req.params;
 
       // Check if goal belongs to user
-      const existingGoal = await db.query(
+      const existingGoal = await query<GoalIdRow>(
         'SELECT id FROM savings_goals WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -121,7 +140,7 @@ const goalController = {
         return res.status(404).json({ error: 'Goal not found' });
       }
 
-      await db.query(
+      await query(
         'DELETE FROM savings_goals WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -135,13 +154,13 @@ const goalController = {
   },
 
   // Update goal progress
-  async updateProgress(req, res) {
+  async updateProgress(req: Request, res: Response) {
     try {
       const { id } = req.params;
       const { current_amount } = req.body;
 
       // Check if goal belongs to user
-      const existingGoal = await db.query(
+      const existingGoal = await query<GoalIdRow>(
         'SELECT id FROM savings_goals WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -150,7 +169,7 @@ const goalController = {
         return res.status(404).json({ error: 'Goal not found' });
       }
 
-      const updatedGoal = await db.query(
+      const updatedGoal = await query<SavingsGoalRow>(
         'UPDATE savings_goals SET current_amount = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
         [current_amount, id, req.user.userId]
       );
@@ -167,9 +186,9 @@ const goalController = {
   },
 
   // Get goal statistics
-  async getGoalStats(req, res) {
+  async getGoalStats(req: Request, res: Response) {
     try {
-      const goals = await db.query(
+      const goals = await query<SavingsGoalRow>(
         'SELECT * FROM savings_goals WHERE user_id = $1',
         [req.user.userId]
       );
@@ -185,9 +204,9 @@ const goalController = {
 
       goals.rows.forEach(goal => {
         stats.totalTargetAmount += parseFloat(goal.target_amount);
-        stats.totalCurrentAmount += parseFloat(goal.current_amount);
-        
-        if (parseFloat(goal.current_amount) >= parseFloat(goal.target_amount)) {
+        stats.totalCurrentAmount += parseFloat(String(goal.current_amount));
+
+        if (parseFloat(String(goal.current_amount)) >= parseFloat(goal.target_amount)) {
           stats.completedGoals += 1;
         }
       });
@@ -205,9 +224,9 @@ const goalController = {
   },
 
   // Clear all goals for user (for testing)
-  async clearAllGoals(req, res) {
+  async clearAllGoals(req: Request, res: Response) {
     try {
-      await db.query(
+      await query(
         'DELETE FROM savings_goals WHERE user_id = $1',
         [req.user.userId]
       );
@@ -221,14 +240,14 @@ const goalController = {
   },
 
   // Create a goal from an AI plan
-  async createGoalFromAIPlan(req, res) {
+  async createGoalFromAIPlan(req: Request, res: Response) {
     try {
       const { aiPlanId, name, target_amount, target_date, description } = req.body;
       if (!aiPlanId || !name || !target_amount || !target_date) {
         return res.status(400).json({ error: 'aiPlanId, name, target_amount, and target_date are required' });
       }
       // Check if AI plan exists and belongs to user
-      const planResult = await db.query(
+      const planResult = await query<AiPlanRow>(
         'SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2',
         [aiPlanId, req.user.userId]
       );
@@ -236,7 +255,7 @@ const goalController = {
         return res.status(404).json({ error: 'AI plan not found' });
       }
       // Insert new goal
-      const newGoal = await db.query(
+      const newGoal = await query<SavingsGoalRow>(
         'INSERT INTO savings_goals (user_id, name, target_amount, current_amount, target_date, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
         [req.user.userId, name, target_amount, 0, target_date || null, description || null]
       );
@@ -251,4 +270,4 @@ const goalController = {
   }
 };
 
-module.exports = goalController; 
+export = goalController;
