@@ -7,8 +7,9 @@ import tseslint from 'typescript-eslint';
  * Flat config (ESLint 9). The backend is TypeScript throughout
  * (docs/superpowers/specs/2026-09-17-backend-typescript-design.md), so the only
  * file-specific block left is the TypeScript one. A .js file appearing under
- * backend/ again would get nothing but the base recommended rules, which is the
- * signal that it should have been .ts.
+ * backend/ again gets no globals and, since flat config defaults sourceType to
+ * module, fails no-undef on `require` and `module.exports` — a loud signal that
+ * it should have been .ts.
  *
  * Deliberately not a style linter — formatting arguments are not worth a build
  * failure on an existing codebase. The rules below are the ones that catch
