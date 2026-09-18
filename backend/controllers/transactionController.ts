@@ -35,15 +35,20 @@ const transactionController = {
       // No express-validator chain runs on this route, so these are read
       // exactly as the original code read them off req.query: untyped
       // strings when present, with page/limit defaulting only on undefined,
-      // matching a destructuring default's own behaviour.
-      const page = parseInt((req.query.page as string | undefined) ?? '1');
-      const limit = parseInt((req.query.limit as string | undefined) ?? '50');
+      // matching a destructuring default's own behaviour. page/limit stay
+      // the raw strings (parsed only at the specific sites below that
+      // originally parsed them) -- '-' and '*' already coerce with ToNumber,
+      // which is what Number() does and parseInt() does not: parsing here
+      // would silently floor a fractional page/limit before offset is
+      // computed, turning '?page=5.7&limit=3' from OFFSET 14.1 into OFFSET 12.
+      const page = (req.query.page as string | undefined) ?? '1';
+      const limit = (req.query.limit as string | undefined) ?? '50';
       const type = req.query.type as string | undefined;
       const category = req.query.category as string | undefined;
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const targetCurrency = req.query.targetCurrency as string | undefined;
-      const offset = (page - 1) * limit;
+      const offset = (Number(page) - 1) * Number(limit);
 
       let sql = 'SELECT * FROM transactions WHERE user_id = $1';
       const params: unknown[] = [req.user.userId];
@@ -76,7 +81,7 @@ const transactionController = {
 
       // Add ordering and pagination
       sql += ` ORDER BY date DESC, created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-      params.push(limit, offset);
+      params.push(parseInt(limit), offset);
 
       const transactions = await query<TransactionRow>(sql, params);
 
@@ -151,10 +156,10 @@ const transactionController = {
       res.json({
         transactions: convertedTransactions,
         pagination: {
-          page,
-          limit,
+          page: parseInt(page),
+          limit: parseInt(limit),
           total: totalCount,
-          pages: Math.ceil(totalCount / limit)
+          pages: Math.ceil(totalCount / Number(limit))
         }
       });
 

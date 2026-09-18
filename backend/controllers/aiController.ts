@@ -3,7 +3,7 @@ import { validationResult } from 'express-validator';
 import { query } from '../db/connection';
 import aiPlanner = require('../services/aiPlanner');
 import { monthOf, monthSpan } from '../utils/dates';
-import type { TransactionRow, TransactionType, AiPlanRow } from '../types/db';
+import type { TransactionRow, TransactionType, AiPlanRow, SavingsGoalRow } from '../types/db';
 
 /**
  * getUserFinancialData's per-goal summary, as aiPlanner's prompt builder
@@ -324,7 +324,7 @@ const aiController = {
       );
 
       // Get savings goals
-      const goals = await query<{ name: string; target_amount: string; current_amount: string | null }>(
+      const goals = await query<SavingsGoalRow>(
         'SELECT * FROM savings_goals WHERE user_id = $1',
         [userId]
       );
@@ -420,14 +420,19 @@ const aiController = {
       // No express-validator chain runs on this route, so these are read
       // exactly as the original code read them off req.query: untyped
       // strings when present, with page/limit defaulting only on undefined,
-      // matching a destructuring default's own behaviour.
-      const page = parseInt((req.query.page as string | undefined) ?? '1');
-      const limit = parseInt((req.query.limit as string | undefined) ?? '10');
-      const offset = (page - 1) * limit;
+      // matching a destructuring default's own behaviour. page/limit stay
+      // the raw strings (parsed only at the specific sites below that
+      // originally parsed them) -- '-' and '*' already coerce with ToNumber,
+      // which is what Number() does and parseInt() does not: parsing here
+      // would silently floor a fractional page/limit before offset is
+      // computed, turning '?page=5.7&limit=3' from OFFSET 14.1 into OFFSET 12.
+      const page = (req.query.page as string | undefined) ?? '1';
+      const limit = (req.query.limit as string | undefined) ?? '10';
+      const offset = (Number(page) - 1) * Number(limit);
 
       const plans = await query<AiPlanRow>(
         'SELECT * FROM ai_plans WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-        [req.user.userId, limit, offset]
+        [req.user.userId, parseInt(limit), offset]
       );
 
       const countResult = await query<{ count: string }>(
@@ -441,10 +446,10 @@ const aiController = {
       res.json({
         plans: plans.rows,
         pagination: {
-          page,
-          limit,
+          page: parseInt(page),
+          limit: parseInt(limit),
           total: totalCount,
-          pages: Math.ceil(totalCount / limit)
+          pages: Math.ceil(totalCount / Number(limit))
         }
       });
 
