@@ -1,9 +1,9 @@
-const { test, describe, after } = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import { test, describe, after } from 'node:test';
+import assert from 'node:assert/strict';
+import {
   parseAmount, extractAmounts, extractTrailingAmount, toCents,
   parseDate, parseDateDetail, splitLeadingDate, addDays,
-} = require('../services/import/tokens');
+} from '../services/import/tokens';
 
 /**
  * The amount and day readers are where a misread becomes a wrong number in
@@ -28,16 +28,16 @@ describe('parseAmount', () => {
   ]) {
     test(`reads ${input}`, () => {
       const amount = parseAmount(input);
-      assert.equal(amount.value, value);
-      assert.equal(amount.sign, sign);
-      assert.equal(amount.corrected, false);
+      assert.equal(amount!.value, value);
+      assert.equal(amount!.sign, sign);
+      assert.equal(amount!.corrected, false);
     });
   }
 
   test('marks US dollars', () => {
-    assert.equal(parseAmount('US$ 3.00').currency, 'USD');
-    assert.equal(parseAmount('3.00 USD').currency, 'USD');
-    assert.equal(parseAmount('$3.00').currency, null);
+    assert.equal(parseAmount('US$ 3.00')!.currency, 'USD');
+    assert.equal(parseAmount('3.00 USD')!.currency, 'USD');
+    assert.equal(parseAmount('$3.00')!.currency, null);
   });
 
   for (const input of ['1 234,56', '12,50', '1,234,56', '23', '$23', '23.4', '23.456', 'Sep 14',
@@ -49,9 +49,9 @@ describe('parseAmount', () => {
 
   test('repairs letters inside an amount and says so', () => {
     const amount = parseAmount('$1O.5O');
-    assert.equal(amount.value, '10.50');
-    assert.equal(amount.corrected, true);
-    assert.equal(parseAmount('l2.3S').value, '12.35');
+    assert.equal(amount!.value, '10.50');
+    assert.equal(amount!.corrected, true);
+    assert.equal(parseAmount('l2.3S')!.value, '12.35');
   });
 });
 
@@ -60,18 +60,18 @@ describe('extractAmounts', () => {
     const { amounts, label } = extractAmounts('SOBEYS #1234 -$23.47 $1,200.00');
     assert.equal(label, 'SOBEYS #1234');
     assert.deepEqual(amounts.map((a) => a.value), ['23.47', '1200.00']);
-    assert.equal(amounts[0].sign, -1);
+    assert.equal(amounts[0]!.sign, -1);
   });
 
   test('keeps a separated sign with its amount', () => {
     const { amounts, label } = extractAmounts('Refund - $ 12.50');
     assert.equal(label, 'Refund');
-    assert.equal(amounts[0].sign, -1);
+    assert.equal(amounts[0]!.sign, -1);
   });
 
   test('does not treat a word as part of an amount', () => {
-    assert.equal(extractTrailingAmount('TOTAL 0.07').label, 'TOTAL');
-    assert.equal(extractTrailingAmount('HST 13% 0.85').label, 'HST 13%');
+    assert.equal(extractTrailingAmount('TOTAL 0.07')!.label, 'TOTAL');
+    assert.equal(extractTrailingAmount('HST 13% 0.85')!.label, 'HST 13%');
     assert.equal(extractTrailingAmount('no amount here'), null);
   });
 });
@@ -113,8 +113,8 @@ describe('parseDate', () => {
   }
 
   test('says when the year was inferred', () => {
-    assert.equal(parseDateDetail('Sep 14', TODAY).inferredYear, true);
-    assert.equal(parseDateDetail('2026-09-14', TODAY).inferredYear, false);
+    assert.equal(parseDateDetail('Sep 14', TODAY)!.inferredYear, true);
+    assert.equal(parseDateDetail('2026-09-14', TODAY)!.inferredYear, false);
   });
 
   test('Feb 29 with no year lands on the most recent leap year', () => {

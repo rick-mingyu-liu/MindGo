@@ -1,12 +1,12 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const { groupRows } = require('../services/import/rows');
-const { parseUberEatsOrders, splitOrderLine } = require('../services/import/uberEats');
-const { classifyLayout } = require('../services/import/classify');
-const { parseOcr } = require('../services/import/parse');
-const {
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { groupRows } from '../services/import/rows';
+import { parseUberEatsOrders, splitOrderLine } from '../services/import/uberEats';
+import { classifyLayout } from '../services/import/classify';
+import { parseOcr } from '../services/import/parse';
+import {
   line, uberEatsOrderLines, UBER_EATS_IMAGE, uberActivityLines, bankScreenshot, receiptPhoto,
-} = require('./helpers/ocrLayouts');
+} from './helpers/ocrLayouts';
 
 /**
  * Uber Eats' Past orders tab: one order per store name, dated and priced on
@@ -24,8 +24,8 @@ describe('splitOrderLine', () => {
   ]) {
     test(`reads ${input}`, () => {
       const order = splitOrderLine(input, TODAY);
-      assert.equal(order.day, day);
-      assert.equal(order.amount.value, amount);
+      assert.equal(order!.day, day);
+      assert.equal(order!.amount.value, amount);
     });
   }
 
@@ -87,6 +87,6 @@ test('parseOcr returns the orders, confident', () => {
   assert.equal(result.layout, 'uber-eats-orders');
   assert.equal(result.needsFallback, false);
   assert.equal(result.rows.length, 6);
-  assert.equal(result.rows[1].category, null, 'no keyword, no guess');
+  assert.equal(result.rows[1]!.category, null, 'no keyword, no guess');
   assert.ok(result.rows.every((r) => r.flags.length === 0));
 });
