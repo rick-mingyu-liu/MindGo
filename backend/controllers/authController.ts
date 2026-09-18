@@ -1,16 +1,84 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { validationResult } = require('express-validator');
-const db = require('../db/connection');
-const config = require('../config');
-const { maskEmail } = require('../utils/privacy');
-const { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } = require('../services/emailService');
-const { validateEmail } = require('../services/emailValidationService');
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'node:crypto';
+import { validationResult } from 'express-validator';
+import { query } from '../db/connection';
+import config = require('../config');
+import { maskEmail } from '../utils/privacy';
+import { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } from '../services/emailService';
+import { validateEmail } from '../services/emailValidationService';
+
+// The columns the SELECT below names — narrower than the full UserRow.
+interface ExistingUserRow {
+  id: number;
+  email: string;
+  email_verified: boolean | null;
+}
+
+// The columns the INSERT ... RETURNING below names.
+interface NewUserRow {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  created_at: Date | null;
+  email_verification_expires: Date | null;
+}
+
+// The columns the SELECT below names, for checking a login attempt.
+interface LoginUserRow {
+  id: number;
+  email: string;
+  password_hash: string;
+  first_name: string;
+  last_name: string;
+  email_verified: boolean | null;
+}
+
+// The columns the SELECT below names, for consuming a verification token.
+interface VerifyEmailUserRow {
+  id: number;
+  email: string;
+  first_name: string;
+  email_verification_expires: Date | null;
+  created_at: Date | null;
+}
+
+// The columns the SELECT below names, for resending a verification email.
+interface ResendVerificationUserRow {
+  id: number;
+  email: string;
+  first_name: string;
+  email_verified: boolean | null;
+  email_verification_token: string | null;
+  email_verification_expires: Date | null;
+}
+
+// The columns the SELECT below names, for a profile response.
+interface ProfileRow {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  created_at: Date | null;
+  weekly_reports_enabled: boolean;
+  email_notifications_enabled: boolean;
+}
+
+// The columns both UPDATE ... RETURNING variants below name.
+interface UpdatedProfileRow {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  language: string;
+  updated_at: Date | null;
+}
 
 const authController = {
   // Register new user
-  async register(req, res) {
+  async register(req: Request, res: Response) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -29,13 +97,13 @@ const authController = {
       }
 
       // Check if user already exists
-      const existingUser = await db.query(
+      const existingUser = await query<ExistingUserRow>(
         'SELECT id, email, email_verified FROM users WHERE email = $1',
         [email]
       );
 
       if (existingUser.rows.length > 0) {
-        const isVerified = existingUser.rows[0].email_verified;
+        const isVerified = existingUser.rows[0]?.email_verified;
         if (isVerified) {
           console.log(`[Register] Attempt to register an already verified address: ${maskEmail(email)}`);
         } else {
@@ -53,16 +121,18 @@ const authController = {
       const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
 
       // Create user with email verification fields
-      const newUser = await db.query(
+      const newUser = await query<NewUserRow>(
         'INSERT INTO users (email, password_hash, first_name, last_name, email_verification_token, email_verification_expires) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, first_name, last_name, created_at, email_verification_expires',
         [email, passwordHash, first_name, last_name, verificationToken, verificationExpires]
       );
-      const userId = newUser.rows[0].id;
+      // RETURNING always answers with the row just inserted, so rows[0] is
+      // never undefined here; the assertions below rely on the same fact.
+      const userId = newUser.rows[0]!.id;
       console.log(`[Register] User created:`, {
         id: userId,
         email: maskEmail(email),
-        created_at: newUser.rows[0].created_at,
-        verification_expires: newUser.rows[0].email_verification_expires
+        created_at: newUser.rows[0]!.created_at,
+        verification_expires: newUser.rows[0]!.email_verification_expires
       });
 
       // Send verification email
@@ -76,7 +146,8 @@ const authController = {
         // `rejected` when the SMTP server rejects a recipient, and those hold
         // the address. Precautionary — that path is not reproducible without a
         // real SMTP server — and it reads better in a log either way.
-        console.error(`Failed to send verification email for user ${userId}:`, emailError.code || emailError.message);
+        const code = emailError instanceof Error ? (emailError as Error & { code?: unknown }).code : undefined;
+        console.error(`Failed to send verification email for user ${userId}:`, code || (emailError instanceof Error ? emailError.message : undefined));
         // Don't fail registration if email fails, but log it
       }
 
@@ -93,7 +164,7 @@ const authController = {
   },
 
   // Login user
-  async login(req, res) {
+  async login(req: Request, res: Response) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -103,7 +174,7 @@ const authController = {
       const { email, password } = req.body;
 
       // Find user
-      const user = await db.query(
+      const user = await query<LoginUserRow>(
         'SELECT id, email, password_hash, first_name, last_name, email_verified FROM users WHERE email = $1',
         [email]
       );
@@ -112,28 +183,36 @@ const authController = {
         return res.status(400).json({ error: 'Invalid credentials' });
       }
 
-      // Check password
-      const isValidPassword = await bcrypt.compare(password, user.rows[0].password_hash);
+      // Check password. rows.length === 0 already returned above, so rows[0]
+      // exists for the rest of this handler.
+      const isValidPassword = await bcrypt.compare(password, user.rows[0]!.password_hash);
       if (!isValidPassword) {
         return res.status(400).json({ error: 'Invalid credentials' });
       }
 
       // Check if email is verified
-      if (!user.rows[0].email_verified) {
-        return res.status(400).json({ 
+      if (!user.rows[0]!.email_verified) {
+        return res.status(400).json({
           error: 'Please verify your email address before logging in. Check your inbox for a verification link.',
-          requiresVerification: true 
+          requiresVerification: true
         });
       }
 
       // Generate JWT token
+      // config.jwt.secret is typed string | undefined because it is read from
+      // the environment, but config/validate.ts exits the process at boot when
+      // it is unset, so every request that reaches this handler has one.
       const token = jwt.sign(
-        { userId: user.rows[0].id, email },
-        config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { userId: user.rows[0]!.id, email },
+        config.jwt.secret as string,
+        // config.jwt.expiresIn is the literal '7d' at its declaration in
+        // config/index.ts, which is a valid jsonwebtoken duration string; the
+        // cast is only needed because config/index.ts doesn't declare it
+        // `as const`, so TypeScript widens the field to plain string.
+        { expiresIn: config.jwt.expiresIn as SignOptions['expiresIn'] }
       );
 
-      const { password_hash, email_verified, ...userWithoutPassword } = user.rows[0];
+      const { password_hash, email_verified, ...userWithoutPassword } = user.rows[0]!;
 
       res.json({
         message: 'Login successful',
@@ -148,12 +227,12 @@ const authController = {
   },
 
   // Verify email
-  async verifyEmail(req, res) {
+  async verifyEmail(req: Request, res: Response) {
     try {
       const { token } = req.params;
       console.log('[VerifyEmail] Received verification request'); // token is a credential — not logged
       // Find user with this verification token
-      const user = await db.query(
+      const user = await query<VerifyEmailUserRow>(
         'SELECT id, email, first_name, email_verification_expires, created_at FROM users WHERE email_verification_token = $1',
         [token]
       );
@@ -168,32 +247,37 @@ const authController = {
         // token was consumed; until the schema records that, this is a 400.
         return res.status(400).json({ error: 'Invalid verification token' });
       }
+      // rows.length === 0 already returned above, so rows[0] exists for the
+      // rest of this handler.
       const now = new Date();
-      const expires = new Date(user.rows[0].email_verification_expires);
-      const created = new Date(user.rows[0].created_at);
+      // email_verification_expires and created_at can be null; new Date(null)
+      // already coerces to the epoch (Number(null) is 0), so ?? 0 reproduces
+      // that instead of silently changing what an absent value renders as.
+      const expires = new Date(user.rows[0]!.email_verification_expires ?? 0);
+      const created = new Date(user.rows[0]!.created_at ?? 0);
       console.log(`[VerifyEmail] User found:`, {
-        id: user.rows[0].id,
+        id: user.rows[0]!.id,
         created_at: created,
         verification_expires: expires,
         now: now
       });
       // Check if token has expired
       if (now > expires) {
-        console.log(`[VerifyEmail] Token expired for user ${user.rows[0].id}`);
+        console.log(`[VerifyEmail] Token expired for user ${user.rows[0]!.id}`);
         return res.status(400).json({ error: 'Verification token has expired' });
       }
       // Mark email as verified and clear token
-      await db.query(
+      await query(
         'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
-        [user.rows[0].id]
+        [user.rows[0]!.id]
       );
-      console.log(`[VerifyEmail] Email verified for user ${user.rows[0].id}`);
+      console.log(`[VerifyEmail] Email verified for user ${user.rows[0]!.id}`);
       res.json({
         message: 'Email verified successfully! You can now log in to your account.',
         user: {
-          id: user.rows[0].id,
-          email: user.rows[0].email,
-          first_name: user.rows[0].first_name
+          id: user.rows[0]!.id,
+          email: user.rows[0]!.email,
+          first_name: user.rows[0]!.first_name
         }
       });
     } catch (error) {
@@ -203,12 +287,12 @@ const authController = {
   },
 
   // Resend verification email
-  async resendVerification(req, res) {
+  async resendVerification(req: Request, res: Response) {
     try {
       const { email } = req.body;
 
       // Find user
-      const user = await db.query(
+      const user = await query<ResendVerificationUserRow>(
         'SELECT id, email, first_name, email_verified, email_verification_token, email_verification_expires FROM users WHERE email = $1',
         [email]
       );
@@ -217,34 +301,36 @@ const authController = {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      if (user.rows[0].email_verified) {
+      // rows.length === 0 already returned above, so rows[0] exists for the
+      // rest of this handler.
+      if (user.rows[0]!.email_verified) {
         return res.status(400).json({ error: 'Email is already verified' });
       }
 
       // Check if previous token is still valid (within the resend cooldown)
-      if (user.rows[0].email_verification_expires && 
-          new Date() < new Date(user.rows[0].email_verification_expires) &&
-          new Date(user.rows[0].email_verification_expires) > new Date(Date.now() - config.emailVerification.resendCooldown)) {
+      if (user.rows[0]!.email_verification_expires &&
+          new Date() < new Date(user.rows[0]!.email_verification_expires) &&
+          new Date(user.rows[0]!.email_verification_expires) > new Date(Date.now() - config.emailVerification.resendCooldown)) {
         return res.status(400).json({ error: 'Please wait before requesting another verification email' });
       }
 
       // Generate new verification token
-      const crypto = require('crypto');
       const verificationToken = crypto.randomBytes(32).toString('hex');
       const verificationExpires = new Date(Date.now() + config.emailVerification.tokenExpiry);
 
       // Update user with new token
-      await db.query(
+      await query(
         'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
-        [verificationToken, verificationExpires, user.rows[0].id]
+        [verificationToken, verificationExpires, user.rows[0]!.id]
       );
 
       // Send verification email
       try {
-        await sendEmailVerification(email, user.rows[0].first_name, verificationToken);
+        await sendEmailVerification(email, user.rows[0]!.first_name, verificationToken);
         res.json({ message: 'Verification email sent successfully' });
       } catch (emailError) {
-        console.error(`Failed to send verification email for user ${user.rows[0].id}:`, emailError.code || emailError.message);
+        const code = emailError instanceof Error ? (emailError as Error & { code?: unknown }).code : undefined;
+        console.error(`Failed to send verification email for user ${user.rows[0]!.id}:`, code || (emailError instanceof Error ? emailError.message : undefined));
         res.status(500).json({ error: 'Failed to send verification email' });
       }
 
@@ -255,9 +341,9 @@ const authController = {
   },
 
   // Get user profile
-  async getProfile(req, res) {
+  async getProfile(req: Request, res: Response) {
     try {
-      const user = await db.query(
+      const user = await query<ProfileRow>(
         'SELECT id, email, first_name, last_name, created_at, weekly_reports_enabled, email_notifications_enabled FROM users WHERE id = $1',
         [req.user.userId]
       );
@@ -275,19 +361,19 @@ const authController = {
   },
 
   // Update user profile
-  async updateProfile(req, res) {
+  async updateProfile(req: Request, res: Response) {
     try {
       const { first_name, last_name, language } = req.body;
-      let query = 'UPDATE users SET first_name = $1, last_name = $2';
+      let sql = 'UPDATE users SET first_name = $1, last_name = $2';
       let params = [first_name, last_name, req.user.userId];
       if (language) {
-        query = 'UPDATE users SET first_name = $1, last_name = $2, language = $3 WHERE id = $4 RETURNING id, email, first_name, last_name, language, updated_at';
+        sql = 'UPDATE users SET first_name = $1, last_name = $2, language = $3 WHERE id = $4 RETURNING id, email, first_name, last_name, language, updated_at';
         params = [first_name, last_name, language, req.user.userId];
       } else {
-        query = 'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3 RETURNING id, email, first_name, last_name, language, updated_at';
+        sql = 'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3 RETURNING id, email, first_name, last_name, language, updated_at';
         params = [first_name, last_name, req.user.userId];
       }
-      const updatedUser = await db.query(query, params);
+      const updatedUser = await query<UpdatedProfileRow>(sql, params);
       res.json({
         message: 'Profile updated successfully',
         user: updatedUser.rows[0]
@@ -299,7 +385,7 @@ const authController = {
   },
 
   // Send test email
-  async sendTestEmail(req, res) {
+  async sendTestEmail(req: Request, res: Response) {
     try {
       const userEmail = req.user.email;
       const report = await generateWeeklyReport(req.user.userId);
@@ -312,10 +398,10 @@ const authController = {
   },
 
   // Update notification settings
-  async updateNotificationSettings(req, res) {
+  async updateNotificationSettings(req: Request, res: Response) {
     try {
       const { weekly_reports_enabled, email_notifications_enabled } = req.body;
-      await db.query(
+      await query(
         'UPDATE users SET weekly_reports_enabled = $1, email_notifications_enabled = $2 WHERE id = $3',
         [weekly_reports_enabled, email_notifications_enabled, req.user.userId]
       );
@@ -327,4 +413,4 @@ const authController = {
   }
 };
 
-module.exports = authController; 
+export = authController;
