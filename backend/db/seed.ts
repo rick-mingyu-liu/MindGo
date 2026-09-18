@@ -1,6 +1,6 @@
-const { refreshDemoAccount, DEMO_EMAIL, DEMO_PASSWORD } = require('../services/demoAccountService');
-const { buildDemoData } = require('./demoData');
-const { labelOf } = require('../utils/terms');
+import { refreshDemoAccount, DEMO_EMAIL, DEMO_PASSWORD } from '../services/demoAccountService';
+import { buildDemoData } from './demoData';
+import { labelOf } from '../utils/terms';
 
 /**
  * Seeds the demo account, anchored to today.
@@ -16,7 +16,7 @@ const { labelOf } = require('../utils/terms');
  * transactions, savings_goals and ai_plans have no unique constraint on their
  * data columns — a second run simply inserted all 46 transactions again.
  */
-async function seedDatabase(now = new Date()) {
+async function seedDatabase(now: Date = new Date()): Promise<void> {
   try {
     console.log('🌱 Seeding the demo account...');
     const result = await refreshDemoAccount({ create: true, now });
@@ -42,4 +42,4 @@ if (require.main === module) {
     .catch(() => process.exit(1));
 }
 
-module.exports = seedDatabase;
+export = seedDatabase;
