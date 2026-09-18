@@ -4,9 +4,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 /**
- * Flat config (ESLint 9). The backend is being converted from CommonJS
- * JavaScript to TypeScript (docs/superpowers/specs/2026-09-17-backend-typescript-design.md);
- * until that finishes, both kinds of file are linted, each with its own parser.
+ * Flat config (ESLint 9). The backend is TypeScript throughout
+ * (docs/superpowers/specs/2026-09-17-backend-typescript-design.md), so the only
+ * file-specific block left is the TypeScript one. A .js file appearing under
+ * backend/ again would get nothing but the base recommended rules, which is the
+ * signal that it should have been .ts.
  *
  * Deliberately not a style linter — formatting arguments are not worth a build
  * failure on an existing codebase. The rules below are the ones that catch
@@ -35,23 +37,6 @@ export default defineConfig(
   },
   js.configs.recommended,
   {
-    files: ['**/*.js'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'commonjs',
-      globals: { ...globals.node },
-    },
-    rules: {
-      'no-unused-vars': unusedVars,
-      // An async function whose rejection nobody handles takes the process
-      // down on an unhandled rejection.
-      'no-async-promise-executor': 'error',
-      // console is the logging mechanism in several services here, so it is
-      // allowed rather than pretended otherwise.
-      'no-console': 'off',
-    },
-  },
-  {
     files: ['**/*.ts'],
     extends: [tseslint.configs.recommended],
     languageOptions: {
@@ -64,7 +49,11 @@ export default defineConfig(
       // keeps its `module.exports = value` shape (spec §4.1).
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
+      // An async function whose rejection nobody handles takes the process
+      // down on an unhandled rejection.
       'no-async-promise-executor': 'error',
+      // console is the logging mechanism in several services here, so it is
+      // allowed rather than pretended otherwise.
       'no-console': 'off',
     },
   },
