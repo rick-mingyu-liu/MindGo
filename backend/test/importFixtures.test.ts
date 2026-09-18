@@ -1,9 +1,9 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { parseOcr } = require('../services/import/parse');
-const { packageRoot } = require('../utils/packageRoot');
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseOcr } from '../services/import/parse';
+import { packageRoot } from '../utils/packageRoot';
 
 const ROOT = packageRoot(__dirname);
 const { scoreImage, sumCounts, rates } = require(path.join(ROOT, '..', 'eval', 'lib', 'score.cjs'));
@@ -27,7 +27,7 @@ describe('recorded OCR fixtures', () => {
     assert.ok(fixtures.length >= 40, `only ${fixtures.length} fixtures; run eval/exportFixtures.mjs`);
   });
 
-  const all = [];
+  const all: unknown[] = [];
   for (const fixture of fixtures) {
     test(fixture.file, () => {
       const result = parseOcr({ lines: fixture.lines, image: fixture.image, today: fixture.today });
