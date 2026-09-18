@@ -1,10 +1,40 @@
-const db = require('../db/connection');
-const finnhubService = require('../services/finnhubService');
-const freeStockDataService = require('../services/freeStockDataService');
+import { Request, Response } from 'express';
+import { query } from '../db/connection';
+import finnhubService = require('../services/finnhubService');
+import freeStockDataService = require('../services/freeStockDataService');
+import type { WatchlistRow } from '../types/db';
+
+/** The shape both the Alpha Vantage and Yahoo Finance index fallbacks below build. */
+interface IndexQuote {
+  c: number;
+  d: number;
+  dp: number;
+  h: number;
+  l: number;
+  o: number;
+  pc: number;
+  t: number;
+  v: number;
+}
+
+/** One row of the report/annualReports/quarterlyReports shape getStockFinancials builds. */
+interface FinancialReportRow {
+  period: string | number | null | undefined;
+  revenue: number | null;
+  netIncome: number | null;
+  eps: number | null;
+  assets: number | null;
+  liabilities: number | null;
+  form: string | undefined;
+  filedDate: string | undefined;
+  accessNumber: string | undefined;
+  cik: string | undefined;
+  filingUrl: string | null;
+}
 
 const investmentController = {
   // Get stock snapshot
-  async getStockSnapshot(req, res) {
+  async getStockSnapshot(req: Request, res: Response) {
     try {
       const { symbol } = req.params;
 
@@ -13,60 +43,66 @@ const investmentController = {
       }
 
       // Special handling for major indices
-      const indexMap = {
+      const indexMap: Record<string, { name: string }> = {
         '^GSPC': { name: 'S&P 500 Index' },
         '^DJI': { name: 'Dow Jones Industrial Average' },
         '^IXIC': { name: 'NASDAQ Composite' },
       };
-      if (indexMap[symbol]) {
+      const indexInfo = indexMap[symbol];
+      if (indexInfo) {
         // Try Alpha Vantage first
-        let quote = null;
+        let quote: IndexQuote | null = null;
         try {
           const avData = await freeStockDataService.getAlphaVantageHistoricalData(symbol);
           // Get the latest date
           const lastIdx = avData.t.length - 1;
           const prevIdx = avData.t.length - 2;
           if (lastIdx >= 0 && prevIdx >= 0) {
-            const price = avData.c[lastIdx];
-            const prevPrice = avData.c[prevIdx];
+            // lastIdx and prevIdx are valid indices into every one of these
+            // arrays -- avData always fills t/o/h/l/c/v together, one push
+            // per date -- so these reads are never actually undefined;
+            // noUncheckedIndexedAccess just can't see that from the bounds
+            // check above.
+            const price = avData.c[lastIdx]!;
+            const prevPrice = avData.c[prevIdx]!;
             const change = price - prevPrice;
             const changePct = (change / prevPrice) * 100;
             quote = {
               c: price,
               d: change,
               dp: changePct,
-              h: avData.h[lastIdx],
-              l: avData.l[lastIdx],
-              o: avData.o[lastIdx],
+              h: avData.h[lastIdx]!,
+              l: avData.l[lastIdx]!,
+              o: avData.o[lastIdx]!,
               pc: prevPrice,
-              t: avData.t[lastIdx],
-              v: avData.v[lastIdx],
+              t: avData.t[lastIdx]!,
+              v: avData.v[lastIdx]!,
             };
           }
-        } catch (e) {
+        } catch (_e) {
           // Fallback to Yahoo Finance
           try {
             const yfData = await freeStockDataService.getYahooFinanceHistoricalData(symbol, '5d');
             const lastIdx = yfData.t.length - 1;
             const prevIdx = yfData.t.length - 2;
             if (lastIdx >= 0 && prevIdx >= 0) {
-              const price = yfData.c[lastIdx];
-              const prevPrice = yfData.c[prevIdx];
+              const price = yfData.c[lastIdx]!;
+              const prevPrice = yfData.c[prevIdx]!;
               const change = price - prevPrice;
               const changePct = (change / prevPrice) * 100;
               quote = {
                 c: price,
                 d: change,
                 dp: changePct,
-                h: yfData.h[lastIdx],
-                l: yfData.l[lastIdx],
-                o: yfData.o[lastIdx],
+                h: yfData.h[lastIdx]!,
+                l: yfData.l[lastIdx]!,
+                o: yfData.o[lastIdx]!,
                 pc: prevPrice,
-                t: yfData.t[lastIdx],
-                v: yfData.v[lastIdx],
+                t: yfData.t[lastIdx]!,
+                v: yfData.v[lastIdx]!,
               };
             }
-          } catch (err) {
+          } catch (_err) {
             return res.status(500).json({ error: 'Failed to fetch index data from Alpha Vantage and Yahoo Finance' });
           }
         }
@@ -77,7 +113,7 @@ const investmentController = {
           symbol: symbol.toUpperCase(),
           quote,
           companyInfo: {
-            name: indexMap[symbol].name,
+            name: indexInfo.name,
             ticker: symbol.toUpperCase(),
             // Fill other fields as null or N/A for indices
             country: null,
@@ -112,7 +148,7 @@ const investmentController = {
         sector = profile.finnhubIndustry || profile.exchange || profile.country || 'N/A';
       }
       // Fallbacks for trading info
-      let volume = quote.v !== undefined ? quote.v : 'N/A';
+      const volume = quote.v !== undefined ? quote.v : 'N/A';
       let dayRange = (quote.l !== undefined && quote.h !== undefined) ? `${quote.l} - ${quote.h}` : null;
       if (!dayRange || dayRange === 'N/A' || dayRange === 'null - null') {
         dayRange = quote.c !== undefined ? `${quote.c}` : 'N/A';
@@ -154,9 +190,9 @@ const investmentController = {
   },
 
   // Get user watchlist
-  async getWatchlist(req, res) {
+  async getWatchlist(req: Request, res: Response) {
     try {
-      const watchlist = await db.query(
+      const watchlist = await query<WatchlistRow>(
         'SELECT * FROM watchlist WHERE user_id = $1 ORDER BY added_at DESC',
         [req.user.userId]
       );
@@ -193,7 +229,7 @@ const investmentController = {
   },
 
   // Add stock to watchlist
-  async addToWatchlist(req, res) {
+  async addToWatchlist(req: Request, res: Response) {
     try {
       const { symbol, company_name } = req.body;
 
@@ -202,7 +238,7 @@ const investmentController = {
       }
 
       // Check if already in watchlist
-      const existing = await db.query(
+      const existing = await query<{ id: number }>(
         'SELECT id FROM watchlist WHERE user_id = $1 AND symbol = $2',
         [req.user.userId, symbol.toUpperCase()]
       );
@@ -211,7 +247,7 @@ const investmentController = {
         return res.status(400).json({ error: 'Stock already in watchlist' });
       }
 
-      const newWatchlistItem = await db.query(
+      const newWatchlistItem = await query<WatchlistRow>(
         'INSERT INTO watchlist (user_id, symbol, company_name) VALUES ($1, $2, $3) RETURNING *',
         [req.user.userId, symbol.toUpperCase(), company_name]
       );
@@ -228,12 +264,12 @@ const investmentController = {
   },
 
   // Remove stock from watchlist
-  async removeFromWatchlist(req, res) {
+  async removeFromWatchlist(req: Request, res: Response) {
     try {
       const { id } = req.params;
 
       // Check if item belongs to user
-      const existing = await db.query(
+      const existing = await query<{ id: number }>(
         'SELECT id FROM watchlist WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -242,7 +278,7 @@ const investmentController = {
         return res.status(404).json({ error: 'Watchlist item not found' });
       }
 
-      await db.query(
+      await query(
         'DELETE FROM watchlist WHERE id = $1 AND user_id = $2',
         [id, req.user.userId]
       );
@@ -256,10 +292,14 @@ const investmentController = {
   },
 
   // Get historical data for a stock
-  async getHistoricalData(req, res) {
+  async getHistoricalData(req: Request, res: Response) {
     try {
       const { symbol } = req.params;
-      const { period = '1m' } = req.query;
+      // No express-validator chain runs on this route, so this is read
+      // exactly as the original code read it off req.query: an untyped
+      // string when present, defaulting only on undefined, matching a
+      // destructuring default's own behaviour.
+      const period = (req.query.period as string | undefined) ?? '1m';
 
       if (!symbol) {
         return res.status(400).json({ error: 'Stock symbol is required' });
@@ -306,7 +346,7 @@ const investmentController = {
   },
 
   // Get market overview
-  async getMarketOverview(req, res) {
+  async getMarketOverview(_req: Request, res: Response) {
     try {
       // Get popular stocks for market overview
       const popularStocks = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'META', 'NVDA', 'NFLX'];
@@ -334,8 +374,16 @@ const investmentController = {
         })
       );
       // Calculate market sentiment (simple implementation)
-      const upCount = marketData.filter(stock => stock.changePercent > 0).length;
-      const downCount = marketData.filter(stock => stock.changePercent < 0).length;
+      //
+      // changePercent is `number | undefined | null` across the two branches
+      // above (a successful quote's .dp is optional per Finnhub's typed
+      // response; a failed fetch sets it to null). '>' and '<' below coerce
+      // exactly as they did in the original untyped JS -- undefined to NaN,
+      // null to 0 -- so this cast changes only what the checker sees, not
+      // what runs. '===' needs no cast: strict equality never coerces, and
+      // number overlaps the union either way.
+      const upCount = marketData.filter(stock => (stock.changePercent as number) > 0).length;
+      const downCount = marketData.filter(stock => (stock.changePercent as number) < 0).length;
       const flatCount = marketData.filter(stock => stock.changePercent === 0).length;
       res.json({
         marketData,
@@ -354,13 +402,17 @@ const investmentController = {
   },
 
   // Get news for a stock
-  async getStockNews(req, res) {
+  async getStockNews(req: Request, res: Response) {
     try {
-      const { symbol } = req.params;
+      // :symbol is a required path segment (see routes/investments.ts):
+      // Express only invokes this handler when the segment matched, so it is
+      // always a string here -- noUncheckedIndexedAccess can't know that a
+      // matched named param is never undefined.
+      const symbol = req.params.symbol!;
       const now = new Date();
       const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const to = now.toISOString().split('T')[0];
-      const news = await finnhubService.getNews(symbol, from, to);
+      const news = await finnhubService.getNews(symbol, from!, to!);
       res.json({ symbol: symbol.toUpperCase(), news });
     } catch (error) {
       console.error('Get stock news error:', error);
@@ -369,22 +421,25 @@ const investmentController = {
   },
 
   // Get financials for a stock
-  async getStockFinancials(req, res) {
+  async getStockFinancials(req: Request, res: Response) {
     try {
-      const { symbol } = req.params;
+      // :symbol is a required path segment -- see the comment in
+      // getStockNews above.
+      const symbol = req.params.symbol!;
       const finnhubData = await finnhubService.getFinancials(symbol);
-      const annualReports = [];
-      const quarterlyReports = [];
-  
-      if (finnhubData && Array.isArray(finnhubData.data)) {
-        for (const report of finnhubData.data) {
+      const annualReports: FinancialReportRow[] = [];
+      const quarterlyReports: FinancialReportRow[] = [];
+      const reports = finnhubData.data;
+
+      if (finnhubData && Array.isArray(reports)) {
+        for (const report of reports) {
           const reportData = report.report || {};
           const bs = reportData.bs || {};
           const ic = reportData.ic || {};
           const cf = reportData.cf || {};
-  
+
           // Helper to find value by concept or label in an array
-          function findValue(arr, concepts = [], labels = []) {
+          function findValue(arr: unknown, concepts: string[] = [], labels: string[] = []): number | null {
             if (!Array.isArray(arr)) return null;
             for (const item of arr) {
               if ((concepts.length && concepts.includes(item.concept)) ||
@@ -396,7 +451,7 @@ const investmentController = {
           }
 
           // Fallback for period/year
-          let reportPeriod = report.period;
+          let reportPeriod: string | null | undefined = report.period;
           if (!reportPeriod) {
             reportPeriod = report.filedDate || report.endDate || report.startDate || null;
           }
@@ -424,7 +479,7 @@ const investmentController = {
           const assets = findValue(bs, ['us-gaap_Assets', 'Assets'], ['Assets', 'Total current assets']);
           const liabilities = findValue(bs, ['us-gaap_Liabilities', 'Liabilities'], ['Liabilities', 'Total current liabilities']);
 
-          const row = {
+          const row: FinancialReportRow = {
             period: reportPeriod,
             revenue,
             netIncome,
@@ -439,7 +494,7 @@ const investmentController = {
               ? `https://www.sec.gov/Archives/edgar/data/${report.cik.replace(/^0+/, '')}/${report.accessNumber.replace(/-/g, '')}/${report.accessNumber}-index.htm`
               : null
           };
-  
+
           if (report.form === '10-K' || report.periodType === 'FY') {
             annualReports.push(row);
           } else if (report.form === '10-Q' || report.periodType === 'QTR') {
@@ -449,7 +504,7 @@ const investmentController = {
       } else {
         console.warn('No data returned from Finnhub for:', symbol);
       }
-  
+
       res.json({
         symbol: symbol.toUpperCase(),
         financials: {
@@ -465,19 +520,19 @@ const investmentController = {
 
 
   // Get AI summary for watchlist (placeholder, to be implemented)
-  async getWatchlistAISummary(req, res) {
+  async getWatchlistAISummary(req: Request, res: Response) {
     try {
       // Placeholder: fetch all news for watchlist and return a summary string
-      const watchlist = await db.query(
+      const watchlist = await query<{ symbol: string }>(
         'SELECT symbol FROM watchlist WHERE user_id = $1',
         [req.user.userId]
       );
       const now = new Date();
       const from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const to = now.toISOString().split('T')[0];
-      let allNews = [];
+      let allNews: unknown[] = [];
       for (const item of watchlist.rows) {
-        const news = await finnhubService.getNews(item.symbol, from, to);
+        const news = await finnhubService.getNews(item.symbol, from!, to!);
         allNews = allNews.concat(news);
       }
       // TODO: Call AI service to summarize allNews
@@ -490,9 +545,9 @@ const investmentController = {
   },
 
   // Clear all watchlist items for user (for testing)
-  async clearAllWatchlist(req, res) {
+  async clearAllWatchlist(req: Request, res: Response) {
     try {
-      await db.query(
+      await query(
         'DELETE FROM watchlist WHERE user_id = $1',
         [req.user.userId]
       );
@@ -506,13 +561,16 @@ const investmentController = {
   },
 
   // Search for stocks/companies by name or symbol
-  async searchStocks(req, res) {
+  async searchStocks(req: Request, res: Response) {
     try {
-      const { query } = req.query;
-      if (!query) {
+      // Renamed from `query` -- that name is already the imported db query
+      // function in this file, and the compiled call to it must stay a
+      // property lookup (see the mockability rule in the sub-step brief).
+      const searchQuery = req.query.query as string | undefined;
+      if (!searchQuery) {
         return res.status(400).json({ error: 'Query is required' });
       }
-      const results = await finnhubService.searchSymbol(query);
+      const results = await finnhubService.searchSymbol(searchQuery);
       res.json({ results });
     } catch (error) {
       console.error('Search stocks error:', error);
@@ -521,9 +579,11 @@ const investmentController = {
   },
 
   // Get key indicators and recommendation trends for a stock
-  async getStockAnalysis(req, res) {
+  async getStockAnalysis(req: Request, res: Response) {
     try {
-      const { symbol } = req.params;
+      // :symbol is a required path segment -- see the comment in
+      // getStockNews above.
+      const symbol = req.params.symbol!;
       // Fetch recommendation trends
       const recommendations = await finnhubService.getRecommendationTrends(symbol);
       // Fetch EPS surprises (last 4 quarters)
@@ -543,4 +603,4 @@ const investmentController = {
   },
 };
 
-module.exports = investmentController; 
+export = investmentController;
