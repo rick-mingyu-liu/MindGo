@@ -1,30 +1,30 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-require('dotenv').config();
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import 'dotenv/config';
 
 // Import utilities and services
-const config = require('./config');
-const validateConfig = require('./config/validate');
+import config = require('./config');
+import validateConfig = require('./config/validate');
 
 // Before anything else is loaded: a missing JWT_SECRET or database URL makes
 // every request fail later, in ways that read as bugs rather than as setup.
 validateConfig();
 
-const logger = require('./utils/logger');
-const ErrorHandler = require('./utils/errorHandler');
-const schedulerService = require('./services/schedulerService');
-const { apiLimiter, aiLimiter } = require('./middleware/rateLimiter');
+import logger = require('./utils/logger');
+import ErrorHandler = require('./utils/errorHandler');
+import schedulerService = require('./services/schedulerService');
+import { apiLimiter, aiLimiter } from './middleware/rateLimiter';
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const transactionRoutes = require('./routes/transactions');
-const summaryRoutes = require('./routes/summary');
-const goalRoutes = require('./routes/goals');
-const investmentRoutes = require('./routes/investments');
-const aiRoutes = require('./routes/ai');
-const importRoutes = require('./routes/import');
+import authRoutes = require('./routes/auth');
+import transactionRoutes = require('./routes/transactions');
+import summaryRoutes = require('./routes/summary');
+import goalRoutes = require('./routes/goals');
+import investmentRoutes = require('./routes/investments');
+import aiRoutes = require('./routes/ai');
+import importRoutes = require('./routes/import');
 
 const app = express();
 const PORT = config.port;
@@ -48,9 +48,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
     version: '1.0.0'
@@ -105,4 +105,4 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-module.exports = app; 
+export = app;
