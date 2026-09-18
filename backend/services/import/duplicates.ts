@@ -20,13 +20,14 @@ export async function flagDuplicates(userId: number, rows: Draft[]): Promise<Dra
   const days = [...new Set(rows.map((row) => row.date).filter((d): d is string => Boolean(d)))];
   if (days.length === 0) return rows;
 
-  // db/connection.js is not yet converted (a later step), so query()'s result
-  // is untyped; this is the shape the SELECT list above actually returns.
+  // query() is generic, but it cannot infer a row shape from a SQL string, so
+  // the shape is named here; this is the shape the SELECT list above actually
+  // returns.
   const { rows: existing } = await query(
     'SELECT date, amount, currency FROM transactions WHERE user_id = $1 AND date = ANY($2::date[])',
     [userId, days]
   ) as { rows: ExistingTransaction[] };
-  // DATE arrives as 'YYYY-MM-DD' (db/connection.js) and DECIMAL(10,2) as a
+  // DATE arrives as 'YYYY-MM-DD' (db/connection.ts) and DECIMAL(10,2) as a
   // two-place string, so both compare exactly with the draft's strings.
   const seen = new Set(existing.map((t) => `${t.date}|${t.amount}|${t.currency}`));
   for (const row of rows) {

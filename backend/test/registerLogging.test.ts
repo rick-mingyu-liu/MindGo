@@ -164,7 +164,7 @@ describe('POST /auth/register logging', () => {
     // Decision C, from the register handler's side rather than the validator's:
     // the missing key must degrade to the domain list, not 500. This is the
     // regression that made the suite environment-dependent, so it is asserted
-    // here as well as in emailValidation.test.js.
+    // here as well as in emailValidation.test.ts.
     config.apiKeys.mailboxLayer = undefined;
 
     const { res } = await register();

@@ -34,7 +34,7 @@ import type { PoolClient } from 'pg';
 const DEMO_EMAIL = 'john.doe@example.com';
 // The credential every surface advertises — the login page, the README and the
 // line `db:seed` prints — and the hash it has to verify against. Both are
-// exported, and `test/demoAccountService.test.js` pins them to each other with
+// exported, and `test/demoAccountService.test.ts` pins them to each other with
 // a real bcrypt.compare.
 //
 // That test exists because the pair silently disagreed for the entire life of
@@ -84,9 +84,9 @@ async function refreshDemoAccount({ create = false, now = new Date() }: RefreshO
   // connection per call, so BEGIN and COMMIT issued through it need not land
   // on the same session and the rewrite would not be atomic at all.
   //
-  // db/connection.js is still JavaScript (a later step); TS still infers
-  // getPool()'s return as pg's own Pool from the require('pg') call inside
-  // it, so no cast is needed to annotate what connect() hands back here.
+  // db/connection.ts declares getPool() as returning pg's own Pool, so
+  // connect() already hands back a PoolClient and no cast is needed to
+  // annotate it here.
   const client: PoolClient = await getPool().connect();
 
   try {

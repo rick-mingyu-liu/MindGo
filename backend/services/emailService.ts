@@ -116,8 +116,9 @@ export const generateWeeklyReport = async (userId: number): Promise<{ text: stri
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // db/connection.js is not yet converted (a later step), so query()'s
-    // result is untyped; SELECT * matches every column of TransactionRow.
+    // query() is generic, but it cannot infer a row shape from a SQL string,
+    // so the shape is named here; SELECT * matches every column of
+    // TransactionRow.
     const transactions = await query(
       `SELECT * FROM transactions
        WHERE user_id = $1 AND date >= $2

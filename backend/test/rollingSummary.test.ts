@@ -17,7 +17,7 @@ import {
  * term, which is when someone actually sets a budget, three quarters of the
  * window is the previous term's money.
  *
- * Runs the real router on a real server, like autoDeleteValidation.test.js: the
+ * Runs the real router on a real server, like autoDeleteValidation.test.ts: the
  * assertions are about which SQL bounds the request produces, and a test of the
  * controller in isolation would not notice a validator that was never mounted.
  */

@@ -5,7 +5,7 @@ import { labelOf } from '../utils/terms';
 /**
  * Seeds the demo account, anchored to today.
  *
- * The write itself lives in services/demoAccountService.js, shared with the
+ * The write itself lives in services/demoAccountService.ts, shared with the
  * scheduled refresh so the two cannot drift. This is the manual entry point,
  * and the only one permitted to bring the account into existence — the
  * scheduled form passes `create: false` and refreshes or does nothing.

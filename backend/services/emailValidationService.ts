@@ -80,7 +80,7 @@ function domainOf(email: unknown): string | undefined {
 /**
  * The fallback. Rejects a known disposable domain and accepts everything else.
  *
- * Deliberately does not check format — `routes/auth.js` already rejects
+ * Deliberately does not check format — `routes/auth.ts` already rejects
  * malformed addresses before the controller runs — and cannot check
  * deliverability, which is the part that needs a service.
  */
@@ -161,7 +161,7 @@ async function validateEmail(email: string): Promise<ValidationResult> {
     // it means registrations are being waved through on the weaker check.
     // error is unknown here; the original duck-typed `.response?.status`,
     // `.code` and `.message` off whatever was thrown rather than requiring an
-    // axios error specifically (test/emailValidation.test.js throws a plain
+    // axios error specifically (test/emailValidation.test.ts throws a plain
     // Error with a bolted-on `.code`), so narrow the same way.
     const e = error as { response?: { status?: unknown }; code?: unknown; message?: unknown };
     console.error('[EmailValidation] MailboxLayer request failed, falling back to the domain list:',

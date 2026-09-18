@@ -11,13 +11,13 @@ Client (frontend / axios)
         │  HTTP  (Authorization: Bearer <JWT>)
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  app.js — global middleware chain                            │
+│  app.ts — global middleware chain                            │
 │  helmet → morgan → cors → express.json()                     │
 └─────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  routes/*.js   (URL → handler mapping)                       │
+│  routes/*.ts   (URL → handler mapping)                       │
 │    router.use(auth)              ← auth middleware           │
 │    body([...]) validators        ← express-validator        │
 └─────────────────────────────────────────────────────────────┘
@@ -25,14 +25,14 @@ Client (frontend / axios)
         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  middleware/                                                 │
-│    auth.js       verifies JWT, sets req.user.userId          │
-│    rateLimiter.js  authLimiter, per-route on 4 /auth routes  │
+│    auth.ts       verifies JWT, sets req.user.userId          │
+│    rateLimiter.ts  authLimiter, per-route on 4 /auth routes  │
 │                    aiLimiter, on the /ai router              │
 └─────────────────────────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  controllers/*.js   (the "C")                                │
+│  controllers/*.ts   (the "C")                                │
 │    - checks validationResult(req)                            │
 │    - reads req.user.userId                                   │
 │    - orchestrates services + DB                              │
@@ -40,7 +40,7 @@ Client (frontend / axios)
         │                              │
         ▼                              ▼
 ┌───────────────────────┐   ┌─────────────────────────────────┐
-│ services/*.js         │   │ db/connection.js                │
+│ services/*.ts         │   │ db/connection.ts                │
 │  email, exchangeRate, │   │  query(text, params)            │
 │  finnhub, freeStock,  │   │  lazy pool, auto-close after    │
 │  aiPlanner, cleanup   │   │  5 min idle                     │
@@ -54,11 +54,20 @@ Client (frontend / axios)
         ▲
         │  cron / setInterval (out-of-band, not request-driven)
 ┌─────────────────────────────────────────────────────────────┐
-│  services/schedulerService.js  (Singleton)                   │
+│  services/schedulerService.ts  (Singleton)                   │
 │    weekly report emails + cleanup jobs                       │
 └─────────────────────────────────────────────────────────────┘
-        │  calls down into  →  services/cleanupService.js
+        │  calls down into  →  services/cleanupService.ts
 ```
+
+Two of those arrows carry types. `auth.ts` sets `req.user`, and
+[types/express.d.ts](types/express.d.ts) merges `AuthUser` into Express's own
+`Request`, so every controller reads `req.user.userId` as a `number` without a
+cast or a guard. Controllers name the row shape where they query —
+`query<TransactionRow>(sql, params)` — because `query()` is generic but cannot
+infer a shape from a SQL string; the interfaces are one per table in
+[types/db.ts](types/db.ts). `types/` holds those two and
+[types/import.ts](types/import.ts), the screenshot parser's vocabulary.
 
 The global middleware runs in the order drawn, but two things sit outside it:
 `app.set('trust proxy', 1)` comes first — the rate limiters read
@@ -68,7 +77,7 @@ The global middleware runs in the order drawn, but two things sit outside it:
 ## Response / error flow
 
 - Controllers return JSON directly.
-- A **global error handler** and **404 handler** are mounted last in `app.js`.
+- A **global error handler** and **404 handler** are mounted last in `app.ts`.
 - On the frontend, `utils/api.ts` interceptors handle `401` (logout) and
   `403/404/500` (SweetAlert dialog) globally.
 
@@ -95,7 +104,7 @@ observer-based, but no custom emitters/listeners are defined here.)
 These are minor and common in Express apps, but worth noting:
 
 1. **No `models/` layer.** SQL lives directly in controllers — e.g.
-   `transactionController.js` calls `db.query(...)` 10 times. The "Model" is
+   `transactionController.ts` calls `db.query(...)` 10 times. The "Model" is
    thin/absent, so it's really **Route–Controller–Repository**, not full MVC
    with an ORM. Business + data-access concerns are mixed in the controller.
 
@@ -105,10 +114,10 @@ These are minor and common in Express apps, but worth noting:
 
 ### Resolved
 
-- **Service imported controllers (inverted dependency).** `schedulerService.js`
+- **Service imported controllers (inverted dependency).** `schedulerService.ts`
   used to `require` `authController` and `aiController` in order to call
   `autoDeleteOldAIPlans` and `deleteUnverifiedAccounts`. Both now live in
-  [services/cleanupService.js](services/cleanupService.js), and the scheduler
+  [services/cleanupService.ts](services/cleanupService.ts), and the scheduler
   depends downward.
 
   An earlier draft of this document said that cleanup logic was *"reused by
@@ -119,7 +128,7 @@ These are minor and common in Express apps, but worth noting:
 - **Address validation lived in the controller.** `authController` held a
   30-domain disposable list, an apilayer client and the verdict logic, ~60
   lines above the controller object. All of it is
-  [services/emailValidationService.js](services/emailValidationService.js) now;
+  [services/emailValidationService.ts](services/emailValidationService.ts) now;
   the controller makes one call, `validateEmail(email)`.
 
   Worth noting as a **strategy/fallback** instance, the same shape the stock

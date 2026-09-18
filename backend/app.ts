@@ -59,7 +59,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // General limiter, mounted after /health so platform health checks are never
 // throttled. Credential endpoints add a stricter limiter of their own in
-// routes/auth.js.
+// routes/auth.ts.
 app.use(apiLimiter);
 
 // API Routes

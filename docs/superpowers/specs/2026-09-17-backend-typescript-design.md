@@ -1,6 +1,6 @@
 # Backend TypeScript Conversion: Design
 
-**Date:** 2026-09-17 · **Status:** approved design, not started · **First branch:** `chore/ts-1-tooling` · **Plan:** [`docs/superpowers/plans/2026-09-17-backend-typescript.md`](../plans/2026-09-17-backend-typescript.md)
+**Date:** 2026-09-17 · **Status:** implemented 2026-09-18, PRs #36–#43 (steps 1–8) plus this step’s · **First branch:** `chore/ts-1-tooling` · **Plan:** `docs/superpowers/plans/2026-09-17-backend-typescript.md` — untracked; recoverable from git history
 
 ## 1. Goal
 
@@ -8,8 +8,11 @@ Convert the backend (`backend/`: 48 source files, about 6,900 lines, plus 28 tes
 files, about 4,400 lines) from CommonJS JavaScript to strict TypeScript.
 **Behaviour stays the same.** Every endpoint, response body, status code and log
 line after the conversion matches what it was before, and every existing test
-still passes. The suite reports 507 from step 1 on: step 1 adds 8 tests, and the
-new test glob no longer counts `test/helpers/ocrLayouts.js` as a test file.
+still passes. The suite reports 508 from step 1 on: step 1 adds 8 tests (3 in
+`packageRoot`, 5 in `errorSummary`) to the 500 already there. An earlier draft
+said 507, subtracting one more for `test/helpers/ocrLayouts`; the measured
+count puts the base at 500 under the new glob, the same figure the old docs
+reported, so that subtraction was counted twice.
 
 Success means:
 
@@ -127,7 +130,7 @@ getting exactly what it gets today. The rules:
 | Today | After conversion |
 |---|---|
 | `module.exports = { a, b }` (22 modules) | `export { a, b }` / `export function a` |
-| `module.exports = <single value>`: a class instance, router, function or config object (23 modules) | `export = value` |
+| `module.exports = <single value>`: a class instance, router, function or config object (26 modules — this said 23 when the spec was written, an undercount; the pre-conversion tree had 27, one of which was `eslint.config.js`, never destined to be `.ts`) | `export = value` |
 | `module.exports.X = …` added to a single value (`aiPlanner.AiUnavailableError`) | `export = Object.assign(value, { X })`, the same object with the same property. TypeScript cannot merge a namespace with an instance |
 
 `export default` is not used anywhere during the conversion. Changing export
@@ -214,7 +217,7 @@ in the PR.
 Before a step's PR is merged, all of these must pass:
 
 1. `npm run build` with no errors.
-2. `npm test`: 507 pass, 0 fail.
+2. `npm test`: 508 pass, 0 fail.
 3. `npm run lint`, clean.
 4. `npm start`, and `GET /health` returns 200.
 5. CI is green.

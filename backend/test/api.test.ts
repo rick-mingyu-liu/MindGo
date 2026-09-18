@@ -20,7 +20,7 @@
  *
  * No network: every transaction here is in one currency, so the summary does no
  * conversion and never calls the exchange-rate API. Conversion itself is
- * covered by exchangeRateService.test.js.
+ * covered by exchangeRateService.test.ts.
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +30,7 @@ import type { Test, Response } from 'supertest';
 const HAVE_DB = Boolean(process.env.TEST_DATABASE_URL);
 
 if (HAVE_DB) {
-  // Must be set before app.js -> config -> db/connection is required.
+  // Must be set before app.ts -> config -> db/connection is required.
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
   process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
   process.env.NODE_ENV = 'test';

@@ -11,9 +11,10 @@ import {
  * that is wrong here is wrong in both, and the disagreement between a chart and
  * a deletion is not something anyone would notice quickly.
  *
- * Run under three timezones by `npm test` (see package.json) — the module
- * formats dates by arithmetic rather than `toISOString()`, and this is what
- * holds it to that.
+ * Swept across four timezones in-process by the last `describe` in this file,
+ * which sets `process.env.TZ` per case — the module formats dates by arithmetic
+ * rather than `toISOString()`, and this is what holds it to that. `npm test`
+ * runs the file once; there is no TZ sweep in package.json.
  */
 
 describe('termOf', () => {

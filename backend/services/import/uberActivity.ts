@@ -18,7 +18,7 @@ import type { OcrLine, ParserDraft, Row } from '../../types/import';
  * Every trip is a charge, so — as with a receipt — the direction comes from
  * the layout and is not a guess. The category is Transportation whatever the
  * destination says: "The Toronto Clinic" is a ride, not a doctor's bill.
- * Uber Eats orders live on their own screen; see uberEats.js.
+ * Uber Eats orders live on their own screen; see uberEats.ts.
  */
 const BUTTON = /^[^\p{L}\p{N}]*(rate|rebook|help|details|receipt)$/iu;
 const HAS_WORD = /[\p{L}\p{N}]/u;

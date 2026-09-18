@@ -1,13 +1,13 @@
 /**
  * Calendar days, as the API and the database both hold them: 'YYYY-MM-DD'.
  *
- * db/connection.js registers a pg type parser so a DATE column arrives as that
+ * db/connection.ts registers a pg type parser so a DATE column arrives as that
  * string rather than a JS Date. Nothing downstream should turn one back into a
  * Date to read its parts — `new Date('2026-08-01').getMonth()` is July for
  * every reader west of UTC, which is how a whole month's transactions end up
  * filed under the month before. These helpers work on the string.
  *
- * utils/terms.js owns term boundaries and accepts these strings directly.
+ * utils/terms.ts owns term boundaries and accepts these strings directly.
  */
 
 // A prefix match, so a full timestamp is accepted too. Rows written before the

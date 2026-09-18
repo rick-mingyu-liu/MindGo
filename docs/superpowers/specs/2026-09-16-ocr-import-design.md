@@ -1,6 +1,6 @@
 # Screenshot Import (OCR) — Design
 
-**Date:** 2026-09-16 · **Status:** implemented 2026-09-16 on feat/ocr-import (Task 16, the LLM fallback, not built); extended 2026-09-17 with real-screenshot fixes and the Uber, Uber Eats and WeChat Pay layouts (see *Revision notes (2026-09-17)*) · **Branch:** `feat/ocr-import` · **Plan:** [`docs/superpowers/plans/2026-09-16-ocr-import.md`](../plans/2026-09-16-ocr-import.md)
+**Date:** 2026-09-16 · **Status:** implemented 2026-09-16 on feat/ocr-import (Task 16, the LLM fallback, not built); extended 2026-09-17 with real-screenshot fixes and the Uber, Uber Eats and WeChat Pay layouts (see *Revision notes (2026-09-17)*) · **Branch:** `feat/ocr-import` · **Plan:** `docs/superpowers/plans/2026-09-16-ocr-import.md` — untracked; recoverable from git history
 
 ## 1. Goal
 

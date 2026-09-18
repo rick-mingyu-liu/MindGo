@@ -7,7 +7,7 @@ const FINNHUB_TOKEN = config.apiKeys.finnhubToken;
 const ALPHA_VANTAGE_API_KEY = config.apiKeys.alphaVantage;
 
 /**
- * Fields `controllers/investmentController.js` actually reads off a quote —
+ * Fields `controllers/investmentController.ts` actually reads off a quote —
  * not Finnhub's documented shape, which has more of them (o, pc, t) than
  * anything in this codebase uses.
  */
@@ -20,7 +20,7 @@ interface FinnhubQuoteResponse {
   v?: number;
 }
 
-/** Fields `investmentController.js` reads off a company profile. */
+/** Fields `investmentController.ts` reads off a company profile. */
 interface FinnhubProfileResponse {
   name?: string;
   country?: string;
@@ -52,7 +52,7 @@ interface FinnhubFinancialStatement {
   cf?: FinnhubFinancialLineItem[];
 }
 
-/** Fields `investmentController.js`'s getStockFinancials reads off each report. */
+/** Fields `investmentController.ts`'s getStockFinancials reads off each report. */
 interface FinnhubFinancialReport {
   report?: FinnhubFinancialStatement;
   period?: string;
@@ -102,7 +102,7 @@ class FinnhubService {
     // defeated the layered design: callers already fall back to
     // freeStockDataService (Yahoo, then Alpha Vantage), so a missing key
     // should degrade to the free path rather than be fatal.
-    // config/validate.js reports the missing key at startup.
+    // config/validate.ts reports the missing key at startup.
   }
 
   // Get real-time quote for a stock

@@ -79,7 +79,7 @@ const resendVerificationValidation = [
 // worth throttling that hard; /profile and /notifications are ordinary
 // authenticated traffic, and a user editing their settings can legitimately
 // save more than five times in a quarter hour. Those fall under the general
-// apiLimiter in app.js instead.
+// apiLimiter in app.ts instead.
 router.post('/register', authLimiter, registerValidation, authController.register);
 router.post('/login', authLimiter, loginValidation, authController.login);
 router.get('/verify-email/:token', authController.verifyEmail);

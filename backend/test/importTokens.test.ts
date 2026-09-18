@@ -136,7 +136,7 @@ describe('parseDate', () => {
   });
 
   // The server's timezone must not change any answer: nothing above builds a
-  // Date. Swept in-process, as terms.test.js does.
+  // Date. Swept in-process, as terms.test.ts does.
   describe('the same answers in every timezone', () => {
     const saved = process.env.TZ;
     after(() => { process.env.TZ = saved; });

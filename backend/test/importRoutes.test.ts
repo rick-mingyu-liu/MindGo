@@ -17,7 +17,7 @@ import type { Draft } from '../types/import';
  * routers on a real server, with auth and the database stubbed.
  *
  * Real routers rather than the validation chains alone, for the reason
- * autoDeleteValidation.test.js gives: the failure worth guarding against is a
+ * autoDeleteValidation.test.ts gives: the failure worth guarding against is a
  * validator that exists but is not mounted. And the body of every request here
  * is, in production, the text of someone's bank screenshot — so each suite
  * also asserts that none of it reached the log.
@@ -74,7 +74,7 @@ before(async () => {
   delete require.cache[importRouterPath];
   delete require.cache[transactionsRouterPath];
 
-  // Mirrors app.js: /import gets its own, larger body limit first.
+  // Mirrors app.ts: /import gets its own, larger body limit first.
   const app = express();
   app.use('/import', express.json({ limit: config.import.bodyLimit }));
   app.use(express.json());
