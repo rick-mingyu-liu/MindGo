@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import scheduler = require('../services/schedulerService');
 import logger = require('../utils/logger');
 import type { ScheduledTask } from 'node-cron';
+import { spawnSync } from 'node:child_process';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
@@ -19,6 +20,103 @@ import type { ScheduledTask } from 'node-cron';
 
 // Lets the awaits inside the interval callback settle after a tick.
 const drain = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+describe('long refresh intervals', () => {
+  const month = 2_592_000_000;
+  const maximumDelay = 2_147_483_647;
+
+  beforeEach(() => {
+    scheduler.jobs.clear();
+    mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
+    mock.method(logger, 'info', () => {});
+    mock.method(logger, 'audit', () => {});
+  });
+  afterEach(() => {
+    scheduler.stop();
+    mock.timers.reset();
+    mock.restoreAll();
+  });
+
+  test('real Node timers do not turn a month into an immediate refresh', () => {
+    // Fake timers accept oversized delays; a real child catches Node's clamp
+    // to 1ms without ever calling the database or waiting a month.
+    const result = spawnSync(process.execPath, ['-e', `
+      const scheduler = require(${JSON.stringify(require.resolve('../services/schedulerService'))});
+      let runs = 0;
+      scheduler.scheduleInterval('demoRefresh', 2592000000, async () => { runs++; return 0; });
+      const entry = scheduler.jobs.get('demoRefresh');
+      const referenced = entry.job.hasRef();
+      setTimeout(() => {
+        scheduler.stop();
+        process.exit(runs === 0 && !referenced ? 0 : 1);
+      }, 30);
+    `], { encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /TimeoutOverflowWarning/);
+  });
+
+  test('waits the full month across timer boundaries and repeats', async () => {
+    let runs = 0;
+    scheduler.scheduleInterval('demoRefresh', month, async () => { runs++; return 0; });
+    for (let cycle = 1; cycle <= 2; cycle++) {
+      mock.timers.tick(maximumDelay);
+      await drain();
+      assert.equal(runs, cycle - 1);
+      mock.timers.tick(month - maximumDelay - 1);
+      await drain();
+      assert.equal(runs, cycle - 1);
+      mock.timers.tick(1);
+      await drain();
+      assert.equal(runs, cycle);
+    }
+  });
+
+  test('shutdown cancels a later chunk', async () => {
+    let runs = 0;
+    scheduler.scheduleInterval('demoRefresh', month, async () => { runs++; return 0; });
+    mock.timers.tick(maximumDelay);
+    await drain();
+    scheduler.stop();
+    mock.timers.tick(month);
+    await drain();
+    assert.equal(runs, 0);
+    assert.deepEqual(scheduler.getStatus(), {});
+  });
+
+  test('a failed refresh is logged and the next month still runs', async () => {
+    let runs = 0;
+    const errors: string[] = [];
+    mock.method(logger, 'error', (message: string) => errors.push(message));
+    scheduler.scheduleInterval('demoRefresh', month, async () => {
+      runs++;
+      throw new Error('unavailable');
+    });
+    for (let cycle = 0; cycle < 2; cycle++) {
+      mock.timers.tick(maximumDelay);
+      mock.timers.tick(month - maximumDelay);
+      await drain();
+    }
+    assert.equal(runs, 2);
+    assert.deepEqual(errors, ['demoRefresh failed', 'demoRefresh failed']);
+  });
+
+  test('shutdown during an active refresh prevents rearming', async () => {
+    let finish: (value: number) => void = () => {};
+    let runs = 0;
+    scheduler.scheduleInterval('demoRefresh', month, () => {
+      runs++;
+      return new Promise<number>((resolve) => { finish = resolve; });
+    });
+    mock.timers.tick(maximumDelay);
+    mock.timers.tick(month - maximumDelay);
+    scheduler.stop();
+    finish(0);
+    await drain();
+    mock.timers.tick(month);
+    await drain();
+    assert.equal(runs, 1);
+  });
+});
 
 describe('scheduleInterval', () => {
   beforeEach(() => {
