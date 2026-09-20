@@ -10,8 +10,10 @@ import * as demoAccountService from './demoAccountService';
 // name -> { job, kind }. `kind` is what tells stop() and getStatus() which
 // API they are holding; the two types share no methods worth guessing at.
 type Job =
-  | { job: NodeJS.Timeout; kind: 'interval' }
+  | { job: NodeJS.Timeout; kind: 'interval'; cancel?: () => void }
   | { job: ScheduledTask; kind: 'cron' };
+
+const MAX_TIMER_DELAY = 2_147_483_647;
 
 /**
  * Owns the two kinds of recurring work: a node-cron job for weekly reports, and
@@ -55,7 +57,7 @@ class SchedulerService {
    * it silently held the test runner open.
    */
   scheduleInterval(name: string, intervalMs: number, task: () => Promise<number>): void {
-    const timer = setInterval(async () => {
+    const run = async (): Promise<void> => {
       try {
         const deleted = await task();
         const line = `${name}: deleted ${deleted} row(s)`;
@@ -72,7 +74,46 @@ class SchedulerService {
       } catch (error) {
         logger.error(`${name} failed`, error);
       }
-    }, intervalMs);
+    };
+
+    // Node clamps delays beyond ~24.9 days to 1ms. The opt-in 30-day demo
+    // refresh must wait in bounded chunks, never become a rapid deletion loop.
+    if (intervalMs > MAX_TIMER_DELAY) {
+      let cancelled = false;
+      let due = Date.now() + intervalMs;
+      const entry: Extract<Job, { kind: 'interval' }> = {
+        kind: 'interval',
+        job: setTimeout(wake, Math.min(intervalMs, MAX_TIMER_DELAY)),
+        cancel: () => {
+          cancelled = true;
+          clearTimeout(entry.job);
+        },
+      };
+      entry.job.unref();
+      this.jobs.set(name, entry);
+
+      function arm(): void {
+        if (cancelled) return;
+        entry.job = setTimeout(wake, Math.min(Math.max(1, due - Date.now()), MAX_TIMER_DELAY));
+        entry.job.unref();
+      }
+
+      async function wake(): Promise<void> {
+        if (cancelled) return;
+        if (Date.now() < due) {
+          arm();
+          return;
+        }
+        await run();
+        // Start a fresh cycle after completion; never overlap refreshes or
+        // replay missed cycles after a suspended process wakes up.
+        due = Date.now() + intervalMs;
+        arm();
+      }
+      return;
+    }
+
+    const timer = setInterval(run, intervalMs);
 
     timer.unref();
     this.jobs.set(name, { job: timer, kind: 'interval' });
@@ -176,7 +217,8 @@ class SchedulerService {
   stop(): void {
     for (const [name, entry] of this.jobs) {
       if (entry.kind === 'interval') {
-        clearInterval(entry.job);
+        if (entry.cancel) entry.cancel();
+        else clearInterval(entry.job);
       } else {
         entry.job.stop();
       }
