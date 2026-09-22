@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../lib/auth';
+import { theme } from '../lib/theme';
 
 /**
  * The root navigator.
@@ -23,6 +24,20 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
           <Stack.Screen name="(tabs)" />
+          {/* Pushed from the transactions list. It gets a header because it
+              is a leaf the person has to be able to back out of; the tabs
+              draw their own. */}
+          <Stack.Screen
+            name="transaction/[id]"
+            options={{
+              headerShown: true,
+              title: 'Edit transaction',
+              headerBackTitle: 'Back',
+              headerStyle: { backgroundColor: theme.card },
+              headerTitleStyle: { color: theme.text },
+              headerTintColor: theme.accent,
+            }}
+          />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

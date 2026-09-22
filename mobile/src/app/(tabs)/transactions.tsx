@@ -2,16 +2,19 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, useFocusEffect } from 'expo-router';
 import api, { errorMessage } from '../../lib/api';
-import { theme } from '../../lib/theme';
+import { theme, colorForCategory, elevation } from '../../lib/theme';
 import { formatDay } from '../../lib/date';
 import { formatMoney, amountOf } from '../../lib/format';
+import { remember } from '../../lib/transactionCache';
 import type { Transaction, TransactionsResponse } from '../../types/api';
 
 const PAGE_SIZE = 25;
@@ -37,6 +40,7 @@ export default function Transactions() {
     setError(null);
     try {
       const data = await fetchPage(1);
+      remember(data.transactions);
       setItems(data.transactions);
       setPage(data.pagination.page);
       setPages(data.pagination.pages);
@@ -65,6 +69,7 @@ export default function Transactions() {
     setLoadingMore(true);
     try {
       const data = await fetchPage(page + 1);
+      remember(data.transactions);
       setItems((previous) => [...previous, ...data.transactions]);
       setPage(data.pagination.page);
       setPages(data.pagination.pages);
@@ -119,7 +124,11 @@ export default function Transactions() {
       renderItem={({ item }) => {
         const income = item.type === 'income';
         return (
-          <View style={styles.row}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            onPress={() => router.push(`/transaction/${item.id}`)}
+          >
+            <View style={[styles.stripe, { backgroundColor: colorForCategory(item.category) }]} />
             <View style={styles.rowMain}>
               <Text style={styles.rowTitle} numberOfLines={1}>
                 {item.description}
@@ -134,7 +143,8 @@ export default function Transactions() {
               {income ? '+' : '−'}
               {formatMoney(amountOf(item), item.convertedCurrency)}
             </Text>
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.faint} style={styles.chevron} />
+          </Pressable>
         );
       }}
     />
@@ -150,12 +160,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.border,
     padding: 14,
     marginBottom: 8,
+    ...elevation,
   },
+  rowPressed: { opacity: 0.6 },
+  // The same colour the donut gives this category, so the list and the chart
+  // read as one picture.
+  stripe: { width: 3, height: 30, borderRadius: 2, marginRight: 12 },
+  chevron: { marginLeft: 8 },
   rowMain: { flex: 1, marginRight: 12 },
   rowTitle: { fontSize: 15, color: theme.text, fontWeight: '600' },
   rowSub: { fontSize: 12, color: theme.muted, marginTop: 3 },
