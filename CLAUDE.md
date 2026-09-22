@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-MindGo is a personal finance app: an Express/PostgreSQL REST API (`backend/`) and a Next.js/TypeScript frontend (`frontend/`). The two are separate npm projects with independent `package.json` files — run commands from within the relevant subdirectory.
+MindGo is a personal finance app: an Express/PostgreSQL REST API (`backend/`), a Next.js/TypeScript frontend (`frontend/`), and an Expo/React Native client (`mobile/`). All three are separate npm projects with independent `package.json` files — run commands from within the relevant subdirectory. They are deliberately *not* npm workspaces: workspaces consolidate every lockfile at the repo root, which breaks `npm ci` for both deploys, since Render builds with root directory `backend` and Vercel with `frontend`.
 
 ## Commands
 
@@ -31,6 +31,21 @@ npm run ocr-assets     # fetch + checksum the OCR model into public/models, copy
 # There is still no `npm test` in the frontend, despite README claims.
 ```
 
+### Mobile (`cd mobile`)
+
+Expo SDK 57 + Expo Router, talking to the same API. [mobile/README.md](mobile/README.md) covers running it on a phone.
+
+```bash
+npm install
+npx expo start          # then scan the QR with Expo Go, or press `i` for the simulator
+npx tsc --noEmit        # typecheck
+npx expo lint           # eslint (eslint-config-expo)
+npx expo-doctor         # dependency and config health
+npx expo export --platform ios   # bundle — catches what typecheck cannot
+```
+
+Signing in to Expo Go requires `npx expo login` **and** the same account signed in on the phone; the dev server then appears under "Development servers" and no QR is needed. There is deliberately **no `babel.config.js`**: the Expo Router install doc says to add one, but `babel-preset-expo` resolves only under `expo/` in SDK 57, so a hand-written config breaks Metro with `MODULE_NOT_FOUND`. There is no test runner yet, the same gap the frontend has.
+
 ### Evaluation (`cd eval`)
 
 `eval/` loads the parser from `backend/dist/`, so run `npm run build` in `backend/` after any parser change before `npm run benchmark` or `npm run fixtures`.
@@ -50,6 +65,8 @@ npm test               # node --test — scorer unit tests
 `backend/test/` holds the only automated tests. `npm test` builds the backend, then runs the compiled tests via `node --test` — no test framework is installed, and none is needed.
 
 - **Unit tests always run**, with no database and no network: `exchangeRateService.test.ts` (conversion, caching, and the failure modes that would silently produce a plausible wrong number), `configValidate.test.ts` (the startup check, exercised in a child process because it calls `process.exit`), `packageRoot.test.ts` (finding `backend/` from source or `dist/`), `errorSummary.test.ts` (the only shape a caught error takes in a log), `cleanupService.test.ts` (`db.query` mocked; asserts both retention predicates and that errors propagate), `schedulerService.test.ts` (the interval plumbing, via `mock.timers`, and the weekly report's next run on a UTC clock), `aiUnavailable.test.ts` (an OpenAI account out of credit or rate-limited answers 503 `ai_unavailable` on every AI endpoint, through the real router with a fake client), `privacy.test.ts` (`maskEmail`, including every input that would make it throw inside a log line), `registerLogging.test.ts` (runs the real `register` handler with stubbed collaborators and asserts no token or raw address reaches the log), `emailValidation.test.ts` (every way MailboxLayer can fail to answer, each of which must degrade rather than block), `logger.test.ts` (which levels survive `NODE_ENV=production`), `terms.test.ts` (the term calendar, swept across four timezones in-process), `autoDeleteValidation.test.ts` (mounts the real transactions router on an ephemeral port and asserts a rejected `months` never reaches `db.query`), `rollingSummary.test.ts` (which window each request selects — term, year and rolling — through the real router, swept across four timezones), `dates.test.ts` (the `DATE` type parser, the day helpers, and `monthlyBreakdown` keys asserted through the real router in three timezones), `importTokens.test.ts`, `importRows.test.ts`, `importClassify.test.ts`, `importBankList.test.ts`, and `importReceipt.test.ts` (the screenshot parser's pieces, unit by unit), `importUberActivity.test.ts` (Uber's trip list: date-and-time lines, buttons and map text ignored, category fixed to Transportation), `importUberEats.test.ts` (Uber Eats' Past orders tab: squeezed order lines, store logos kept out of descriptions, category from the store alone), `importWechat.test.ts` (WeChat Pay's list: yuan amounts with stray characters, years from month headers, direction from the sign), `importParse.test.ts` (the parser end to end, against hand-built layouts in `test/helpers/ocrLayouts.ts`), `importFixtures.test.ts` (replays recorded OCR output from `eval/` through the real parser; fails on any silent amount or type error; it requires eval/lib/score.cjs, so a checkout without eval/ cannot run the backend suite), and `importRoutes.test.ts` (both import endpoints through the real routers with `db.query` stubbed; asserts nothing logged contains screenshot text or row values, even when the database throws). `test/helpers/ocrLayouts.ts` is not a test file and is not run — `npm test`'s `dist/test/**/*.test.js` glob does not match it.
+
+  **`sharedContracts.test.ts` pins the code the three projects copy.** `frontend/` and `mobile/` cannot import each other — React Native's `View` is not React DOM's `div` — and a shared package would move every lockfile to the repo root and break both deploys (see Overview). So three things are duplicated on purpose and guarded instead: the day helpers (`mobile/src/lib/date.ts` must end with `frontend/lib/date.ts` verbatim), the category list, and `CATEGORY_COLORS` plus `FALLBACK_COLORS`. It reads files outside `backend/`, so like `demoData.test.ts` it fails on a checkout without `frontend/` or `mobile/`. Note what it does **not** pin: `backend/utils/dates.ts` is not a copy of `frontend/lib/date.ts` — they share a name and a purpose but expose different functions, and only `toDay` and `formatDay` overlap.
 
   One trap in `schedulerService.test.ts`: `mock.timers`' fake `Timeout` **ignores `unref()`** — `hasRef()` stays `true` however you call it — so the one test that checks the timer does not hold the event loop open has to run on a real timer, in its own `describe`.
 - **`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`; point it at a throwaway database instead:
@@ -154,7 +171,13 @@ is in git history.
   aggregates in Node rather than SQL. That cost is per user and per request, so
   it is the gate on offering an *All time* period.
 - **The frontend has no test runner**, so `lib/date.ts` is unguarded. Its
-  backend twin, `utils/dates.ts`, is covered by `test/dates.test.ts`.
+  backend twin, `utils/dates.ts`, is covered by `test/dates.test.ts`, and
+  `sharedContracts.test.ts` at least pins the mobile copy to it.
+- **`mobile/` has no test runner either**, and covers four of the API's
+  seven routers. No savings goals, investments, AI planning, screenshot
+  import or registration; new transactions are hardcoded to CAD; there is
+  no dark mode. The API has no `GET /transactions/:id`, so the edit screen
+  depends on a row the list already loaded and cannot be deep-linked to.
 - **Phone OCR speed is unmeasured.** On a laptop (M-series Mac, Chrome,
   visible tab) screenshot import takes about 1–2 s per image; Chrome throttles
   a hidden tab to 8–15 s. A mid-range phone may be several times slower than
