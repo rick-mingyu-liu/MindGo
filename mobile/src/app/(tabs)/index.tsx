@@ -9,27 +9,36 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import api, { errorMessage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { theme } from '../../lib/theme';
 import { formatDayRange } from '../../lib/date';
 import { formatMoney } from '../../lib/format';
+import { Card } from '../../components/Card';
+import { DonutChart, type Slice } from '../../components/DonutChart';
+import { BarChart, type Bar } from '../../components/BarChart';
+import { PeriodPicker, PERIODS, type Period } from '../../components/PeriodPicker';
+import { categories as CATEGORY_LISTS } from '../../lib/categories';
 import type { SummaryResponse } from '../../types/api';
+
+/** Income category names, for splitting the category totals into two charts. */
+const INCOME_CATEGORIES = new Set<string>(CATEGORY_LISTS.income);
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const [period, setPeriod] = useState<Period>(PERIODS[0]!);
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (which: Period) => {
     setError(null);
     try {
-      // `term=current` is the API's own default and the same window the web
-      // dashboard opens on, so both clients agree about what "this term" is.
+      // Exactly one of term/year/months, or the API answers 400.
       const { data } = await api.get<SummaryResponse>('/summary/rolling', {
-        params: { term: 'current' },
+        params: { [which.param]: which.value },
       });
       setSummary(data);
     } catch (e) {
@@ -45,22 +54,28 @@ export default function Dashboard() {
   // and then never again, because the screen is never unmounted by the tabs.
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load]),
+      void load(period);
+    }, [load, period]),
   );
 
-  if (loading) {
-    return (
-      <View style={styles.centre}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.hint}>Waking the server can take ~20s</Text>
-      </View>
-    );
+  function choose(next: Period) {
+    setPeriod(next);
+    setLoading(true);
+    void load(next);
   }
 
-  const categories = Object.entries(summary?.categories ?? {}).sort(
-    (a, b) => b[1].total - a[1].total,
-  );
+  const spending: Slice[] = Object.entries(summary?.categories ?? {})
+    .filter(([name]) => !INCOME_CATEGORIES.has(name))
+    .map(([label, totals]) => ({ label, value: totals.total }))
+    .sort((a, b) => b.value - a.value);
+
+  const bars: Bar[] = (summary?.monthlyBreakdown ?? []).map((month) => ({
+    // '2026-09' → 'Sep'. Built from the string, never `new Date(month)`,
+    // which parses as UTC and names the month before west of UTC.
+    label: MONTHS[Number(month.month.slice(5, 7)) - 1] ?? month.month,
+    income: month.income,
+    expenses: month.expenses,
+  }));
 
   return (
     <ScrollView
@@ -71,116 +86,117 @@ export default function Dashboard() {
           refreshing={refreshing}
           onRefresh={() => {
             setRefreshing(true);
-            void load();
+            void load(period);
           }}
         />
       }
     >
       <Text style={styles.greeting}>Hi {user?.first_name}</Text>
+      <Text style={styles.period}>{summary?.periodLabel ?? period.label}</Text>
+      <Text style={styles.range}>
+        {summary ? formatDayRange(summary.startDate, summary.endDate) : ' '}
+      </Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.picker}>
+        <PeriodPicker selected={period} onSelect={choose} disabled={loading} />
+      </View>
 
-      {summary ? (
+      {error ? (
+        <Card>
+          <Text style={styles.error}>{error}</Text>
+        </Card>
+      ) : null}
+
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.hint}>Waking the server can take ~20s</Text>
+        </View>
+      ) : summary ? (
         <>
-          {/* Every one of these labels is computed by the server. Rendering
-              them rather than deriving them is what keeps this client from
-              disagreeing with the web one about where a term begins. */}
-          <Text style={styles.period}>{summary.periodLabel}</Text>
-          <Text style={styles.range}>
-            {formatDayRange(summary.startDate, summary.endDate)}
-          </Text>
-
           <View style={styles.cards}>
-            <View style={styles.card}>
+            <Card style={styles.half}>
               <Text style={styles.cardLabel}>Income</Text>
               <Text style={[styles.cardValue, { color: theme.income }]}>
                 {formatMoney(summary.totalIncome, summary.targetCurrency)}
               </Text>
-            </View>
-            <View style={styles.card}>
+            </Card>
+            <Card style={styles.half}>
               <Text style={styles.cardLabel}>Expenses</Text>
               <Text style={[styles.cardValue, { color: theme.expense }]}>
                 {formatMoney(summary.totalExpenses, summary.targetCurrency)}
               </Text>
-            </View>
+            </Card>
           </View>
 
-          <View style={styles.card}>
+          <Card>
             <Text style={styles.cardLabel}>Net</Text>
-            <Text
-              style={[
-                styles.cardValue,
-                { color: summary.netIncome >= 0 ? theme.income : theme.expense },
-              ]}
-            >
-              {formatMoney(summary.netIncome, summary.targetCurrency)}
-            </Text>
-          </View>
+            <View style={styles.netRow}>
+              <Ionicons
+                name={summary.netIncome >= 0 ? 'trending-up' : 'trending-down'}
+                size={22}
+                color={summary.netIncome >= 0 ? theme.income : theme.expense}
+              />
+              <Text
+                style={[
+                  styles.netValue,
+                  { color: summary.netIncome >= 0 ? theme.income : theme.expense },
+                ]}
+              >
+                {formatMoney(summary.netIncome, summary.targetCurrency)}
+              </Text>
+            </View>
+          </Card>
 
-          <Text style={styles.section}>By category</Text>
-          {categories.length === 0 ? (
-            <Text style={styles.hint}>Nothing recorded this term yet.</Text>
-          ) : (
-            categories.map(([name, totals]) => (
-              <View key={name} style={styles.row}>
-                <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{name}</Text>
-                  <Text style={styles.rowSub}>
-                    {totals.count} {totals.count === 1 ? 'entry' : 'entries'}
-                  </Text>
-                </View>
-                <Text style={styles.rowAmount}>
-                  {formatMoney(totals.total, summary.targetCurrency)}
-                </Text>
-              </View>
-            ))
-          )}
+          <Card title="Where it went">
+            <DonutChart slices={spending} currency={summary.targetCurrency} />
+          </Card>
+
+          <Card title="Month by month">
+            <BarChart bars={bars} currency={summary.targetCurrency} />
+          </Card>
         </>
       ) : null}
 
       <Pressable style={styles.signOut} onPress={() => void signOut()}>
+        <Ionicons name="log-out-outline" size={18} color={theme.expense} />
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: theme.bg },
   content: { padding: 16, paddingBottom: 48 },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: theme.bg },
-  greeting: { fontSize: 15, color: theme.muted },
+  greeting: { fontSize: 14, color: theme.muted },
   period: { fontSize: 28, fontWeight: '700', color: theme.text, marginTop: 2 },
-  range: { fontSize: 13, color: theme.muted, marginBottom: 16 },
+  range: { fontSize: 13, color: theme.faint, marginBottom: 14, minHeight: 18 },
+  picker: { marginBottom: 16 },
   cards: { flexDirection: 'row', gap: 12 },
-  card: {
-    flex: 1,
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 16,
-    marginBottom: 12,
+  half: { flex: 1 },
+  cardLabel: {
+    fontSize: 11,
+    color: theme.muted,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
-  cardLabel: { fontSize: 12, color: theme.muted, fontWeight: '600' },
-  cardValue: { fontSize: 22, fontWeight: '700', marginTop: 4 },
-  section: { fontSize: 13, fontWeight: '700', color: theme.muted, marginTop: 12, marginBottom: 8 },
-  row: {
+  cardValue: { fontSize: 20, fontWeight: '700', marginTop: 6 },
+  netRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  netValue: { fontSize: 24, fontWeight: '700' },
+  error: { color: theme.expense, lineHeight: 20 },
+  loading: { alignItems: 'center', gap: 12, paddingVertical: 48 },
+  hint: { color: theme.muted, fontSize: 13 },
+  signOut: {
+    marginTop: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 14,
-    marginBottom: 8,
+    justifyContent: 'center',
+    gap: 7,
+    padding: 12,
   },
-  rowMain: { flex: 1 },
-  rowTitle: { fontSize: 15, color: theme.text, fontWeight: '600' },
-  rowSub: { fontSize: 12, color: theme.muted, marginTop: 2 },
-  rowAmount: { fontSize: 15, fontWeight: '700', color: theme.text },
-  error: { color: theme.expense, marginVertical: 12, lineHeight: 20 },
-  hint: { color: theme.muted, fontSize: 13 },
-  signOut: { marginTop: 28, alignItems: 'center', padding: 12 },
   signOutText: { color: theme.expense, fontSize: 15, fontWeight: '600' },
 });

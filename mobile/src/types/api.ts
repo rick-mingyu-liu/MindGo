@@ -82,6 +82,16 @@ export interface CategoryTotal {
  * `endDate` is **exclusive**. Fall 2026 ends `2027-01-01`, which is not a day
  * in the term. `formatDayRange` in lib/date.ts handles that.
  */
+/** One month's totals, as `monthlyBreakdown` carries them. */
+export interface MonthTotals {
+  /** 'YYYY-MM'. */
+  month: string;
+  income: number;
+  expenses: number;
+  netIncome: number;
+  transactions: Transaction[];
+}
+
 export interface SummaryResponse {
   period: string;
   term: string | null;
@@ -94,6 +104,7 @@ export interface SummaryResponse {
   totalIncome: number;
   totalExpenses: number;
   netIncome: number;
+  monthlyBreakdown: MonthTotals[];
   categories: Record<string, CategoryTotal>;
   transactions: Transaction[];
   targetCurrency: Currency;
