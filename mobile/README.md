@@ -1,8 +1,9 @@
 # MindGo mobile
 
 A React Native client for the existing MindGo API, built with Expo (SDK 57) and
-Expo Router. This is a deliberate first mobile project: four screens that
-exercise every mobile fundamental once, against a backend that already works.
+Expo Router. This is a deliberate first mobile project: a handful of screens
+that exercise every mobile fundamental once, against a backend that already
+works.
 
 ## Getting it onto your phone
 
@@ -12,8 +13,15 @@ npm install
 npx expo start
 ```
 
-Install **Expo Go** from the App Store or Play Store, then scan the QR code in
-the terminal. That is the whole loop — no Xcode, no Apple Developer account, no
+Install **Expo Go** from the App Store or Play Store. You also need to be signed
+in on **both** sides — `npx expo login` here and the same account in Expo Go —
+or the app refuses to open the project. Once signed in, the dev server appears
+under "Development servers" on Expo Go's home screen and there is no QR code to
+scan at all. (If you do scan it: use the iPhone **Camera** app, or Expo Go's own
+scanner on Android. A generic QR-reader app reports "no data" because it does
+not understand the `exp://` scheme.)
+
+Then scan the QR code in the terminal. That is the whole loop — no Xcode, no Apple Developer account, no
 $99, no build step. Saving a file reloads the app on the phone.
 
 Press `i` in the terminal for the iOS simulator instead, or `w` for the browser.
@@ -60,10 +68,17 @@ src/
     index.tsx             the gate: decides login vs. tabs on launch
     login.tsx             email + password
     (tabs)/
-      _layout.tsx         tab navigator, and the signed-in guard
-      index.tsx           dashboard — term summary and category totals
+      _layout.tsx         tab navigator, icons, and the signed-in guard
+      index.tsx           dashboard — summary, donut, bars, period picker
       transactions.tsx    paginated list, pull to refresh, infinite scroll
       add.tsx             new transaction form with a native date picker
+    transaction/
+      [id].tsx            edit and delete — a dynamic route
+  components/             reusable pieces, none of them routes
+    Card.tsx              the one container, with cross-platform elevation
+    DonutChart.tsx        spending by category, on react-native-svg
+    BarChart.tsx          income vs expenses per month, plain Views
+    PeriodPicker.tsx      This term / Last term / This year / Last year
   lib/                    everything that is not a screen
     api.ts                axios instance, async auth interceptor
     auth.tsx              session context, restore-on-launch, sign out
@@ -71,8 +86,9 @@ src/
     config.ts             API_URL and the localhost explanation
     date.ts               copied verbatim from frontend/lib/date.ts
     categories.ts         copied from the web app's canonical list
+    theme.ts              palette, elevation, shared category colours
     format.ts             currency, and the amount-is-a-string trap
-    theme.ts              one static palette
+    transactionCache.ts   rows the list hands to the detail screen
   types/api.ts            response shapes, captured from the live API
 ```
 
@@ -135,37 +151,70 @@ npx expo-doctor      # dependency and config health
 All three pass as of 2026-09-22. There is no test runner here yet — the same
 gap the web frontend has.
 
+## Duplication, and what guards it
+
+`frontend/` and `mobile/` cannot share code. React Native's `View` is not
+React DOM's `div`, so no component crosses over, and a real shared package
+would move every lockfile to the repo root — which breaks `npm ci` for Render
+(root directory `backend`) and Vercel (root directory `frontend`) at once.
+
+So three things are copied on purpose, and
+`backend/test/sharedContracts.test.ts` fails the moment any of them drift:
+
+| Copied | From |
+|---|---|
+| `lib/date.ts` | `frontend/lib/date.ts`, verbatim |
+| `lib/categories.ts` | the `categories` export in `frontend/pages/transactions/new.tsx` |
+| `CATEGORY_COLORS` in `lib/theme.ts` | `frontend/pages/index.tsx` |
+
+If you edit one side, edit the other. The backend suite will tell you if you
+forget.
+
 ## Good next exercises
 
 Roughly in order of how much new ground each covers:
 
 1. **Dark mode.** `useColorScheme()` plus making `lib/theme.ts` reactive. The
-   web app already has a ThemeContext to mirror.
-2. **Edit and delete a transaction.** `PUT`/`DELETE /transactions/:id` already
-   exist. Teaches dynamic routes (`[id].tsx`) and `useLocalSearchParams`.
-3. **The period selector.** The dashboard is pinned to `term=current`; the API
-   also takes `term=previous`, `year=`, and `months=` — but exactly one at a
-   time, or it answers 400.
-4. **Pull the category list from the server** instead of the copy in
-   `lib/categories.ts`, which is now a third copy that nothing pins.
-5. **Camera and OCR.** The big one: `expo-camera` plus Apple Vision or ML Kit
+   web app already has a ThemeContext to mirror. Note the catch: a reactive
+   palette means no screen can call `StyleSheet.create` at module scope any
+   more, which is why it was left static.
+2. **Swipe to delete** on the transactions list, with
+   `react-native-gesture-handler`'s `Swipeable`. Delete already works from the
+   detail screen, so this is purely about the gesture.
+3. **A currency picker** on the Add and Edit screens. The API accepts CAD,
+   USD, EUR, GBP, AUD and CNY; both forms currently hardcode the currency.
+4. **Savings goals.** A whole feature area with nothing built — eight
+   endpoints covering list, create, edit, delete, progress and stats, and the
+   demo account already has goals seeded with target dates.
+5. **`GET /transactions/:id` on the backend**, which would let the edit screen
+   load a row on its own instead of depending on `lib/transactionCache.ts`.
+   It must be declared *after* `GET /categories` in `routes/transactions.ts`,
+   or `:id` swallows that route.
+6. **Camera and OCR.** The big one: `expo-camera` plus Apple Vision or ML Kit
    feeding the existing `POST /import/parse`, which accepts OCR lines rather
    than an image and so does not care who produced them. Read
-   [docs/2026-09-22-mobile-client-design.md](../docs/2026-09-22-mobile-client-design.md) first — the
-   parser's layout thresholds were tuned against one specific OCR model, and a
-   different engine's box geometry needs `eval/` re-run before the output can
-   be trusted.
-6. **A real build.** `eas build --profile development` when you need a native
+   [docs/2026-09-22-mobile-client-design.md](../docs/2026-09-22-mobile-client-design.md)
+   first — the parser's layout thresholds were tuned against one specific OCR
+   model, and a different engine's box geometry needs `eval/` re-run before
+   the output can be trusted.
+7. **A real build.** `eas build --profile development` when you need a native
    module Expo Go does not bundle, or TestFlight when you want it on someone
    else's phone. That is where the $99/year starts.
 
 ## Known limits
 
-- New transactions are hardcoded to **CAD**. The API accepts CAD, USD, EUR,
-  GBP, AUD and CNY; the form does not offer a picker yet.
-- There is **no registration screen** — sign in with an account that exists.
-  Registration would also need the email-verification link to deep-link back
-  into the app rather than open the web frontend.
+- **Four of the API's seven routers are untouched.** No savings goals, no
+  investments or watchlist, no AI planning, no screenshot import, no
+  registration screen, no settings.
+- New transactions are hardcoded to **CAD**.
+- **No dark mode.** The palette is a single static light theme.
+- **The edit screen cannot be deep-linked to.** It reads the row from
+  `lib/transactionCache.ts`, which the list fills, because the API has no
+  endpoint that returns one transaction. Opening `/transaction/123` on a cold
+  start shows an explanation rather than an empty form.
+- **There is no test runner**, the same gap the web frontend has. The only
+  automated check on this code is the drift guard in the backend suite, plus
+  typecheck, lint and a bundle.
 - **Web is not a target.** `expo-secure-store` has no web implementation, so
   `lib/storage.ts` falls back to `localStorage` purely to keep `npm run web`
   usable while iterating. It is not secure and is not meant to ship.
