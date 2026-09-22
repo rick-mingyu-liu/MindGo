@@ -3,11 +3,14 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://www.postgresql.org/)
+[![Expo](https://img.shields.io/badge/Expo-SDK%2057-black.svg)](https://expo.dev/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
 
 A personal finance app built around the **Waterloo term**, not the calendar month.
 
 A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. MindGo tracks income, expenses, savings goals and a stock watchlist against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
+
+There is also a **React Native client** in [`mobile/`](mobile/) that talks to the same API — sign-in, the term dashboard with charts, and adding, editing or deleting a transaction from a phone.
 
 **Demo:** `john.doe@example.com` / `password123`
 
@@ -21,6 +24,7 @@ A study term and a co-op term are both four months, and that is the unit student
 - [Quick start](#quick-start)
 - [The demo account](#the-demo-account)
 - [Architecture](#architecture)
+- [Mobile](#mobile)
 - [Development](#development)
 - [API](#api)
 - [Deployment](#deployment)
@@ -270,6 +274,39 @@ docs/superpowers/specs/         design specs for screenshot import and the TypeS
 
 ---
 
+## Mobile
+
+[`mobile/`](mobile/) is a third npm project, built on Expo SDK 57 and Expo Router. It shares the API and nothing else.
+
+```
+mobile/src/
+├── app/                        every file is a screen (file-based routing)
+│   ├── _layout.tsx             root navigator, auth provider, safe area
+│   ├── index.tsx               the gate: login or tabs, once the keychain answers
+│   ├── login.tsx
+│   ├── (tabs)/                 dashboard · transactions · add
+│   └── transaction/[id].tsx    edit and delete
+├── components/                 Card · DonutChart · BarChart · PeriodPicker
+├── lib/                        api · auth · storage · theme · date · categories
+└── types/api.ts                response shapes, captured from the live API
+```
+
+```bash
+cd mobile && npm install
+npx expo start          # scan with Expo Go, or press `i` for the simulator
+npx tsc --noEmit        # typecheck
+npx expo lint
+npx expo-doctor         # dependency and config health
+```
+
+Running it on a phone needs `npx expo login` **and** the same account signed in inside Expo Go — the dev server then appears under "Development servers" and there is no QR code to scan. [`mobile/README.md`](mobile/README.md) covers the rest, including why `localhost` is unreachable from a phone.
+
+**The three projects are deliberately not npm workspaces.** Workspaces consolidate every lockfile at the repo root, which breaks `npm ci` for both deploys at once — Render builds with root directory `backend`, Vercel with `frontend`. So `mobile/` copies the day helpers, the category list and the category colours from `frontend/`, and `backend/test/sharedContracts.test.ts` fails if any copy drifts.
+
+There is **no `babel.config.js`** in `mobile/`, on purpose: the Expo Router install doc says to add one, but `babel-preset-expo` resolves only under `expo/` in SDK 57, so a hand-written config breaks Metro with `MODULE_NOT_FOUND`.
+
+---
+
 ## Development
 
 ```bash
@@ -290,6 +327,10 @@ npm run lint
 npm run check:locales    # fails on duplicate or unresolved keys
 npm run ocr-assets       # fetch + checksum the OCR model, copy ONNX Runtime
 
+# mobile
+npx expo start           # dev server; Expo Go or a simulator
+npx expo export --platform ios   # bundle — catches what typecheck cannot
+
 # eval
 npm run generate         # regenerate the synthetic screenshot set
 npm run benchmark        # score the shipped model on the synthetic set
@@ -302,7 +343,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 
 ### Tests
 
-[`backend/test/`](backend/test/) holds the application's tests — **508 across 30 files**, run by `node --test`. No test framework is installed and none is needed.
+[`backend/test/`](backend/test/) holds the application's tests — **519 across 31 files**, run by `node --test`. No test framework is installed and none is needed.
 
 **Unit tests always run**, with no database and no network. They cover the things that fail silently:
 
@@ -314,6 +355,8 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
 
+**Drift guards** (`sharedContracts.test.ts`, `demoData.test.ts`) pin the code the three projects copy. `frontend/` and `mobile/` cannot import each other — React Native's `View` is not React DOM's `div` — so the day helpers, the category list and the category colours are duplicated on purpose, and these tests fail the moment any of them stop agreeing.
+
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
 **`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`:
@@ -324,7 +367,7 @@ TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
 
 It creates and deletes users, which is why opting in is deliberate. **Never point it at production.**
 
-The frontend has no test runner. Verify UI changes by running the app.
+Neither the frontend nor `mobile/` has a test runner. Verify UI changes by running the app; for `mobile/`, `npx tsc --noEmit`, `npx expo lint`, `npx expo-doctor` and `npx expo export` are the checks that exist.
 
 ### CI
 
@@ -429,6 +472,8 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
 
+**Mobile** — Expo SDK 57, React Native 0.86, Expo Router (file-based, like the web app's Pages Router), `expo-secure-store` for the token, `react-native-svg` for the charts.
+
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
 **External services** — [Finnhub](https://finnhub.io/), Yahoo Finance and [Alpha Vantage](https://www.alphavantage.co/) for stock data; [OpenAI](https://openai.com/) for planning; [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
@@ -441,13 +486,15 @@ Six tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `
 
 The improvement backlog is retired; the reasoning for anything already fixed lives in the comment next to the code, and the rest is in git history.
 
-- **Phone OCR speed is unmeasured.** Screenshot import takes about 1–2 s per image on a laptop; a phone may be several times slower. Measure on a real device before announcing the feature.
+- **Phone OCR speed is unmeasured**, and screenshot import is not in the mobile client. Import takes about 1–2 s per image on a laptop; a phone may be several times slower. `POST /import/parse` takes OCR lines rather than an image, so a native client could feed it Apple Vision or ML Kit output instead of the 45 MB WASM model — but the parser's layout thresholds were tuned against one specific engine, so `eval/` needs re-running before that output can be trusted. It also needs a development build, since Expo Go bundles no OCR module.
 - **Uber and Uber Eats imports can double-count** a card charge already imported from a bank screenshot. Duplicates are flagged only when the day, amount and currency all match.
 - **Each new app layout needs its own parser rules.** Every layout added so far needed at least one measured spacing rule; an unsupported app shows the recognised text for manual entry.
 - **The LLM fallback for screenshot import was not built.** The seven real screenshots tried so far were all read by the rule-based parser once their layouts were added; unsure rows report `ai_fallback_unavailable`.
 - **Retention settings do not persist.** `GET/PUT /transactions/retention-settings` reports a saved preference it never stores, and nothing acts on one. The settings page no longer shows or requests it.
 - **`/summary/rolling` returns every transaction twice** and aggregates in Node — one user's year is a ~154 kB response. This is the gate on an *All time* view.
-- **No frontend test runner**, so `lib/date.ts` and `lib/preferences.ts` are unguarded.
+- **No frontend test runner**, so `lib/date.ts` and `lib/preferences.ts` are unguarded. `mobile/` has none either.
+- **The mobile client covers three of the API's seven routers.** No savings goals, investments, AI planning, screenshot import, registration or settings; new transactions are hardcoded to CAD, and there is no dark mode.
+- **The API has no `GET /transactions/:id`.** The mobile edit screen therefore reads the row from a list it already loaded and cannot be deep-linked to. Adding the endpoint would fix it — declared *after* `GET /categories`, or `:id` swallows that route.
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.
 - **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else.
 
