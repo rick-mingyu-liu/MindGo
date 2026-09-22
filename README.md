@@ -12,7 +12,9 @@ A study term and a co-op term are both four months, and that is the unit student
 
 There is also a **React Native client** in [`mobile/`](mobile/) that talks to the same API — sign-in, the term dashboard with charts, and adding, editing or deleting a transaction from a phone.
 
-**Demo:** `john.doe@example.com` / `password123`
+**Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
+
+The API runs on Render's free plan, which sleeps after ~15 minutes of inactivity, so the first request can wait about 20 seconds on a cold start. That is the server waking up, not the app hanging.
 
 ---
 
