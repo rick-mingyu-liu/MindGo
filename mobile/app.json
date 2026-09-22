@@ -25,7 +25,8 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font"
     ],
     "scheme": "mindgo",
     "experiments": {
