@@ -131,7 +131,17 @@ export default function EditTransaction() {
   }
 
   const handleDelete = async () => {
-    if (!confirm(t('Are you sure you want to delete this transaction? This action cannot be undone.'))) {
+    const result = await Swal.fire({
+      title: t('Are you sure?'),
+      text: t('Are you sure you want to delete this transaction? This action cannot be undone.'),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: t('Yes, delete it!'),
+      cancelButtonText: t('Cancel'),
+    })
+    if (!result.isConfirmed) {
       return
     }
 
