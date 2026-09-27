@@ -45,6 +45,14 @@ app.use(cors(config.cors));
 // too small for one long screenshot's OCR output. The app-wide parser skips a
 // body that has already been read.
 app.use('/import', express.json({ limit: config.import.bodyLimit }));
+// /mcp speaks JSON-RPC, so a body that isn't JSON is the client's parse error
+// (-32700, 400), not the 500 the global handler would make of it.
+app.use('/mcp', express.json(), (error: unknown, _req: Request, res: Response, next: express.NextFunction) => {
+  if ((error as { type?: string })?.type === 'entity.parse.failed') {
+    return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+  }
+  next(error);
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

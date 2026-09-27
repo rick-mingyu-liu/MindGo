@@ -21,20 +21,18 @@ export const looksLikeToken = (value: unknown): value is string => typeof value 
 
 /** Creates a token for a user. Returns the token itself, which is never stored and cannot be shown again. */
 export async function createToken(userId: number, name: string): Promise<{ id: number; token: string }> {
-  const active = await query<{ count: string }>(
-    'SELECT COUNT(*) AS count FROM access_tokens WHERE user_id = $1 AND revoked_at IS NULL',
-    [userId]
-  );
-  if (Number(active.rows[0]?.count ?? 0) >= MAX_TOKENS_PER_USER) {
-    throw new RangeError(`at most ${MAX_TOKENS_PER_USER} active tokens; revoke one first`);
-  }
   const token = PREFIX + randomBytes(32).toString('base64url');
+  // The limit is checked in the insert itself rather than by a separate read
+  // first. Only the CLI creates tokens, so nothing races it in practice.
   const created = await query<Pick<AccessTokenRow, 'id'>>(
-    'INSERT INTO access_tokens (user_id, name, token_hash) VALUES ($1, $2, $3) RETURNING id',
-    [userId, name.slice(0, 60), hashToken(token)]
+    `INSERT INTO access_tokens (user_id, name, token_hash)
+     SELECT $1, $2, $3
+     WHERE (SELECT COUNT(*) FROM access_tokens WHERE user_id = $1 AND revoked_at IS NULL) < $4
+     RETURNING id`,
+    [userId, name.slice(0, 60), hashToken(token), MAX_TOKENS_PER_USER]
   );
   const id = created.rows[0]?.id;
-  if (id === undefined) throw new Error('the token was not stored');
+  if (id === undefined) throw new RangeError(`at most ${MAX_TOKENS_PER_USER} active tokens; revoke one first`);
   return { id, token };
 }
 
