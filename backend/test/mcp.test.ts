@@ -5,7 +5,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import db = require('../db/connection');
 import { hashToken } from '../services/accessTokens';
-import { currentTerm, previousTerm, boundsOf } from '../utils/terms';
+import { currentTerm, previousTerm, boundsOf, labelOf } from '../utils/terms';
 
 /**
  * POST /mcp lets another app read your numbers with a personal access token.
@@ -159,6 +159,7 @@ describe('the tools', () => {
     const expected = Math.round(4000 * (out.days_elapsed / out.days_total) * 100) / 100;
     assert.equal(out.pace.last_term_same_point, expected);
     assert.equal(out.pace.ratio, Math.round((2000 / expected) * 100) / 100);
+    assert.equal(out.pace.compared_with, labelOf(previousTerm(currentTerm(now))));
   });
 
   test('previous term has no pace, and a bad term is a tool error', async () => {

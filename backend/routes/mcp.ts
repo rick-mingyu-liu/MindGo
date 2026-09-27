@@ -29,7 +29,7 @@ const TOOLS = [
     name: 'money_term_summary',
     description:
       'Income, spending, savings rate and top spending categories (CAD) for a Waterloo term: Winter Jan–Apr, Spring May–Aug, Fall Sep–Dec. ' +
-      'For the current term it also says how many days in it is and compares spending with last term at the same point (pace.ratio above 1 means spending faster).',
+      'For the current term it also says how many days in it is and compares spending with the previous term (pace.compared_with) at the same point; pace.ratio above 1 means spending faster.',
     inputSchema: {
       type: 'object',
       properties: { term: { type: 'string', enum: ['current', 'previous'], description: 'Which term; default current' } },

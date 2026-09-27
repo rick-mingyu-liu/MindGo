@@ -82,13 +82,16 @@ export async function termSummary(userId: number, which: 'current' | 'previous',
   const daysTotal = daysBetween(start, end);
   const daysElapsed = which === 'current' ? Math.min(daysTotal, daysBetween(start, today) + 1) : daysTotal;
 
-  let pace: { last_term_same_point: number; ratio: number | null } | null = null;
+  let pace: { compared_with: string; last_term_same_point: number; ratio: number | null } | null = null;
   if (which === 'current') {
     // Last term's spending over the same share of the term, from its own totals.
-    const previous = boundsOf(previousTerm(current));
+    const previousId = previousTerm(current);
+    const previous = boundsOf(previousId);
     const before = await totalsBetween(userId, previous.start, previous.end);
     const samePoint = before.expenses * (daysElapsed / daysTotal);
     pace = {
+      // Named, so nobody reads "last term" as the same term a year ago.
+      compared_with: labelOf(previousId),
       last_term_same_point: round2(samePoint),
       ratio: samePoint > 0 ? round2(totals.expenses / samePoint) : null,
     };
