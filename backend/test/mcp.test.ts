@@ -1,0 +1,218 @@
+import { test, describe, before, after, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Server } from 'node:http';
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import db = require('../db/connection');
+import { hashToken } from '../services/accessTokens';
+import { currentTerm, previousTerm, boundsOf } from '../utils/terms';
+
+/**
+ * POST /mcp lets another app read your numbers with a personal access token.
+ * What must hold, through the real router with `db.query` stubbed:
+ *
+ *   - nothing gets in without a valid, unrevoked access token — a login JWT
+ *     included, since that token can delete everything;
+ *   - every query it runs is a read (the one write is the token's
+ *     last_used_at), and none reads a transaction's description or a whole row;
+ *   - the tools answer with totals, and bad input comes back as a tool error.
+ */
+
+const routerPath = require.resolve('../routes/mcp');
+const TOKEN = 'mgo_' + 'a'.repeat(43);
+
+interface Query {
+  text: string;
+  params: unknown[];
+}
+
+let server: Server;
+let baseUrl: string;
+let queries: Query[];
+/** Rows the stub answers per kind of query. */
+let totals: Record<string, Array<{ currency: string; type: string; category: string; total: string }>>;
+let goals: Array<Record<string, unknown>>;
+
+before(async () => {
+  delete require.cache[routerPath];
+  const app = express();
+  app.use(express.json());
+  app.use('/mcp', require(routerPath));
+  server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('expected a bound TCP address');
+  baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+after(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  delete require.cache[routerPath];
+});
+
+beforeEach(() => {
+  queries = [];
+  totals = {};
+  goals = [];
+  mock.method(db, 'query', async (text: string, params: unknown[]) => {
+    queries.push({ text, params });
+    if (text.includes('UPDATE access_tokens')) {
+      return { rowCount: params[0] === hashToken(TOKEN) ? 1 : 0, rows: params[0] === hashToken(TOKEN) ? [{ id: 1, user_id: 7 }] : [] };
+    }
+    if (text.includes('GROUP BY currency')) return { rowCount: 0, rows: totals[String(params[1])] ?? [] };
+    if (text.includes('COUNT(DISTINCT')) return { rowCount: 1, rows: [{ months: '10' }] };
+    if (text.includes('FROM savings_goals')) return { rowCount: goals.length, rows: goals };
+    return { rowCount: 0, rows: [] };
+  });
+});
+
+afterEach(() => mock.restoreAll());
+
+const rpc = (body: unknown, token: string | null = TOKEN) =>
+  fetch(`${baseUrl}/mcp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+
+async function callTool(name: string, args: Record<string, unknown> = {}) {
+  const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+  const body = (await res.json()) as { result: { content: Array<{ text: string }>; isError?: boolean } };
+  const text = body.result.content[0]?.text ?? '';
+  return { isError: body.result.isError === true, text, json: () => JSON.parse(text) };
+}
+
+describe('who gets in', () => {
+  test('no token: 401, and the database is never asked', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, null);
+    assert.equal(res.status, 401);
+    assert.equal(queries.length, 0);
+  });
+
+  test('a login JWT is refused without a lookup, even a validly signed one', async () => {
+    const jwtToken = jwt.sign({ userId: 7, email: 'a@b.c' }, 'secret');
+    const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, jwtToken);
+    assert.equal(res.status, 401);
+    assert.equal(queries.length, 0);
+  });
+
+  test('an unknown or revoked token: 401', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, 'mgo_' + 'b'.repeat(43));
+    assert.equal(res.status, 401);
+    assert.match(queries[0]?.text ?? '', /revoked_at IS NULL/);
+  });
+
+  test('the token is looked up by its hash, never stored or compared in the clear', async () => {
+    await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    assert.deepEqual(queries[0]?.params, [hashToken(TOKEN)]);
+    assert.ok(!JSON.stringify(queries).includes(TOKEN));
+  });
+});
+
+describe('the protocol', () => {
+  test('initialize, a notification, and tools/list', async () => {
+    const init = (await (await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })).json()) as {
+      result: { protocolVersion: string; capabilities: unknown };
+    };
+    assert.equal(init.result.protocolVersion, '2025-06-18');
+    assert.deepEqual(init.result.capabilities, { tools: {} });
+
+    const note = await rpc({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    assert.equal(note.status, 202);
+
+    const list = (await (await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' })).json()) as { result: { tools: Array<{ name: string }> } };
+    assert.deepEqual(list.result.tools.map((t) => t.name), ['money_term_summary', 'money_baseline', 'money_goals']);
+  });
+
+  test('an unknown method and a batch are JSON-RPC errors', async () => {
+    const unknown = (await (await rpc({ jsonrpc: '2.0', id: 3, method: 'transactions/delete' })).json()) as { error: { code: number } };
+    assert.equal(unknown.error.code, -32601);
+    const batch = (await (await rpc([{ jsonrpc: '2.0', id: 4, method: 'tools/list' }])).json()) as { error: { code: number } };
+    assert.equal(batch.error.code, -32600);
+  });
+
+  test('GET is refused', async () => {
+    const res = await fetch(`${baseUrl}/mcp`, { headers: { authorization: `Bearer ${TOKEN}` } });
+    assert.equal(res.status, 405);
+  });
+});
+
+describe('the tools', () => {
+  test('term summary: totals, top spending and pace against last term', async () => {
+    const now = new Date();
+    const current = boundsOf(currentTerm(now));
+    const previous = boundsOf(previousTerm(currentTerm(now)));
+    totals[current.start] = [
+      { currency: 'CAD', type: 'income', category: 'Salary', total: '5000' },
+      { currency: 'CAD', type: 'expense', category: 'Rent', total: '1500' },
+      { currency: 'CAD', type: 'expense', category: 'Food', total: '500' },
+    ];
+    totals[previous.start] = [{ currency: 'CAD', type: 'expense', category: 'Rent', total: '4000' }];
+
+    const out = (await callTool('money_term_summary')).json();
+    assert.equal(out.term, currentTerm(now));
+    assert.equal(out.income, 5000);
+    assert.equal(out.expenses, 2000);
+    assert.equal(out.net, 3000);
+    assert.equal(out.savings_rate, 0.6);
+    assert.deepEqual(out.top_spending, [{ category: 'Rent', amount: 1500 }, { category: 'Food', amount: 500 }]);
+    const expected = Math.round(4000 * (out.days_elapsed / out.days_total) * 100) / 100;
+    assert.equal(out.pace.last_term_same_point, expected);
+    assert.equal(out.pace.ratio, Math.round((2000 / expected) * 100) / 100);
+  });
+
+  test('previous term has no pace, and a bad term is a tool error', async () => {
+    assert.equal((await callTool('money_term_summary', { term: 'previous' })).json().pace, null);
+    const bad = await callTool('money_term_summary', { term: '2020-fall; DROP TABLE' });
+    assert.equal(bad.isError, true);
+    assert.match(bad.text, /current or previous/);
+  });
+
+  test('baseline divides by the months that have data', async () => {
+    const now = new Date();
+    const start = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    totals[start] = [
+      { currency: 'CAD', type: 'income', category: 'Salary', total: '30000' },
+      { currency: 'CAD', type: 'expense', category: 'Rent', total: '20000' },
+    ];
+    const out = (await callTool('money_baseline')).json();
+    assert.equal(out.months_with_data, 10);
+    assert.equal(out.monthly_income, 3000);
+    assert.equal(out.monthly_spending, 2000);
+    assert.equal(out.monthly_saving, 1000);
+  });
+
+  test('goals: percent, status and what each needs per month', async () => {
+    const inAYear = new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10);
+    goals = [
+      { name: 'Emergency fund', target_amount: '6000.00', current_amount: '1200.00', target_date: inAYear, currency: 'CAD' },
+      { name: 'Laptop', target_amount: '2000.00', current_amount: '2000.00', target_date: null, currency: 'CAD' },
+      { name: 'Trip', target_amount: '1000.00', current_amount: '100.00', target_date: '2020-01-01', currency: 'USD' },
+    ];
+    const out = (await callTool('money_goals')).json().goals;
+    assert.equal(out[0].percent, 20);
+    assert.equal(out[0].status, 'in progress');
+    assert.ok(out[0].needed_per_month > 390 && out[0].needed_per_month < 410);
+    assert.equal(out[1].status, 'reached');
+    assert.equal(out[1].needed_per_month, null);
+    assert.equal(out[2].status, 'overdue');
+    assert.equal(out[2].currency, 'USD');
+  });
+
+  test('an unknown tool is a tool error', async () => {
+    const out = await callTool('delete_everything');
+    assert.equal(out.isError, true);
+  });
+
+  test('every query is a read, and none reads descriptions or whole rows', async () => {
+    await callTool('money_term_summary');
+    await callTool('money_baseline');
+    await callTool('money_goals');
+    for (const q of queries) {
+      const sql = q.text.trim();
+      if (sql.startsWith('UPDATE access_tokens SET last_used_at')) continue;
+      assert.match(sql, /^SELECT /, sql);
+      assert.doesNotMatch(sql, /SELECT \*|description/i, sql);
+    }
+  });
+});

@@ -10,6 +10,7 @@
     "dev": "tsx watch app.ts",
     "db:setup": "node dist/db/setup.js",
     "db:seed": "node dist/db/seed.js",
+    "access-token": "node dist/db/accessToken.js",
     "lint": "eslint .",
     "test": "npm run build && node --test 'dist/test/**/*.test.js'"
   },
