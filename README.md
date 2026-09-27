@@ -452,6 +452,25 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 20 requests per hour per IP. Generated plans are deleted 30 minutes after creation. When OpenAI is out of credit or rate-limited, the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
 
+### `/mcp` — read-only, for a personal agent
+
+MindGo as an [MCP](https://modelcontextprotocol.io) server, so an agent such as [DearByte](https://github.com/dearbyte-labs/DearByte) can read your numbers. `POST /mcp` speaks JSON-RPC 2.0 and takes a **personal access token**, never the login JWT:
+
+```bash
+cd backend
+npm run access-token -- create you@example.com "DearByte"   # printed once; only its hash is stored
+npm run access-token -- list you@example.com
+npm run access-token -- revoke you@example.com <id>
+```
+
+| Tool | Answers (CAD) |
+|---|---|
+| `money_term_summary` | this term's or last term's income, spending, savings rate, top categories, and spending pace against last term at the same point |
+| `money_baseline` | average monthly income, spending and saving over the last 12 whole months |
+| `money_goals` | each goal's target, amount saved, status and what it needs per month |
+
+Every tool is a `SELECT` of totals: no transaction, description or merchant leaves, and nothing can be changed or deleted through a token. At most 5 active tokens per account. The table comes from migration `012`.
+
 ---
 
 ## Deployment

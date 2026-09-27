@@ -52,6 +52,16 @@ export interface ImportBatchRow {
   created_at: Date | null;
 }
 
+export interface AccessTokenRow {
+  id: number;
+  user_id: number;
+  name: string;
+  token_hash: string;
+  created_at: Date | null;
+  last_used_at: Date | null;
+  revoked_at: Date | null;
+}
+
 export interface SavingsGoalRow {
   id: number;
   user_id: number | null;

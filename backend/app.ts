@@ -25,6 +25,7 @@ import goalRoutes = require('./routes/goals');
 import investmentRoutes = require('./routes/investments');
 import aiRoutes = require('./routes/ai');
 import importRoutes = require('./routes/import');
+import mcpRoutes = require('./routes/mcp');
 
 const app = express();
 const PORT = config.port;
@@ -71,6 +72,8 @@ app.use('/investments', investmentRoutes);
 // Every /ai call costs real OpenAI credit, so it gets its own hourly budget.
 app.use('/ai', aiLimiter, aiRoutes);
 app.use('/import', importRoutes);
+// Read-only, for a personal agent; opened by an access token, never the login JWT.
+app.use('/mcp', mcpRoutes);
 
 // Error handling middleware
 app.use(ErrorHandler.globalErrorHandler);

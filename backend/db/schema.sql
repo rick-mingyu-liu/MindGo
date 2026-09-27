@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS import_batches (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Read-only personal access tokens for POST /mcp; see migration 012.
+CREATE TABLE IF NOT EXISTS access_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(60) NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP,
+    revoked_at TIMESTAMP
+);
+
 -- Savings goals table
 CREATE TABLE IF NOT EXISTS savings_goals (
     id SERIAL PRIMARY KEY,
@@ -95,6 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
 CREATE INDEX IF NOT EXISTS idx_import_batches_user_id ON import_batches(user_id);
+CREATE INDEX IF NOT EXISTS idx_access_tokens_user_id ON access_tokens(user_id);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
