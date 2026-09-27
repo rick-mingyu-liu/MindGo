@@ -32,6 +32,8 @@ interface Totals {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
+/** `'2026-05-01'` plus 27 days. A day string parses as UTC midnight and is printed in UTC, so no timezone enters. */
+const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
 
 /** `(2026, 0)` -> `'2026-01-01'`, by arithmetic: never `new Date(y, m, d).toISOString()`. */
 const monthStart = (absoluteMonth: number): string =>
@@ -84,11 +86,14 @@ export async function termSummary(userId: number, which: 'current' | 'previous',
 
   let pace: { compared_with: string; last_term_same_point: number; ratio: number | null } | null = null;
   if (which === 'current') {
-    // Last term's spending over the same share of the term, from its own totals.
+    // What last term had actually spent by the same day of the term, not a
+    // prorated share of its total: tuition and rent land early, so a share
+    // would make every term's first weeks look like a spending spree.
     const previousId = previousTerm(current);
     const previous = boundsOf(previousId);
-    const before = await totalsBetween(userId, previous.start, previous.end);
-    const samePoint = before.expenses * (daysElapsed / daysTotal);
+    const cutoff = addDays(previous.start, daysElapsed);
+    const before = await totalsBetween(userId, previous.start, cutoff < previous.end ? cutoff : previous.end);
+    const samePoint = before.expenses;
     pace = {
       // Named, so nobody reads "last term" as the same term a year ago.
       compared_with: labelOf(previousId),
@@ -160,10 +165,12 @@ export async function goalProgress(userId: number, now: Date = new Date()) {
       currency: goal.currency,
       target: round2(target),
       saved: round2(saved),
-      percent: target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : null,
+      // Floored, so 99.6% never reads as 100 on a goal that isn't reached.
+      percent: target > 0 ? Math.min(100, Math.floor((saved / target) * 100)) : null,
       target_date: due,
       status: remaining === 0 ? 'reached' : daysLeft === null ? 'no date' : daysLeft < 0 ? 'overdue' : 'in progress',
-      needed_per_month: remaining === 0 || monthsLeft === null ? null : round2(remaining / Math.max(1, monthsLeft)),
+      // None for an overdue goal: "needs the whole rest this month" isn't a plan.
+      needed_per_month: remaining === 0 || monthsLeft === null || (daysLeft ?? 0) < 0 ? null : round2(remaining / Math.max(1, monthsLeft)),
     };
   });
 }

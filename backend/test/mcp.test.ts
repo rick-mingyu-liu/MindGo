@@ -4,7 +4,8 @@ import type { Server } from 'node:http';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import db = require('../db/connection');
-import { hashToken } from '../services/accessTokens';
+import exchangeRateService = require('../services/exchangeRateService');
+import { hashToken, createToken, revokeToken, looksLikeToken, MAX_TOKENS_PER_USER } from '../services/accessTokens';
 import { currentTerm, previousTerm, boundsOf, labelOf } from '../utils/terms';
 
 /**
@@ -59,9 +60,11 @@ beforeEach(() => {
     if (text.includes('UPDATE access_tokens')) {
       return { rowCount: params[0] === hashToken(TOKEN) ? 1 : 0, rows: params[0] === hashToken(TOKEN) ? [{ id: 1, user_id: 7 }] : [] };
     }
-    if (text.includes('GROUP BY currency')) return { rowCount: 0, rows: totals[String(params[1])] ?? [] };
+    if (text.includes('GROUP BY currency')) return { rowCount: 0, rows: totals[`${String(params[1])}|${String(params[2])}`] ?? totals[String(params[1])] ?? [] };
     if (text.includes('COUNT(DISTINCT')) return { rowCount: 1, rows: [{ months: '10' }] };
     if (text.includes('FROM savings_goals')) return { rowCount: goals.length, rows: goals };
+    if (text.includes('INSERT INTO access_tokens')) return { rowCount: 1, rows: [{ id: 1 }] };
+    if (text.includes('SET revoked_at')) return { rowCount: 1, rows: [] };
     return { rowCount: 0, rows: [] };
   });
 });
@@ -147,18 +150,21 @@ describe('the tools', () => {
       { currency: 'CAD', type: 'expense', category: 'Rent', total: '1500' },
       { currency: 'CAD', type: 'expense', category: 'Food', total: '500' },
     ];
-    totals[previous.start] = [{ currency: 'CAD', type: 'expense', category: 'Rent', total: '4000' }];
+    // Last term front-loaded its spending: 4000 by this point, whatever it spent later.
+    totals[previous.start] = [{ currency: 'CAD', type: 'expense', category: 'Tuition', total: '4000' }];
 
     const out = (await callTool('money_term_summary')).json();
+    const paceQuery = queries.filter((q) => q.text.includes('GROUP BY currency')).at(-1);
+    const cutoff = new Date(Date.parse(previous.start) + out.days_elapsed * 86_400_000).toISOString().slice(0, 10);
+    assert.deepEqual(paceQuery?.params, [7, previous.start, cutoff < previous.end ? cutoff : previous.end]);
     assert.equal(out.term, currentTerm(now));
     assert.equal(out.income, 5000);
     assert.equal(out.expenses, 2000);
     assert.equal(out.net, 3000);
     assert.equal(out.savings_rate, 0.6);
     assert.deepEqual(out.top_spending, [{ category: 'Rent', amount: 1500 }, { category: 'Food', amount: 500 }]);
-    const expected = Math.round(4000 * (out.days_elapsed / out.days_total) * 100) / 100;
-    assert.equal(out.pace.last_term_same_point, expected);
-    assert.equal(out.pace.ratio, Math.round((2000 / expected) * 100) / 100);
+    assert.equal(out.pace.last_term_same_point, 4000);
+    assert.equal(out.pace.ratio, 0.5);
     assert.equal(out.pace.compared_with, labelOf(previousTerm(currentTerm(now))));
   });
 
@@ -189,6 +195,7 @@ describe('the tools', () => {
       { name: 'Emergency fund', target_amount: '6000.00', current_amount: '1200.00', target_date: inAYear, currency: 'CAD' },
       { name: 'Laptop', target_amount: '2000.00', current_amount: '2000.00', target_date: null, currency: 'CAD' },
       { name: 'Trip', target_amount: '1000.00', current_amount: '100.00', target_date: '2020-01-01', currency: 'USD' },
+      { name: 'Almost', target_amount: '1000.00', current_amount: '996.00', target_date: inAYear, currency: 'CAD' },
     ];
     const out = (await callTool('money_goals')).json().goals;
     assert.equal(out[0].percent, 20);
@@ -198,22 +205,79 @@ describe('the tools', () => {
     assert.equal(out[1].needed_per_month, null);
     assert.equal(out[2].status, 'overdue');
     assert.equal(out[2].currency, 'USD');
+    assert.equal(out[2].needed_per_month, null, 'an overdue goal has no monthly plan');
+    assert.equal(out[3].percent, 99, '99.6% is not reported as done');
   });
 
-  test('an unknown tool is a tool error', async () => {
-    const out = await callTool('delete_everything');
-    assert.equal(out.isError, true);
+  test('an unknown tool is a protocol error, -32602', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'delete_everything' } });
+    const body = (await res.json()) as { error: { code: number } };
+    assert.equal(body.error.code, -32602);
+    const none = (await (await rpc({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: null })).json()) as { error: { code: number } };
+    assert.equal(none.error.code, -32602);
   });
 
-  test('every query is a read, and none reads descriptions or whole rows', async () => {
+  test('amounts in other currencies are converted to CAD', async () => {
+    mock.method(exchangeRateService, 'getExchangeRate', async (from: string, to: string) => {
+      assert.equal(to, 'CAD');
+      return from === 'USD' ? 1.4 : 0.2;
+    });
+    const now = new Date();
+    totals[boundsOf(currentTerm(now)).start] = [
+      { currency: 'USD', type: 'income', category: 'Salary', total: '1000' },
+      { currency: 'CNY', type: 'expense', category: 'Food', total: '500' },
+      { currency: 'CAD', type: 'expense', category: 'Food', total: '50' },
+    ];
+    const out = (await callTool('money_term_summary')).json();
+    assert.equal(out.income, 1400);
+    assert.equal(out.expenses, 150);
+    assert.deepEqual(out.top_spending, [{ category: 'Food', amount: 150 }]);
+  });
+
+  test('every query is a read of the token owner\'s rows, and none reads descriptions or whole rows', async () => {
     await callTool('money_term_summary');
     await callTool('money_baseline');
     await callTool('money_goals');
-    for (const q of queries) {
+    const reads = queries.filter((q) => !q.text.trim().startsWith('UPDATE access_tokens SET last_used_at'));
+    assert.ok(reads.length >= 5);
+    for (const q of reads) {
       const sql = q.text.trim();
-      if (sql.startsWith('UPDATE access_tokens SET last_used_at')) continue;
       assert.match(sql, /^SELECT /, sql);
       assert.doesNotMatch(sql, /SELECT \*|description/i, sql);
+      // The user comes from the token row (user_id 7 in the stub), never the request.
+      assert.match(sql, /user_id = \$1/, sql);
+      assert.equal(q.params[0], 7, sql);
     }
+  });
+
+  test('answers are marked no-store, and a posted-back response gets 202', async () => {
+    const res = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    const back = await rpc({ jsonrpc: '2.0', id: 5, result: {} });
+    assert.equal(back.status, 202);
+  });
+});
+
+describe('the token service', () => {
+  test('a created token has the checked format, and only its hash is stored', async () => {
+    const { id, token } = await createToken(7, 'DearByte');
+    assert.equal(id, 1);
+    assert.ok(looksLikeToken(token));
+    const insert = queries.find((q) => q.text.includes('INSERT INTO access_tokens'));
+    assert.deepEqual(insert?.params, [7, 'DearByte', hashToken(token), MAX_TOKENS_PER_USER]);
+    assert.ok(!JSON.stringify(queries).includes(token));
+  });
+
+  test('past the limit, creating refuses', async () => {
+    mock.restoreAll();
+    mock.method(db, 'query', async () => ({ rowCount: 0, rows: [] }));
+    await assert.rejects(createToken(7, 'one too many'), RangeError);
+  });
+
+  test('revoking is scoped to the owner', async () => {
+    await revokeToken(7, 3);
+    const update = queries.find((q) => q.text.includes('SET revoked_at'));
+    assert.match(update?.text ?? '', /WHERE id = \$1 AND user_id = \$2 AND revoked_at IS NULL/);
+    assert.deepEqual(update?.params, [3, 7]);
   });
 });

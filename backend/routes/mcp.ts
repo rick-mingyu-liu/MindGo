@@ -15,7 +15,8 @@ import { errorSummary } from '../utils/errorSummary';
  * totals, category names and goals — never individual transactions.
  */
 
-const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// Only a version without JSON-RPC batching (2025-03-26 allowed batches, which this refuses).
+const PROTOCOL_VERSION = '2025-06-18';
 
 interface RpcRequest {
   jsonrpc?: unknown;
@@ -29,7 +30,7 @@ const TOOLS = [
     name: 'money_term_summary',
     description:
       'Income, spending, savings rate and top spending categories (CAD) for a Waterloo term: Winter Jan–Apr, Spring May–Aug, Fall Sep–Dec. ' +
-      'For the current term it also says how many days in it is and compares spending with the previous term (pace.compared_with) at the same point; pace.ratio above 1 means spending faster.',
+      'For the current term it also says how many days in it is and compares spending with what the previous term (pace.compared_with) had spent by the same day; pace.ratio above 1 means spending faster. Co-op students alternate study and work terms, so a high ratio can simply mean a different kind of term.',
     inputSchema: {
       type: 'object',
       properties: { term: { type: 'string', enum: ['current', 'previous'], description: 'Which term; default current' } },
@@ -61,6 +62,8 @@ async function tokenAuth(req: Request, res: Response, next: NextFunction) {
       return res.status(401).json({ error: 'A MindGo access token is required.' });
     }
     req.user = { userId, email: '' };
+    // Money totals: no proxy or browser may keep a copy.
+    res.set('Cache-Control', 'no-store');
     next();
   } catch (error) {
     console.error('MCP auth error:', errorSummary(error));
@@ -91,6 +94,10 @@ async function callTool(userId: number, name: unknown, args: Record<string, unkn
 
 router.post('/', async (req: Request, res: Response) => {
   const body = req.body as RpcRequest | unknown[] | undefined;
+  // A response or notification a client posts back needs no answer.
+  if (typeof body === 'object' && body !== null && !Array.isArray(body) && body.method === undefined && ('result' in body || 'error' in body)) {
+    return res.status(202).end();
+  }
   if (Array.isArray(body) || typeof body !== 'object' || body === null || body.jsonrpc !== '2.0' || typeof body.method !== 'string') {
     return res.json(failure(null, -32600, 'Invalid request'));
   }
@@ -101,16 +108,18 @@ router.post('/', async (req: Request, res: Response) => {
   if (id === undefined) return res.status(202).end();
 
   switch (method) {
-    case 'initialize': {
-      const asked = params.protocolVersion;
-      const protocolVersion = typeof asked === 'string' && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0];
-      return res.json(reply(id, { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'mindgo', version: '1.0.0' } }));
-    }
+    case 'initialize':
+      return res.json(reply(id, { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: {} }, serverInfo: { name: 'mindgo', version: '1.0.0' } }));
     case 'ping':
       return res.json(reply(id, {}));
     case 'tools/list':
       return res.json(reply(id, { tools: TOOLS }));
     case 'tools/call': {
+      // An unknown tool is a protocol error (-32602), as the MCP spec has it;
+      // a known tool with bad arguments answers as a tool error below.
+      if (typeof params.name !== 'string' || !TOOLS.some((t) => t.name === params.name)) {
+        return res.json(failure(id, -32602, `Unknown tool: ${String(params.name).slice(0, 60)}`));
+      }
       const args = (typeof params.arguments === 'object' && params.arguments !== null ? params.arguments : {}) as Record<string, unknown>;
       try {
         const result = await callTool(req.user.userId, params.name, args);
