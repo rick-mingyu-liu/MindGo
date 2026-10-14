@@ -132,6 +132,13 @@ CREATE OR REPLACE TRIGGER update_goals_updated_at BEFORE UPDATE ON savings_goals
 
 -- Conversation records never own saved transactions: deleting history cannot
 -- cascade into the ledger. Owner is repeated in every compound relationship.
+-- Column-specific ON DELETE SET NULL below needs PostgreSQL 15; fail clearly.
+DO $$
+BEGIN
+    IF current_setting('server_version_num')::int < 150000 THEN
+        RAISE EXCEPTION 'Conversation recording requires PostgreSQL 15 or later (column-specific ON DELETE SET NULL); this server is %', current_setting('server_version');
+    END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS agent_conversations (
     id UUID PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

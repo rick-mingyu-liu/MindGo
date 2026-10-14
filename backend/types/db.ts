@@ -103,7 +103,7 @@ export interface AgentMessageRow extends Message { conversation_id: string; user
 export interface AgentDraftRow extends Draft { conversation_id: string; user_id: number; created_at: Date }
 export interface AgentTransactionVersion { id: number; updated_at: string; xmin: string }
 export interface AgentReceiptRow extends Receipt {
-  conversation_id: string | null; user_id: number; request_id: string; request_hash: string;
+  conversation_id: string | null; user_id: number; request_hash: string;
   transaction_versions: AgentTransactionVersion[];
 }
 

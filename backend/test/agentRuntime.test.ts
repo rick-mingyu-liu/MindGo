@@ -65,6 +65,7 @@ test('unknown tools denied, built-ins/settings disabled, config isolated and ses
     assert.equal(options.env?.JWT_SECRET, undefined);
     assert.equal(options.env?.ANTHROPIC_API_KEY, 'fictional-test-key');
     assert.ok(options.env?.CLAUDE_CONFIG_DIR?.startsWith(options.cwd!));
+    assert.equal(options.env?.HOME, options.cwd);
     yield success;
   });
   await f.runtime(input);

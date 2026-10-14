@@ -1,6 +1,13 @@
 -- Apply with psql -v ON_ERROR_STOP=1. Audit first: report counts only,
 -- abort on incompatible legacy values, and never rewrite financial records.
 BEGIN;
+-- Fail before any change on a server too old for the DDL below.
+DO $$
+BEGIN
+    IF current_setting('server_version_num')::int < 150000 THEN
+        RAISE EXCEPTION 'Conversation recording requires PostgreSQL 15 or later (column-specific ON DELETE SET NULL); this server is %', current_setting('server_version');
+    END IF;
+END $$;
 DO $$
 DECLARE incompatible BIGINT;
 BEGIN

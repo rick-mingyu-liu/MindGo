@@ -87,6 +87,8 @@ const config = {
     maxHistoryChars: 24_000,
     maxHistoryMessages: 30,
     maxRows: 12,
+    maxConversations: 100,
+    maxMessagesPerConversation: 200,
     maxTotalTokens: 32_000,
     maxToolOutputChars: 16_000,
   },

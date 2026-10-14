@@ -1,4 +1,4 @@
-import { test, before, after, describe } from 'node:test';
+import { test, before, beforeEach, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { ConversationState } from '../services/agent/types';
@@ -21,6 +21,8 @@ describe('agent storage safety', { skip: !enabled }, () => {
     for (let n = 0; n < 2; n++) users.push((await db.query<{id:number}>("INSERT INTO users(email,password_hash,first_name,last_name) VALUES($1,'x','Agent','Test') RETURNING id", [`agent-${randomUUID()}@example.invalid`])).rows[0]!.id);
     alice = users[0]!; bob = users[1]!;
   });
+  // Many tests admit turns for the same user; keep each under the hourly cap.
+  beforeEach(async () => { await db.query('DELETE FROM agent_admissions WHERE user_id=ANY($1::int[])', [users]); });
   after(async () => { if (db) { await db.query('DELETE FROM users WHERE id=ANY($1::int[])', [users]); await db.getPool().end(); } });
   test('conversation order follows creation time and stays stable after visits and messages', async () => {
     const older = await store.createConversation(bob, settings);
@@ -135,6 +137,62 @@ describe('agent storage safety', { skip: !enabled }, () => {
     const c=await store.createConversation(user,settings);await store.beginTurn(user,c.id,{...settings,requestId:randomUUID(),content:'Twentieth'});await store.deleteConversations(user);
     const next=await store.createConversation(user,settings);
     await assert.rejects(store.beginTurn(user,next.id,{...settings,requestId:randomUUID(),content:'Twenty first'}),{code:'agent_rate_limited'});
+  });
+  test('concurrent confirmations with different nonces on one version write exactly one batch',async()=>{
+    const s=await proposal();const rowIds=s.draft!.rows.map(r=>r.id);
+    const before=Number((await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice])).rows[0]!.count);
+    const attempts=await Promise.allSettled([randomUUID(),randomUUID()].map(requestId=>store.confirmDraft(alice,s.conversation.id,{version:s.draft!.version,rowIds,requestId})));
+    const accepted=attempts.filter(a=>a.status==='fulfilled');const refused=attempts.filter(a=>a.status==='rejected');
+    assert.equal(accepted.length,1);assert.equal(refused.length,1);
+    assert.equal((refused[0] as PromiseRejectedResult).reason.code,'agent_version_conflict');
+    const after=Number((await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice])).rows[0]!.count);
+    assert.equal(after-before,rowIds.length);
+    assert.equal((await db.query('SELECT id FROM agent_receipts WHERE conversation_id=$1',[s.conversation.id])).rowCount,1);
+  });
+  test('edits and confirmation wait for an active run in the conversation',async()=>{
+    const s=await proposal();const runId=randomUUID();
+    const count=async()=>(await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice])).rows[0]!.count;const before=await count();
+    await store.beginTurn(alice,s.conversation.id,{...settings,requestId:runId,content:'Fictional correction'});
+    try {
+      await assert.rejects(store.editDraft(alice,s.conversation.id,s.draft!.version,s.draft!.rows),{code:'agent_busy'});
+      await assert.rejects(store.cancelDraft(alice,s.conversation.id,s.draft!.version),{code:'agent_busy'});
+      await assert.rejects(store.confirmDraft(alice,s.conversation.id,{version:s.draft!.version,rowIds:[s.draft!.rows[0]!.id],requestId:randomUUID()}),{code:'agent_busy'});
+      assert.equal(await count(),before);
+    } finally {await store.cancelRun(alice,s.conversation.id,runId);}
+  });
+  test('undo after the database-clock window is refused and deletes nothing',async()=>{
+    const s=await proposal();const receipt=(await store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:s.draft!.rows.map(r=>r.id),requestId:randomUUID()})).receipts[0]!;
+    await db.query("UPDATE agent_receipts SET undo_until=now()-interval '1 second' WHERE id=$1",[receipt.id]);
+    await assert.rejects(store.undoReceipt(alice,receipt.id),{code:'agent_expired'});
+    assert.equal((await db.query('SELECT id FROM transactions WHERE id=ANY($1::int[])',[receipt.transaction_ids])).rowCount,2);
+  });
+  test('undo after one saved transaction was deleted conflicts and deletes nothing',async()=>{
+    const s=await proposal();const receipt=(await store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:s.draft!.rows.map(r=>r.id),requestId:randomUUID()})).receipts[0]!;
+    await db.query('DELETE FROM transactions WHERE id=$1',[receipt.transaction_ids[0]]);
+    await assert.rejects(store.undoReceipt(alice,receipt.id),{code:'agent_undo_conflict'});
+    assert.equal((await db.query('SELECT id FROM transactions WHERE id=ANY($1::int[])',[receipt.transaction_ids])).rowCount,1);
+    assert.equal((await store.getConversation(alice,s.conversation.id)).receipts[0]!.undone_at,null);
+  });
+  test('model history excludes cancelled and failed user turns',async()=>{
+    const c=await store.createConversation(bob,settings);
+    const kept=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:kept,content:'Fictional kept turn'});await store.finishTurn(bob,c.id,kept,{text:'Kept reply'});
+    const cancelled=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:cancelled,content:'Fictional cancelled turn'});await store.cancelRun(bob,c.id,cancelled);
+    const failed=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:failed,content:'Fictional failed turn'});await store.failTurn(bob,c.id,failed,'agent_provider_error');
+    const next=randomUUID();const started=await store.beginTurn(bob,c.id,{...settings,requestId:next,content:'Fictional next turn'});
+    assert.deepEqual(started.history.map(m=>m.content),['Fictional kept turn','Kept reply']);
+    // The exact replay of the running turn is bounded the same way.
+    const replay=await store.beginTurn(bob,c.id,{...settings,requestId:next,content:'Fictional next turn'});
+    assert.deepEqual(replay.history.map(m=>m.content),['Fictional kept turn','Kept reply','Fictional next turn']);
+    await store.cancelRun(bob,c.id,next);
+  });
+  test('without a provider key, replays answer from saved state and new runs are refused',async()=>{
+    const c=await store.createConversation(bob,settings);const requestId=randomUUID();const input={...settings,requestId,content:'Fictional replay'};
+    await store.beginTurn(bob,c.id,input);await store.finishTurn(bob,c.id,requestId,{text:'Replay reply'});
+    const replay=await store.beginTurn(bob,c.id,input,false);
+    assert.equal(replay.started,false);assert.equal(replay.state.run!.id,requestId);
+    const fresh=randomUUID();
+    await assert.rejects(store.beginTurn(bob,c.id,{...input,requestId:fresh},false),{code:'agent_unavailable',status:503});
+    assert.equal((await db.query('SELECT id FROM agent_admissions WHERE id=$1',[fresh])).rowCount,0);
   });
   test('expired drafts cannot confirm and expired leases cannot finish',async()=>{
     const s=await proposal();await db.query("UPDATE agent_drafts SET expires_at=now()-interval '1 second' WHERE conversation_id=$1",[s.conversation.id]);

@@ -12,7 +12,7 @@ const router = express.Router();
 router.use(auth);
 router.use((_req, res, next) => { res.setHeader('Cache-Control','no-store'); next(); });
 const available = () => config.agent.enabled && Boolean(config.agent.apiKey);
-router.get('/status', (_req,res) => { res.json({available:available()}); });
+router.get('/status', (_req,res) => { res.json({available:available(),storage:config.agent.enabled}); });
 router.use((_req,_res,next) => { next(config.agent.enabled ? undefined : new AgentError('agent_unavailable',503)); });
 
 // No background worker or polling: a request owns the SDK execution. PostgreSQL
@@ -55,7 +55,6 @@ router.delete('/conversations/:id',route(async(req,res)=>{
   const id=validateUuid(req.params.id);await store.deleteConversation(req.user.userId,id);abortOwned(req.user.userId,id);res.json({deleted:true});
 }));
 router.post('/conversations/:id/messages',route(async(req,res)=>{
-  if(!available()) throw new AgentError('agent_unavailable',503);
   const conversationId=validateUuid(req.params.id);const userId=req.user.userId;
   const body=object(req.body,['requestId','content','currency','timezone','language']);
   const input={requestId:validateUuid(body.requestId),content:validateMessage(body.content),...validateSettings(body)};
@@ -66,7 +65,9 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
   const timer=setTimeout(()=>{timedOut=true;controller.abort();},config.agent.timeoutMs);timer.unref();
   const runKey=key(userId,input.requestId);
   try {
-    const begin=await store.beginTurn(userId,conversationId,input);
+    // Without a provider key an exact replay still returns saved state; only a
+    // new run is refused, inside the same transaction that would admit it.
+    const begin=await store.beginTurn(userId,conversationId,input,available());
     if(!begin.started) { res.json(begin.state);return; }
     started=true;active.set(runKey,{userId,conversationId,controller});
     if(controller.signal.aborted) throw new AgentError('agent_cancelled',409);

@@ -22,7 +22,8 @@ beforeEach(() => {
   originalAgent = {...config.agent}; config.agent.enabled = true; config.agent.apiKey = 'fictional-not-used'; config.jwt.secret = secret;
   financialWrites = 0; printed = [];
   mock.method(console, 'error', (...args:unknown[]) => printed.push(args));
-  mock.method(store, 'beginTurn', async () => ({ started:true,state,history:[],pendingRows:[] }));
+  // Mirrors the store contract: a new run is refused when it cannot start.
+  mock.method(store, 'beginTurn', async (_user:number,_id:string,_input:unknown,canStart=true) => { if(!canStart) throw new AgentError('agent_unavailable',503); return { started:true,state,history:[],pendingRows:[] }; });
   mock.method(store, 'assertRunActive', async () => {});
   mock.method(store, 'finishTurn', async () => state);
   mock.method(store, 'failTurn', async () => state);
@@ -39,7 +40,7 @@ test('status and conversation routes require login', async () => {
 test('disabled agent does not touch persistence or runtime', async () => {
   config.agent.enabled=false;
   mock.method(store,'beginTurn',async()=>assert.fail('database queried'));
-  assert.deepEqual((await request(app).get('/agent/status').auth(token,{type:'bearer'})).body,{available:false});
+  assert.deepEqual((await request(app).get('/agent/status').auth(token,{type:'bearer'})).body,{available:false,storage:false});
   const res=await post();assert.equal(res.status,503);assert.equal(res.body.code,'agent_unavailable');
 });
 test('conversational agreement never invokes financial confirmation',async()=>{
@@ -79,7 +80,19 @@ test('saved history remains readable when only the provider key is missing',asyn
   config.agent.apiKey=undefined;
   mock.method(store,'getConversation',async()=>state);
   assert.equal((await request(app).get(`/agent/conversations/${conversationId}`).auth(token,{type:'bearer'})).status,200);
-  assert.equal((await post()).status,503);
+  const refused=await post();assert.equal(refused.status,503);assert.equal(refused.body.code,'agent_unavailable');
+});
+test('status distinguishes storage from model availability',async()=>{
+  const status=async()=>(await request(app).get('/agent/status').auth(token,{type:'bearer'})).body;
+  assert.deepEqual(await status(),{available:true,storage:true});
+  config.agent.apiKey=undefined;assert.deepEqual(await status(),{available:false,storage:true});
+  config.agent.enabled=false;config.agent.apiKey='fictional-not-used';assert.deepEqual(await status(),{available:false,storage:false});
+});
+test('an exact replay returns saved state even when the provider key is missing',async()=>{
+  config.agent.apiKey=undefined;let canStartSeen:boolean|undefined;
+  mock.method(store,'beginTurn',async(_user:number,_id:string,_input:unknown,canStart:boolean)=>{canStartSeen=canStart;return {started:false,state,history:[],pendingRows:[]};});
+  mock.method(runtime,'runAgent',async()=>assert.fail('provider called without a key'));
+  const res=await post();assert.equal(res.status,200);assert.equal(res.body.run.id,requestId);assert.equal(canStartSeen,false);
 });
 test('explicit cancellation aborts a running provider and never publishes its draft',async()=>{
   let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});

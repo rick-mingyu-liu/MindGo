@@ -6,6 +6,8 @@ import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { Query, SDKResultMessage, McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
 import config = require('../../config');
+import logger = require('../../utils/logger');
+import { errorSummary } from '../../utils/errorSummary';
 import { AgentError, type DraftRow, type ConversationSettings } from './types';
 import { categories, currencies, validateRows, validateMessage, validateSettings } from './validation';
 
@@ -114,7 +116,7 @@ export function createAgentRuntime(loadSdk: () => Promise<Sdk> = () => import('@
       // credentials, shell hooks, proxy configuration or user authentication.
       const env: Record<string,string> = {
         PATH: `${dirname(process.execPath)}:/usr/bin:/bin`, CLAUDE_CONFIG_DIR: privateConfig, XDG_CONFIG_HOME: privateConfig,
-        TMPDIR: root, TMP: root, TEMP: root,
+        HOME: root, TMPDIR: root, TMP: root, TEMP: root,
         ANTHROPIC_BASE_URL:'https://api.deepseek.com/anthropic',
         ANTHROPIC_API_KEY:config.agent.apiKey, ANTHROPIC_AUTH_TOKEN:config.agent.apiKey,
         ANTHROPIC_MODEL:config.agent.model, ANTHROPIC_DEFAULT_HAIKU_MODEL:config.agent.model,
@@ -170,6 +172,8 @@ export function createAgentRuntime(loadSdk: () => Promise<Sdk> = () => import('@
       }
       if (terminalError) throw terminalError;
       if (!final || final.is_error || final.subtype !== 'success') {
+        // The subtype is an SDK enum; result text and errors may quote user data.
+        logger.error('Agent runtime result was not success', {subtype: final?.subtype});
         if (final?.subtype === 'error_max_turns' || final?.subtype === 'error_max_budget_usd') throw new AgentError('agent_limit_exceeded', 429);
         throw new AgentError('agent_provider_error', 502);
       }
@@ -184,6 +188,7 @@ export function createAgentRuntime(loadSdk: () => Promise<Sdk> = () => import('@
     } catch (error) {
       if (terminalError) throw terminalError;
       if (error instanceof AgentError) throw error;
+      logger.error('Agent runtime failed', errorSummary(error));
       throw new AgentError('agent_provider_error',502);
     } finally {
       clearTimeout(timer); input.signal.removeEventListener('abort',cancel);

@@ -1,3 +1,4 @@
+import config = require('../../config');
 import { AgentError, type ConversationSettings, type DraftRow } from './types';
 export const currencies = ['CAD', 'USD', 'EUR', 'GBP', 'AUD', 'CNY'];
 export const categories = {
@@ -17,11 +18,11 @@ export function validateSettings(value: unknown): ConversationSettings {
   return { currency, timezone, language: language as ConversationSettings['language'] };
 }
 export function validateMessage(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > 4000 || value.includes('\0')) invalid();
+  if (typeof value !== 'string' || !value.trim() || value.length > config.agent.maxInputChars || value.includes('\0')) invalid();
   return value.trim();
 }
 export function validateRows(value: unknown, allowEmpty = false): DraftRow[] {
-  if (!Array.isArray(value) || value.length > 12 || (!allowEmpty && value.length === 0)) invalid();
+  if (!Array.isArray(value) || value.length > config.agent.maxRows || (!allowEmpty && value.length === 0)) invalid();
   const ids = new Set<string>();
   return value.map((item: unknown) => {
     if (!item || typeof item !== 'object') invalid();

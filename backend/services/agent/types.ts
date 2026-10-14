@@ -6,7 +6,7 @@ export interface Conversation extends ConversationSettings { id: string; title: 
 export interface Message { id: string; role: 'user' | 'assistant'; content: string; status: 'complete' | 'failed' | 'cancelled'; created_at: Date }
 export interface DraftRow { id: string; amount: string; description: string; category: string; type: 'expense' | 'income'; date: string; currency: string }
 export interface Draft { id: string; version: number; status: 'pending' | 'confirmed' | 'cancelled' | 'expired'; rows: DraftRow[]; expires_at: Date }
-export interface Receipt { id: string; transaction_ids: number[]; undo_until: Date; undone_at: Date | null; created_at: Date }
+export interface Receipt { id: string; request_id: string; transaction_ids: number[]; undo_until: Date; undone_at: Date | null; created_at: Date }
 export interface Run { id: string; status: 'running' | 'complete' | 'failed' | 'cancelled'; error_code: string | null }
 export interface ConversationState { conversation: Conversation; messages: Message[]; draft: Draft | null; receipts: Receipt[]; run: Run | null }
 export interface TurnInput extends ConversationSettings { requestId: string; content: string }
