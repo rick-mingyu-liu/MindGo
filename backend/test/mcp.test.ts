@@ -5,7 +5,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import db = require('../db/connection');
 import exchangeRateService = require('../services/exchangeRateService');
-import { hashToken, createToken, revokeToken, looksLikeToken, MAX_TOKENS_PER_USER } from '../services/accessTokens';
+import { hashToken, revokeToken } from '../services/accessTokens';
 import { currentTerm, previousTerm, boundsOf, labelOf } from '../utils/terms';
 
 /**
@@ -263,20 +263,8 @@ describe('the tools', () => {
 });
 
 describe('the token service', () => {
-  test('a created token has the checked format, and only its hash is stored', async () => {
-    const { id, token } = await createToken(7, 'DearByte');
-    assert.equal(id, 1);
-    assert.ok(looksLikeToken(token));
-    const insert = queries.find((q) => q.text.includes('INSERT INTO access_tokens'));
-    assert.deepEqual(insert?.params, [7, 'DearByte', hashToken(token), MAX_TOKENS_PER_USER]);
-    assert.ok(!JSON.stringify(queries).includes(token));
-  });
-
-  test('past the limit, creating refuses', async () => {
-    mock.restoreAll();
-    mock.method(db, 'query', async () => ({ rowCount: 0, rows: [] }));
-    await assert.rejects(createToken(7, 'one too many'), RangeError);
-  });
+  // createToken runs on a dedicated pooled client so the limit holds under
+  // concurrency; it is covered in accessTokenRoutes.test.ts.
 
   test('revoking is scoped to the owner', async () => {
     await revokeToken(7, 3);

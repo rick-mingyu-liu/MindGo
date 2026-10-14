@@ -30,7 +30,9 @@ const TOOLS = [
     name: 'money_term_summary',
     description:
       'Income, spending, savings rate and top spending categories (CAD) for a Waterloo term: Winter Jan–Apr, Spring May–Aug, Fall Sep–Dec. ' +
-      'For the current term it also says how many days in it is and compares spending with what the previous term (pace.compared_with) had spent by the same day; pace.ratio above 1 means spending faster. Co-op students alternate study and work terms, so a high ratio can simply mean a different kind of term.',
+      'For the current term it also says how many days in it is and compares spending so far (pace.current_window, counting today) with what the previous term (pace.compared_with) had actually spent in its own first as many days (pace.comparison_window; the whole previous term when it was shorter, flagged clamped). Windows are [start, end_exclusive). pace.current_spending and pace.last_term_same_point are the spending inside each window; pace.ratio is their quotient, above 1 meaning more recorded spending than at that point last term, and null, with pace.note, when last term recorded none. pace.caveat and currency_note restate the limits below. ' +
+      'Adjacent terms often differ in circumstances — a study term against a co-op work term, or tuition paid in one and not the other — so the ratio compares recorded spending and is not a judgement. ' +
+      'Non-CAD amounts are converted at current exchange rates, not historical ones.',
     inputSchema: {
       type: 'object',
       properties: { term: { type: 'string', enum: ['current', 'previous'], description: 'Which term; default current' } },
