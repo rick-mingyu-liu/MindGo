@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 
 export const sendWeeklyReport = async (to: string, content: string, htmlContent: string): Promise<void> => {
   await transporter.sendMail({
-    from: `"MindGo" <${config.email.user}>`,
+    from: `"TermPocket" <${config.email.user}>`,
     to,
     subject: 'Your Weekly Financial Report',
     text: content,
@@ -34,15 +34,15 @@ export const sendEmailVerification = async (to: string, firstName: string, verif
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #16a34a; margin: 0;">MindGo</h1>
-        <p style="color: #6b7280; margin: 10px 0 0 0;">Personal Finance Management</p>
+        <h1 style="color: #16a34a; margin: 0;">TermPocket</h1>
+        <p style="color: #6b7280; margin: 10px 0 0 0;">Your money, term by term.</p>
       </div>
 
       <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; border-left: 4px solid #16a34a;">
-        <h2 style="color: #111827; margin: 0 0 20px 0;">Welcome to MindGo, ${firstName}!</h2>
+        <h2 style="color: #111827; margin: 0 0 20px 0;">Welcome to TermPocket, ${firstName}!</h2>
 
         <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">
-          Thank you for creating your MindGo account. To complete your registration and start managing your finances, please verify your email address by clicking the button below.
+          Thank you for creating your TermPocket account. To complete your registration and start managing your finances, please verify your email address by clicking the button below.
         </p>
 
         <div style="text-align: center; margin: 30px 0;">
@@ -60,35 +60,35 @@ export const sendEmailVerification = async (to: string, firstName: string, verif
         </p>
 
         <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
-          This verification link will expire in 30 minutes. If you didn't create a MindGo account, you can safely ignore this email.
+          This verification link will expire in 30 minutes. If you didn't create a TermPocket account, you can safely ignore this email.
         </p>
       </div>
 
       <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
         <p style="color: #6b7280; font-size: 14px; margin: 0;">
-          © 2025 MindGo. All rights reserved.
+          © ${new Date().getFullYear()} TermPocket. All rights reserved.
         </p>
       </div>
     </div>
   `;
 
   const textContent = `
-Welcome to MindGo, ${firstName}!
+Welcome to TermPocket, ${firstName}!
 
-Thank you for creating your MindGo account. To complete your registration and start managing your finances, please verify your email address by visiting the following link:
+Thank you for creating your TermPocket account. To complete your registration and start managing your finances, please verify your email address by visiting the following link:
 
 ${verificationUrl}
 
-This verification link will expire in 24 hours. If you didn't create a MindGo account, you can safely ignore this email.
+This verification link will expire in 24 hours. If you didn't create a TermPocket account, you can safely ignore this email.
 
 Best regards,
-The MindGo Team
+The TermPocket Team
   `;
 
   await transporter.sendMail({
-    from: `"MindGo" <${config.email.user}>`,
+    from: `"TermPocket" <${config.email.user}>`,
     to,
-    subject: 'Verify your MindGo account',
+    subject: 'Verify your TermPocket account',
     text: textContent,
     html: htmlContent,
   });
@@ -280,7 +280,7 @@ export const generateWeeklyReport = async (userId: number): Promise<{ text: stri
 
     // Footer
     content += `Keep up the great work managing your finances! 💪\n\n`;
-    content += `— The MindGo Team\n`;
+    content += `— The TermPocket Team\n`;
     content += `https://mindgo.io\n`;
 
     // --- HTML Content ---
@@ -338,7 +338,7 @@ export const generateWeeklyReport = async (userId: number): Promise<{ text: stri
         </table>
 
         <div style="margin-top: 2em; font-size: 1.1em;">Keep up the great work managing your finances! 💪</div>
-        <div style="margin-top: 2em; color: #888; font-size: 1em;">— The MindGo Team<br><a href="https://mindgo.io" style="color: #3182ce; text-decoration: none;">https://mindgo.io</a></div>
+        <div style="margin-top: 2em; color: #888; font-size: 1em;">— The TermPocket Team<br><a href="https://mindgo.io" style="color: #3182ce; text-decoration: none;">https://mindgo.io</a></div>
       </div>
     `;
 

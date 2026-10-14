@@ -4,7 +4,7 @@ import { termSummary, monthlyBaseline, goalProgress } from '../services/moneyFac
 import { errorSummary } from '../utils/errorSummary';
 
 /**
- * POST /mcp — MindGo as an MCP server, so a personal agent can read your
+ * POST /mcp — TermPocket as an MCP server, so a personal agent can read your
  * numbers. MCP over HTTP is JSON-RPC 2.0 in POST requests; this answers with
  * plain JSON, never an event stream, which the spec allows.
  *
@@ -58,7 +58,7 @@ async function tokenAuth(req: Request, res: Response, next: NextFunction) {
     const userId = token ? await userForToken(token) : null;
     if (userId === null) {
       res.set('WWW-Authenticate', 'Bearer');
-      return res.status(401).json({ error: 'A MindGo access token is required.' });
+      return res.status(401).json({ error: 'A TermPocket access token is required.' });
     }
     req.user = { userId, email: '' };
     next();
@@ -104,7 +104,9 @@ router.post('/', async (req: Request, res: Response) => {
     case 'initialize': {
       const asked = params.protocolVersion;
       const protocolVersion = typeof asked === 'string' && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0];
-      return res.json(reply(id, { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'mindgo', version: '1.0.0' } }));
+      // `name` is the identifier clients key on and stays 'mindgo'; `title` is
+      // the display name (added in 2025-06-18; earlier clients ignore it).
+      return res.json(reply(id, { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'mindgo', title: 'TermPocket', version: '1.0.0' } }));
     }
     case 'ping':
       return res.json(reply(id, {}));
@@ -118,7 +120,7 @@ router.post('/', async (req: Request, res: Response) => {
       } catch (error) {
         // A bad argument is the caller's to fix and safe to repeat; anything
         // else is logged by name only and answered generically.
-        const message = error instanceof RangeError ? error.message : 'MindGo could not read that right now.';
+        const message = error instanceof RangeError ? error.message : 'TermPocket could not read that right now.';
         if (!(error instanceof RangeError)) console.error('MCP tool error:', { userId: req.user.userId, tool: String(params.name), ...errorSummary(error) });
         return res.json(reply(id, { content: [{ type: 'text', text: message }], isError: true }));
       }
