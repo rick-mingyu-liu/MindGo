@@ -513,7 +513,7 @@
       "agent_version_conflict": "草稿已被其他请求修改。请刷新并核对最新版本后再确认。",
       "agent_expired": "草稿或撤销期限已结束。请刷新查看最新状态。",
       "agent_busy": "另一次处理正在进行。请等待完成或取消后再发送。",
-      "agent_rate_limited": "已达到每小时消息上限。请稍后重试。",
+      "agent_rate_limited": "请求过于频繁，请稍后再试。",
       "agent_cancelled": "本次处理已取消，你可以发送新消息。",
       "agent_timeout": "回复超时。请刷新状态后重新发送消息。",
       "agent_provider_error": "AI 服务未能完成回复。请刷新状态后重试。",
