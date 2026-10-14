@@ -46,4 +46,16 @@ const importLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export { apiLimiter, authLimiter, aiLimiter, importLimiter };
+// Creating and revoking access tokens, keyed on the user. Mount after auth.
+const accessTokenLimiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.accessTokenMax,
+  keyGenerator: (req) => `user:${req.user.userId}`,
+  message: {
+    error: 'Too many token changes in a short time, please wait a few minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export { apiLimiter, authLimiter, aiLimiter, importLimiter, accessTokenLimiter };

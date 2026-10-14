@@ -32,6 +32,8 @@ interface Totals {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
+/** `'2026-05-01'` plus 27 days. A day string parses as UTC midnight and is printed in UTC, so no timezone enters. */
+const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
 
 /** `(2026, 0)` -> `'2026-01-01'`, by arithmetic: never `new Date(y, m, d).toISOString()`. */
 const monthStart = (absoluteMonth: number): string =>
@@ -72,6 +74,90 @@ const topCategories = (byCategory: Map<string, number>) =>
     .slice(0, TOP_CATEGORIES)
     .map(([category, amount]) => ({ category, amount: round2(amount) }));
 
+/** Said with every term summary: the totals mix currencies through today's rate, which is not what anything cost on the day. */
+export const CONVERSION_NOTE = 'Non-CAD amounts are converted to CAD at current exchange rates, not the rates on the day they were spent.';
+
+const PACE_CAVEAT =
+  'Compares recorded spending only. Adjacent terms often differ in kind — a study term and a co-op work term, or tuition paid in one and not the other — so a ratio above or below 1 is a difference, not a judgement.';
+
+/** A run of days, half-open: `start` is in it, `end_exclusive` is not. */
+interface Window {
+  start: string;
+  end_exclusive: string;
+  /** Days in [start, end_exclusive). */
+  days: number;
+}
+
+/** termSummary's `pace`, for the current term only. Amounts are CAD. */
+interface Pace {
+  /** The term compared with, e.g. 'Winter 2026': always the term just before, never the same term a year ago. */
+  compared_with: string;
+  /** What `compared_with` spent within `comparison_window`. */
+  last_term_same_point: number;
+  /** current_spending / last_term_same_point; null when the latter is 0, with `note` saying why. */
+  ratio: number | null;
+  /** What this term has spent within `current_window`; rows dated after today are not counted. */
+  current_spending: number;
+  /** This term from its first day through today. */
+  current_window: Window;
+  /** The previous term's first `current_window.days` days, or all of it when shorter (`clamped: true`). */
+  comparison_window: Window & { clamped: boolean };
+  /** Present when the ratio is missing or the window was clamped. */
+  note?: string;
+  /** That adjacent terms can differ in kind, so the ratio compares spending and judges nothing. */
+  caveat: string;
+}
+
+/**
+ * Spending so far this term against what the previous term had actually spent
+ * by the same point — not a prorated share of its total: tuition and rent land
+ * early, so a share would make every term's first weeks look like a spree.
+ *
+ * "The same point" is the first N days of the previous term, where N is the
+ * days of this term so far counting today (the term's first day is day 1).
+ * Terms differ in length — Winter 120 or 121 days, Spring 123, Fall 122 — so
+ * when N runs past the previous term's end the window is that whole term, and
+ * `clamped` says so. Every window is half-open, [start, end_exclusive), like
+ * boundsOf. Day strings are stepped by UTC arithmetic, so only `today` — the
+ * process's local day, as everywhere else — depends on the timezone.
+ */
+async function paceOf(userId: number, currentId: string, today: string): Promise<Pace> {
+  const current = boundsOf(currentId);
+  const previousId = previousTerm(currentId);
+  const previous = boundsOf(previousId);
+  const tomorrow = addDays(today, 1);
+  const currentEnd = tomorrow < current.end ? tomorrow : current.end;
+  const elapsed = daysBetween(current.start, currentEnd);
+  const cutoff = addDays(previous.start, elapsed);
+  const clamped = cutoff > previous.end;
+  const comparisonEnd = clamped ? previous.end : cutoff;
+
+  const spent = (await totalsBetween(userId, current.start, currentEnd)).expenses;
+  const before = (await totalsBetween(userId, previous.start, comparisonEnd)).expenses;
+  const label = labelOf(previousId);
+
+  let note: string | undefined;
+  if (before === 0) {
+    note = spent === 0
+      ? `No spending recorded so far this term or in the same window of ${label}, so there is nothing to compare.`
+      : `No spending recorded in the same window of ${label}, so a ratio would be meaningless.`;
+  } else if (clamped) {
+    note = `This term is already longer than ${label} was, so the comparison is with all of ${label}.`;
+  }
+
+  return {
+    // Named, so nobody reads "last term" as the same term a year ago.
+    compared_with: label,
+    last_term_same_point: round2(before),
+    ratio: before > 0 ? round2(spent / before) : null,
+    current_spending: round2(spent),
+    current_window: { start: current.start, end_exclusive: currentEnd, days: elapsed },
+    comparison_window: { start: previous.start, end_exclusive: comparisonEnd, days: daysBetween(previous.start, comparisonEnd), clamped },
+    ...(note ? { note } : {}),
+    caveat: PACE_CAVEAT,
+  };
+}
+
 /** A term's totals. For the current term, how far in it is and how spending compares with last term at the same point. */
 export async function termSummary(userId: number, which: 'current' | 'previous', now: Date = new Date()) {
   const current = currentTerm(now);
@@ -81,21 +167,7 @@ export async function termSummary(userId: number, which: 'current' | 'previous',
   const today = toDay(now) as string;
   const daysTotal = daysBetween(start, end);
   const daysElapsed = which === 'current' ? Math.min(daysTotal, daysBetween(start, today) + 1) : daysTotal;
-
-  let pace: { compared_with: string; last_term_same_point: number; ratio: number | null } | null = null;
-  if (which === 'current') {
-    // Last term's spending over the same share of the term, from its own totals.
-    const previousId = previousTerm(current);
-    const previous = boundsOf(previousId);
-    const before = await totalsBetween(userId, previous.start, previous.end);
-    const samePoint = before.expenses * (daysElapsed / daysTotal);
-    pace = {
-      // Named, so nobody reads "last term" as the same term a year ago.
-      compared_with: labelOf(previousId),
-      last_term_same_point: round2(samePoint),
-      ratio: samePoint > 0 ? round2(totals.expenses / samePoint) : null,
-    };
-  }
+  const pace = which === 'current' ? await paceOf(userId, current, today) : null;
 
   return {
     term,
@@ -105,6 +177,7 @@ export async function termSummary(userId: number, which: 'current' | 'previous',
     days_elapsed: daysElapsed,
     days_total: daysTotal,
     currency: REPORT_CURRENCY,
+    currency_note: CONVERSION_NOTE,
     income: round2(totals.income),
     expenses: round2(totals.expenses),
     net: round2(totals.income - totals.expenses),
@@ -160,10 +233,12 @@ export async function goalProgress(userId: number, now: Date = new Date()) {
       currency: goal.currency,
       target: round2(target),
       saved: round2(saved),
-      percent: target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : null,
+      // Floored, so 99.6% never reads as 100 on a goal that isn't reached.
+      percent: target > 0 ? Math.min(100, Math.floor((saved / target) * 100)) : null,
       target_date: due,
       status: remaining === 0 ? 'reached' : daysLeft === null ? 'no date' : daysLeft < 0 ? 'overdue' : 'in progress',
-      needed_per_month: remaining === 0 || monthsLeft === null ? null : round2(remaining / Math.max(1, monthsLeft)),
+      // None for an overdue goal: "needs the whole rest this month" isn't a plan.
+      needed_per_month: remaining === 0 || monthsLeft === null || (daysLeft ?? 0) < 0 ? null : round2(remaining / Math.max(1, monthsLeft)),
     };
   });
 }

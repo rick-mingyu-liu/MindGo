@@ -18,6 +18,7 @@ import {
 import toast from 'react-hot-toast'
 import { api, logout } from '@/utils/api'
 import { useTheme } from '@/contexts/ThemeContext'
+import AiConnections from '@/components/AiConnections'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -360,6 +361,8 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+
+            <AiConnections />
 
             <Card>
               <CardHeader>

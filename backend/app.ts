@@ -26,6 +26,7 @@ import investmentRoutes = require('./routes/investments');
 import aiRoutes = require('./routes/ai');
 import importRoutes = require('./routes/import');
 import mcpRoutes = require('./routes/mcp');
+import accessTokenRoutes = require('./routes/accessTokens');
 
 const app = express();
 const PORT = config.port;
@@ -45,6 +46,14 @@ app.use(cors(config.cors));
 // too small for one long screenshot's OCR output. The app-wide parser skips a
 // body that has already been read.
 app.use('/import', express.json({ limit: config.import.bodyLimit }));
+// /mcp speaks JSON-RPC, so a body that isn't JSON is the client's parse error
+// (-32700, 400), not the 500 the global handler would make of it.
+app.use('/mcp', express.json(), (error: unknown, _req: Request, res: Response, next: express.NextFunction) => {
+  if ((error as { type?: string })?.type === 'entity.parse.failed') {
+    return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+  }
+  next(error);
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -72,6 +81,8 @@ app.use('/investments', investmentRoutes);
 // Every /ai call costs real OpenAI credit, so it gets its own hourly budget.
 app.use('/ai', aiLimiter, aiRoutes);
 app.use('/import', importRoutes);
+// The signed-in user's tokens for /mcp, managed with the login JWT.
+app.use('/access-tokens', accessTokenRoutes);
 // Read-only, for a personal agent; opened by an access token, never the login JWT.
 app.use('/mcp', mcpRoutes);
 
