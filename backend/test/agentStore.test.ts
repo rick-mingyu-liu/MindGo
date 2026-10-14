@@ -1,0 +1,131 @@
+import { test, before, after, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import type { ConversationState } from '../services/agent/types';
+const enabled = !!process.env.TEST_DATABASE_URL;
+if (enabled) { process.env.DATABASE_URL = process.env.TEST_DATABASE_URL; process.env.NODE_ENV = 'test'; }
+describe('agent storage safety', { skip: !enabled }, () => {
+  let store: typeof import('../services/agent/store');
+  let db: typeof import('../db/connection');
+  const users: number[] = [];
+  let alice: number; let bob: number;
+  const settings = { currency: 'CAD', timezone: 'America/Toronto', language: 'auto' as const };
+  const row = () => ({ id: randomUUID(), amount: '12.50', description: 'Fictional lunch', category: 'Dining Out', type: 'expense' as const, date: '2026-10-14', currency: 'CAD' });
+  async function proposal(): Promise<ConversationState> {
+    const c = await store.createConversation(alice, settings); const requestId = randomUUID();
+    await store.beginTurn(alice, c.id, { ...settings, requestId, content: 'Fictional lunch' });
+    return store.finishTurn(alice, c.id, requestId, { text: 'Please review.', proposedRows: [row(), row()] });
+  }
+  before(async () => {
+    store = require('../services/agent/store'); db = require('../db/connection');
+    for (let n = 0; n < 2; n++) users.push((await db.query<{id:number}>("INSERT INTO users(email,password_hash,first_name,last_name) VALUES($1,'x','Agent','Test') RETURNING id", [`agent-${randomUUID()}@example.invalid`])).rows[0]!.id);
+    alice = users[0]!; bob = users[1]!;
+  });
+  after(async () => { if (db) { await db.query('DELETE FROM users WHERE id=ANY($1::int[])', [users]); await db.getPool().end(); } });
+  test('concurrent identical confirmations write a selected subset once; changed nonce reuse conflicts', async () => {
+    const s = await proposal(); const input = { version: s.draft!.version, rowIds: [s.draft!.rows[0]!.id], requestId: randomUUID() };
+    const results = await Promise.all([store.confirmDraft(alice,s.conversation.id,input), store.confirmDraft(alice,s.conversation.id,input)]);
+    assert.equal(results[0]!.receipts[0]!.id, results[1]!.receipts[0]!.id);
+    assert.equal(results[0]!.receipts[0]!.transaction_ids.length,1);
+    assert.equal(results[0]!.draft!.rows.length,1);
+    assert.equal((await db.query('SELECT id FROM transactions WHERE user_id=$1',[alice])).rowCount,1);
+    await assert.rejects(store.confirmDraft(alice,s.conversation.id,{...input,rowIds:[s.draft!.rows[1]!.id]}),{code:'agent_request_conflict'});
+    await store.undoReceipt(alice,results[0]!.receipts[0]!.id);
+  });
+  test('ownership, obsolete versions and arbitrary edited IDs cannot write', async () => {
+    const s = await proposal();
+    await assert.rejects(store.getConversation(bob,s.conversation.id),{code:'agent_not_found'});
+    await assert.rejects(store.confirmDraft(bob,s.conversation.id,{version:1,rowIds:[s.draft!.rows[0]!.id],requestId:randomUUID()}),{code:'agent_not_found'});
+    await assert.rejects(store.editDraft(alice,s.conversation.id,1,[row()]),{code:'agent_invalid_input'});
+    const edited = await store.editDraft(alice,s.conversation.id,1,[{...s.draft!.rows[0]!,amount:'15.00'}]);
+    assert.equal(edited.draft!.version,2);
+    await assert.rejects(store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:[s.draft!.rows[0]!.id],requestId:randomUUID()}),{code:'agent_version_conflict'});
+  });
+  test('cancelled and deleted runs cannot publish drafts; request identity is immutable',async()=>{
+    const c=await store.createConversation(alice,settings); const requestId=randomUUID(); const input={...settings,requestId,content:'Fictional input'};
+    assert.equal((await store.beginTurn(alice,c.id,input)).started,true);
+    assert.equal((await store.beginTurn(alice,c.id,input)).started,false);
+    await assert.rejects(store.beginTurn(alice,c.id,{...input,content:'Changed'}),{code:'agent_request_conflict'});
+    const other=await store.createConversation(alice,settings);
+    await assert.rejects(store.beginTurn(alice,other.id,{...input,requestId:randomUUID()}),{code:'agent_busy'});
+    await store.cancelRun(alice,c.id,requestId);
+    await assert.rejects(store.finishTurn(alice,c.id,requestId,{text:'late',proposedRows:[row()]}),{code:'agent_cancelled'});
+    const r2=randomUUID(); await store.beginTurn(alice,c.id,{...input,requestId:r2});
+    await store.deleteConversation(alice,c.id);
+    await assert.rejects(store.finishTurn(alice,c.id,r2,{text:'late'}),{code:'agent_not_found'});
+  });
+  test('undo detects microsecond manual edits; deletion preserves saved entries and usable minimal receipt',async()=>{
+    const s=await proposal(); const confirmed=await store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:s.draft!.rows.map(r=>r.id),requestId:randomUUID()});
+    const receipt=confirmed.receipts[0]!;
+    await db.query("UPDATE transactions SET description='Manual edit' WHERE id=$1",[receipt.transaction_ids[0]]);
+    await assert.rejects(store.undoReceipt(alice,receipt.id),{code:'agent_undo_conflict'});
+    assert.equal((await db.query('SELECT id FROM transactions WHERE id=ANY($1::int[])',[receipt.transaction_ids])).rowCount,2);
+    await store.deleteConversation(alice,s.conversation.id);
+    assert.equal((await db.query('SELECT id FROM transactions WHERE id=ANY($1::int[])',[receipt.transaction_ids])).rowCount,2);
+    const s2=await proposal();const saved=await store.confirmDraft(alice,s2.conversation.id,{version:1,rowIds:[s2.draft!.rows[0]!.id],requestId:randomUUID()});
+    await store.deleteConversation(alice,s2.conversation.id);await store.undoReceipt(alice,saved.receipts[0]!.id);await store.undoReceipt(alice,saved.receipts[0]!.id);
+  });
+  test('undo compares PostgreSQL microseconds without JavaScript Date truncation',async()=>{
+    const s=await proposal();const confirmed=await store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:[s.draft!.rows[0]!.id],requestId:randomUUID()});const receipt=confirmed.receipts[0]!;
+    // Two timestamps in the same JavaScript millisecond must still conflict.
+    // Set the retained timestamp one microsecond earlier while retaining xmin,
+    // isolating timestamp precision from the independent tuple-version guard.
+    await db.query(`UPDATE agent_receipts SET transaction_versions=jsonb_set(transaction_versions,'{0,updated_at}',to_jsonb(((transaction_versions->0->>'updated_at')::timestamp-interval '1 microsecond')::text)) WHERE id=$1`,[receipt.id]);
+    await assert.rejects(store.undoReceipt(alice,receipt.id),{code:'agent_undo_conflict'});
+    assert.equal((await db.query('SELECT id FROM transactions WHERE id=ANY($1::int[])',[receipt.transaction_ids])).rowCount,1);
+  });
+  test('compound foreign keys reject same-owner wrong-conversation run links and cross-owner drafts',async()=>{
+    const s=await proposal();const other=await store.createConversation(alice,settings);
+    const message=(await db.query<{id:string}>('SELECT id FROM agent_messages WHERE conversation_id=$1 LIMIT 1',[s.conversation.id])).rows[0]!;
+    await assert.rejects(db.query('UPDATE agent_messages SET conversation_id=$1 WHERE id=$2',[other.id,message.id]),{code:'23503'});
+    await assert.rejects(db.query('UPDATE agent_drafts SET user_id=$1 WHERE conversation_id=$2',[bob,s.conversation.id]),{code:'23503'});
+  });
+  test('a failing second financial insert rolls back the entire batch and receipt',async()=>{
+    const s=await proposal();const rows=s.draft!.rows.map((r,i)=>({...r,description:i?'Reject fictional row':'Accept fictional row'}));
+    const edited=await store.editDraft(alice,s.conversation.id,1,rows);
+    await db.query("ALTER TABLE transactions ADD CONSTRAINT agent_test_reject CHECK (description <> 'Reject fictional row') NOT VALID");
+    try {
+      const before=await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice]);
+      await assert.rejects(store.confirmDraft(alice,s.conversation.id,{version:edited.draft!.version,rowIds:rows.map(r=>r.id),requestId:randomUUID()}),{code:'23514'});
+      assert.equal((await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice])).rows[0]!.count,before.rows[0]!.count);
+      assert.equal((await store.getConversation(alice,s.conversation.id)).receipts.length,0);
+    } finally {await db.query('ALTER TABLE transactions DROP CONSTRAINT agent_test_reject');}
+  });
+  test('history and conversation limits are bounded and run cleanup preserves messages',async()=>{
+    const c=await store.createConversation(bob,settings);const runId=randomUUID();
+    await store.beginTurn(bob,c.id,{...settings,requestId:runId,content:'Fictional history'});await store.finishTurn(bob,c.id,runId,{text:'Recorded context'});
+    await db.query("INSERT INTO agent_messages(id,conversation_id,user_id,role,content,status,created_at) SELECT gen_random_uuid(),$1,$2,'user',repeat('x',1000),'complete',now()+n*interval '1 millisecond' FROM generate_series(1,196) n",[c.id,bob]);
+    const next=randomUUID();const started=await store.beginTurn(bob,c.id,{...settings,requestId:next,content:'Next'});
+    assert.ok(started.history.length<=30);assert.ok(started.history.reduce((n,m)=>n+m.content.length,0)<=24000);
+    await store.finishTurn(bob,c.id,next,{text:'Finished'});
+    await assert.rejects(store.beginTurn(bob,c.id,{...settings,requestId:randomUUID(),content:'Over cap'}),{code:'agent_conversation_full'});
+    await db.query("UPDATE agent_runs SET created_at=now()-interval '31 days' WHERE conversation_id=$1",[c.id]);
+    await store.cleanupAgentData();assert.equal((await store.getConversation(bob,c.id)).messages.length,200);
+  });
+  test('conversation admission caps at 100 and deletion frees capacity',async()=>{
+    const user=(await db.query<{id:number}>("INSERT INTO users(email,password_hash,first_name,last_name) VALUES($1,'x','Capacity','Test') RETURNING id",[`agent-${randomUUID()}@example.invalid`])).rows[0]!.id;users.push(user);
+    await db.query("INSERT INTO agent_conversations(id,user_id,currency,timezone,language) SELECT gen_random_uuid(),$1,'CAD','UTC','auto' FROM generate_series(1,99)",[user]);
+    const attempts=await Promise.allSettled([store.createConversation(user,settings),store.createConversation(user,settings)]);
+    const accepted=attempts.filter(result=>result.status==='fulfilled');const refused=attempts.filter(result=>result.status==='rejected');
+    assert.equal(accepted.length,1);assert.equal(refused.length,1);
+    assert.equal((refused[0] as PromiseRejectedResult).reason.code,'agent_conversation_limit');
+    assert.equal((refused[0] as PromiseRejectedResult).reason.status,409);
+    const conversations=await store.listConversations(user);assert.equal(conversations.length,100);
+    await store.deleteConversation(user,conversations[0]!.id);
+    await store.createConversation(user,settings);assert.equal((await store.listConversations(user)).length,100);
+  });
+  test('history deletion cannot reset the hourly admission budget',async()=>{
+    const user=(await db.query<{id:number}>("INSERT INTO users(email,password_hash,first_name,last_name) VALUES($1,'x','Rate','Test') RETURNING id",[`agent-${randomUUID()}@example.invalid`])).rows[0]!.id;users.push(user);
+    await db.query('INSERT INTO agent_admissions(id,user_id) SELECT gen_random_uuid(),$1 FROM generate_series(1,19)',[user]);
+    const c=await store.createConversation(user,settings);await store.beginTurn(user,c.id,{...settings,requestId:randomUUID(),content:'Twentieth'});await store.deleteConversations(user);
+    const next=await store.createConversation(user,settings);
+    await assert.rejects(store.beginTurn(user,next.id,{...settings,requestId:randomUUID(),content:'Twenty first'}),{code:'agent_rate_limited'});
+  });
+  test('expired drafts cannot confirm and expired leases cannot finish',async()=>{
+    const s=await proposal();await db.query("UPDATE agent_drafts SET expires_at=now()-interval '1 second' WHERE conversation_id=$1",[s.conversation.id]);
+    await assert.rejects(store.confirmDraft(alice,s.conversation.id,{version:1,rowIds:[s.draft!.rows[0]!.id],requestId:randomUUID()}),{code:'agent_expired'});
+    const c=await store.createConversation(alice,settings);const id=randomUUID();await store.beginTurn(alice,c.id,{...settings,requestId:id,content:'Fictional'});
+    await db.query("UPDATE agent_runs SET lease_until=now()-interval '1 second' WHERE id=$1",[id]);
+    await assert.rejects(store.finishTurn(alice,c.id,id,{text:'late',proposedRows:[row()]}),{code:'agent_timeout'});
+  });
+});
