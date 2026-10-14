@@ -13,7 +13,6 @@ import {
   Info,
   Edit,
   Settings as SettingsIcon,
-  Mail,
   ScanText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api } from '@/utils/api'
@@ -26,8 +25,6 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLogo } from '@/components/BrandLogo'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import Swal from 'sweetalert2'
 import { categories as categoryTypeMap } from './transactions/new';
 import { useTranslation } from 'next-i18next'
 import { formatDay, formatDayRange } from '@/lib/date';
@@ -205,7 +202,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
   const { resolvedTheme } = useTheme();
-  const [sheetOpen, setSheetOpen] = useState(false)
   const [categoryView, setCategoryView] = useState<CategoryView>('all');
   const [period, setPeriod] = useState<PeriodKey>('thisTerm');
   const { t, i18n } = useTranslation('common');
@@ -249,25 +245,6 @@ export default function Dashboard() {
       setLoading(false)
     }
   }, [period])
-
-  const handleSendReport = async () => {
-    try {
-      await api.post('/auth/test-email');
-      Swal.fire({
-        icon: 'success',
-        title: t('Report Sent!'),
-        text: t('Your financial report has been emailed to you. Check your inbox!'),
-        confirmButtonColor: '#facc15',
-      });
-    } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: t('Error'),
-        text: t('Failed to send financial report.'),
-        confirmButtonColor: '#f87171',
-      });
-    }
-  };
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -460,20 +437,13 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={handleSendReport}
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  {t('Send Report')}
-                </Button>
-                <Button
-                  variant="outline"
                   onClick={() => router.push('/settings')}
                 >
                   <SettingsIcon className="w-4 h-4 mr-2" />
                   {t('Settings')}
                 </Button>
               </div>
-              {/* Mobile actions: FAB + menu */}
+              {/* Mobile actions: FAB + settings */}
               <div className="sm:hidden flex items-center gap-2">
                 <button
                   className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
@@ -482,23 +452,9 @@ export default function Dashboard() {
                 >
                   <Plus className="w-8 h-8" />
                 </button>
-                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="ml-2">
-                      <SettingsIcon className="w-6 h-6" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="p-6 flex flex-col gap-4">
-                    <Button onClick={handleSendReport}>
-                      <Mail className="w-4 h-4 mr-2" />
-                      {t('Send Report')}
-                    </Button>
-                    <Button onClick={() => router.push('/settings')}>
-                      <SettingsIcon className="w-4 h-4 mr-2" />
-                      {t('Settings')}
-                    </Button>
-                  </SheetContent>
-                </Sheet>
+                <Button variant="outline" size="icon" onClick={() => router.push('/settings')} aria-label={t('Settings')}>
+                  <SettingsIcon className="w-6 h-6" />
+                </Button>
               </div>
             </div>
           </div>
@@ -543,14 +499,6 @@ export default function Dashboard() {
                       >
                         <Target className="w-4 h-4 mr-2" />
                         {t('Create a Goal')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSendReport}
-                      >
-                        <Mail className="w-4 h-4 mr-2" />
-                        {t('Send Report')}
                       </Button>
                     </div>
                   </div>

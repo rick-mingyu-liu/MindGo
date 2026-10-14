@@ -18,6 +18,8 @@ import toast from 'react-hot-toast'
 import { api, logout } from '@/utils/api'
 import { useTheme } from '@/contexts/ThemeContext'
 import AiConnections from '@/components/AiConnections'
+import OpenSourceAcknowledgements from '@/components/OpenSourceAcknowledgements'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -63,6 +65,7 @@ export default function Settings() {
   const [weeklyReports, setWeeklyReports] = useState<boolean | null>(null)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [ackDialogOpen, setAckDialogOpen] = useState(false)
 
   useEffect(() => {
@@ -111,6 +114,7 @@ export default function Settings() {
   }
 
   const handleClearData = async () => {
+    if (clearing || deleteConfirmation !== 'DELETE') return
     setClearing(true)
     try {
       await Promise.all([
@@ -310,22 +314,6 @@ export default function Settings() {
                     {t('Logout')}
                   </Button>
                 </div>
-
-                <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/40 p-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-base flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-destructive" />
-                      {t('Clear All Data')}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Permanently delete all transactions, goals, and archived watchlist data.')}
-                    </p>
-                  </div>
-                  <Button variant="destructive" onClick={() => setClearDialogOpen(true)} disabled={clearing}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {t('Clear All Data')}
-                  </Button>
-                </div>
               </CardContent>
             </Card>
 
@@ -335,11 +323,27 @@ export default function Settings() {
                 {t('Open Source Acknowledgements')}
               </Button>
             </div>
+
+            <details className="rounded-lg border border-destructive/40 bg-card">
+              <summary className="flex cursor-pointer items-center gap-2 rounded-lg p-6 font-semibold text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <AlertTriangle className="h-5 w-5" />
+                {t('Danger zone')}
+              </summary>
+              <div className="space-y-4 px-6 pb-6">
+                <p className="text-sm text-muted-foreground">
+                  {t('Permanently delete all transactions, goals, and archived watchlist data.')}
+                </p>
+                <Button variant="destructive" onClick={() => { setDeleteConfirmation(''); setClearDialogOpen(true) }} disabled={clearing}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('Clear All Data')}
+                </Button>
+              </div>
+            </details>
           </div>
         </div>
       </div>
 
-      <Dialog open={clearDialogOpen} onOpenChange={(open) => !clearing && setClearDialogOpen(open)}>
+      <Dialog open={clearDialogOpen} onOpenChange={(open) => { if (!clearing) { setClearDialogOpen(open); setDeleteConfirmation('') } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('Clear All Data')}</DialogTitle>
@@ -347,86 +351,22 @@ export default function Settings() {
               {t('This permanently deletes all your transactions, goals and archived watchlist data. It cannot be undone.')}
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirmation">{t('Type DELETE to confirm')}</Label>
+            <Input id="delete-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck={false} disabled={clearing} />
+          </div>
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline" disabled={clearing}>{t('Cancel')}</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={handleClearData} disabled={clearing}>
+            <Button variant="destructive" onClick={handleClearData} disabled={clearing || deleteConfirmation !== 'DELETE'}>
               {clearing ? t('Clearing...') : t('Yes, Delete Everything')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={ackDialogOpen} onOpenChange={setAckDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t('Open Source Acknowledgements')}</DialogTitle>
-            <DialogDescription>{t('This project is made by these amazing open source projects:')}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <h4 className="font-semibold mb-2">{t('Frontend')}</h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li>Next.js</li>
-                <li>React</li>
-                <li>TypeScript</li>
-                <li>Tailwind CSS</li>
-                <li>shadcn/ui</li>
-                <li>Radix UI (@radix-ui/react-*)</li>
-                <li>lucide-react</li>
-                <li>recharts</li>
-                <li>react-hook-form</li>
-                <li>next-i18next</li>
-                <li>react-i18next</li>
-                <li>i18next</li>
-                <li>sweetalert2</li>
-                <li>react-hot-toast</li>
-                <li>react-markdown</li>
-                <li>axios</li>
-                <li>clsx</li>
-                <li>class-variance-authority</li>
-                <li>autoprefixer</li>
-                <li>postcss</li>
-                <li>tailwind-merge</li>
-                <li>@vercel/analytics</li>
-                <li>ppu-paddle-ocr</li>
-                <li>onnxruntime-web</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">{t('Backend')}</h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li>Express.js</li>
-                <li>PostgreSQL (pg)</li>
-                <li>bcryptjs</li>
-                <li>helmet</li>
-                <li>express-rate-limit</li>
-                <li>cors</li>
-                <li>jsonwebtoken</li>
-                <li>nodemailer</li>
-                <li>node-cron</li>
-                <li>dotenv</li>
-                <li>morgan</li>
-                <li>axios</li>
-                <li>express-validator</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-2">{t('APIs (free)')}</h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li>ExchangeRate.host (currency conversion)</li>
-                <li>Frankfurter.dev (currency conversion)</li>
-              </ul>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">{t('Close')}</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OpenSourceAcknowledgements open={ackDialogOpen} onOpenChange={setAckDialogOpen} />
     </>
   )
 }
