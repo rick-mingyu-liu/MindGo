@@ -415,22 +415,85 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 ### `/mcp` — read-only, for a personal agent
 
-TermPocket as an [MCP](https://modelcontextprotocol.io) server, so an agent such as [DearByte](https://github.com/dearbyte-labs/DearByte) can read your numbers. `POST /mcp` speaks JSON-RPC 2.0 and takes a **personal access token**, never the login JWT:
+TermPocket as an [MCP](https://modelcontextprotocol.io) server, so an AI client can read your numbers. `POST /mcp` speaks JSON-RPC 2.0 over Streamable HTTP and takes a **personal access token**, never the login JWT.
+
+#### What a connected client can read
+
+| Tool | Answers |
+|---|---|
+| `money_term_summary` | a term's income, spending, net, savings rate and top spending categories. For the current term it adds `pace`, which compares spending so far with what last term had actually spent over the same number of days. `pace` excludes future-dated rows and returns both half-open date windows, clamps the comparison to all of last term if that term was shorter, and includes a `note` when last term spent nothing (then `ratio` is `null`) or the comparison was clamped, and a `caveat` that a study term and a co-op term are different kinds of term. |
+| `money_baseline` | average monthly income, spending and saving over the last 12 whole months that have data |
+| `money_goals` | each savings goal's **name**, target, amount saved, target date, status, and what it needs per month |
+
+Every tool is a `SELECT` of totals. No transaction, description or merchant leaves, and nothing can be added, changed or deleted through a token.
+
+The figures are what you recorded in TermPocket, not verified bank balances. Term summaries and monthly baselines are in **CAD**, with other currencies converted at **current** exchange rates. Savings goals retain each goal's own `currency`; their amounts are not converted. The AI service you connect receives these numbers and handles them under its own terms. Nothing is anonymised or end-to-end encrypted.
+
+#### Create and revoke a token
+
+In the web app, **Settings → AI connections**:
+
+- Name the connection and press **Create token**.
+- The token (`mgo_…`) is shown **once**. Copy it into your client straight away; only its SHA-256 hash is stored.
+- **Revoke** takes effect at once: the next request from that client gets `401`.
+- At most 5 tokens per account can be active at a time.
+
+The CLI still works, and enforces the same limit through the same transaction:
 
 ```bash
 cd backend
-npm run access-token -- create you@example.com "DearByte"   # printed once; only its hash is stored
+npm run access-token -- create you@example.com "Claude Code"
 npm run access-token -- list you@example.com
 npm run access-token -- revoke you@example.com <id>
 ```
 
-| Tool | Answers (CAD) |
-|---|---|
-| `money_term_summary` | this term's or last term's income, spending, savings rate, top categories, and spending pace against last term at the same point |
-| `money_baseline` | average monthly income, spending and saving over the last 12 whole months |
-| `money_goals` | each goal's target, amount saved, status and what it needs per month |
+#### Connect Claude Code (verified)
 
-Every tool is a `SELECT` of totals: no transaction, description or merchant leaves, and nothing can be changed or deleted through a token. At most 5 active tokens per account. The table comes from migration `012`.
+Verified on 2026-10-14 with **Claude Code 2.1.300**:
+
+- the endpoint was a local backend on a test database with fictional data
+- discovery found all three tools
+- all three tool calls worked, and the client interpreted the results
+- after revoking the token, the client reported `✘ Failed to connect` with a `401`
+
+```bash
+claude mcp add --transport http termpocket https://<your-api-host>/mcp \
+  --header "Authorization: Bearer <token>"
+claude mcp get termpocket        # ✔ Connected
+```
+
+The `/mcp` endpoint is the backend's URL plus `/mcp`. Settings shows the right one for the deployment you're signed in to.
+
+[Claude Code's MCP documentation](https://code.claude.com/docs/en/mcp) describes local scope (the default), which stores the configuration in your own `~/.claude.json`, and environment-variable expansion in HTTP headers. Never put a real token in a committed `.mcp.json`. If you share one, reference an environment variable instead:
+
+```json
+{ "mcpServers": { "termpocket": { "type": "http", "url": "https://<your-api-host>/mcp",
+  "headers": { "Authorization": "Bearer ${TERMPOCKET_TOKEN}" } } } }
+```
+
+**Protocol, as observed:**
+1. Claude Code first sends a `server/discover` probe under revision 2026-07-28. TermPocket answers `-32601`, and the client falls back.
+2. It then asks for `2025-11-25` in `initialize`. TermPocket offers only `2025-06-18`, and the client accepts it.
+3. A `GET /mcp` for a server stream gets `405`, which the spec allows.
+
+TermPocket implements one protocol version and refuses JSON-RPC batches.
+
+#### Other clients (not verified)
+
+- **claude.ai custom connectors**: [Anthropic documents a Request headers setting](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) for fixed credentials, including bearer tokens, and requires an endpoint reachable from its cloud infrastructure. Use `Authorization: Bearer <token>` with the public HTTPS `/mcp` URL. This combination has not been tested with TermPocket.
+- **Clients that require OAuth** cannot connect. TermPocket has no authorization server, and adding one is a separate project.
+
+#### Troubleshooting
+
+- **`401 A TermPocket access token is required.`**:
+  - the token is wrong, revoked, or from another deployment's database;
+  - the header lacks `Bearer `; or
+  - you used the login JWT, which `/mcp` refuses on purpose.
+
+  Create a new token in Settings.
+- **Claude Code shows `✘ Failed to connect` with no OAuth prompt.** This is expected when the header is set: Claude Code doesn't fall back to OAuth. Fix the token, then run `claude mcp get termpocket`.
+- **The first request is slow.** On a sleeping host, the first request waits for the server to wake.
+- **`429` from Settings.** Creating and revoking tokens shares a per-user budget of 20 requests per 15 minutes (`RATE_LIMIT_ACCESS_TOKEN_MAX`).
 
 ---
 
