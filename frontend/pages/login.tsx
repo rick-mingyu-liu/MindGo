@@ -4,7 +4,7 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, TrendingUp, Shield, Target, CalendarRange, ScanText, Coins, Sparkles, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Target, CalendarRange, ScanText, Coins, AlertCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -376,24 +376,6 @@ export default function Login() {
                 <div>
                   <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Six currencies')}</h4>
                   <p className="text-sm text-muted-foreground">{t('Record money in CAD, USD, EUR, GBP, AUD or CNY, and see your totals in the currency you choose.')}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg shrink-0">
-                  <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('AI planning')}</h4>
-                  <p className="text-sm text-muted-foreground">{t('Ask for a budget or savings plan built from your own numbers. Treat it as a starting point, not professional financial advice.')}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg shrink-0">
-                  <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Investment watchlist')}</h4>
-                  <p className="text-sm text-muted-foreground">{t('Follow stocks you care about with price charts, news and an AI summary of your watchlist.')}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

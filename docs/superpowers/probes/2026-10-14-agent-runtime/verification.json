@@ -1,0 +1,18 @@
+{
+  "sdkVersion": "0.3.300",
+  "claudeCodeVersion": "2.1.300",
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com/anthropic",
+  "turnLimitEnforced": true,
+  "persistSessionFalseVerified": true,
+  "statelessApplicationHistoryReplayVerified": true,
+  "realToolRoundtrips": 2,
+  "resumeRecalledBothToolResultCanaries": true,
+  "restrictionAttemptDenied": true,
+  "controlledErrorsReceived": 2,
+  "cancelAndDeadlineAborted": true,
+  "invalidKeyStatus": 401,
+  "usageTokensReported": true,
+  "priceBasis": "unknown",
+  "builtinToolsExposed": false
+}

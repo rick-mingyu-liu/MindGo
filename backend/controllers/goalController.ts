@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import { query } from '../db/connection';
-import config = require('../config');
-import { aiPlanIsLive } from '../services/cleanupService';
 import { getExchangeRate } from '../services/exchangeRateService';
-import type { SavingsGoalRow, AiPlanRow } from '../types/db';
+import type { SavingsGoalRow } from '../types/db';
 
 /** SELECT id FROM savings_goals — the ownership check before an update/delete. */
 interface GoalIdRow {
@@ -237,38 +235,6 @@ const goalController = {
 
     } catch (error) {
       console.error('Clear goals error:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  // Create a goal from an AI plan
-  async createGoalFromAIPlan(req: Request, res: Response) {
-    try {
-      const { aiPlanId, name, target_amount, target_date, description } = req.body;
-      if (!aiPlanId || !name || !target_amount || !target_date) {
-        return res.status(400).json({ error: 'aiPlanId, name, target_amount, and target_date are required' });
-      }
-      // Check if AI plan exists and belongs to user
-      const planResult = await query<AiPlanRow>(
-        // An expired plan is gone as far as the user is concerned, whether or
-        // not the hourly sweep has deleted it yet.
-        `SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2 AND ${aiPlanIsLive(3)}`,
-        [aiPlanId, req.user.userId, config.dataRetention.aiPlanMinutes]
-      );
-      if (planResult.rows.length === 0) {
-        return res.status(404).json({ error: 'AI plan not found' });
-      }
-      // Insert new goal
-      const newGoal = await query<SavingsGoalRow>(
-        'INSERT INTO savings_goals (user_id, name, target_amount, current_amount, target_date, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [req.user.userId, name, target_amount, 0, target_date || null, description || null]
-      );
-      res.status(201).json({
-        message: 'Goal created from AI plan successfully',
-        goal: newGoal.rows[0]
-      });
-    } catch (error) {
-      console.error('Create goal from AI plan error:', error);
       res.status(500).json({ error: 'Server error' });
     }
   }

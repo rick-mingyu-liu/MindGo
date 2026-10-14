@@ -82,17 +82,10 @@ interface DemoGoal {
   description: string;
 }
 
-/** A demo watchlist entry, as inserted by `demoAccountService`. */
-interface DemoWatchlistEntry {
-  symbol: string;
-  company_name: string;
-}
-
 interface DemoData {
   email: string;
   transactions: DemoTransaction[];
   goals: DemoGoal[];
-  watchlist: DemoWatchlistEntry[];
   terms: string[];
 }
 
@@ -266,15 +259,7 @@ function buildDemoData(now: Date = new Date()): DemoData {
     },
   ];
 
-  const watchlist: DemoWatchlistEntry[] = [
-    { symbol: 'AAPL', company_name: 'Apple Inc.' },
-    { symbol: 'MSFT', company_name: 'Microsoft Corporation' },
-    { symbol: 'NVDA', company_name: 'NVIDIA Corporation' },
-    { symbol: 'VFV.TO', company_name: 'Vanguard S&P 500 Index ETF' },
-    { symbol: 'SHOP', company_name: 'Shopify Inc.' },
-  ];
-
-  return { email: DEMO_EMAIL, transactions, goals, watchlist, terms: terms.map((t) => t.id) };
+  return { email: DEMO_EMAIL, transactions, goals, terms: terms.map((t) => t.id) };
 }
 
 export { buildDemoData, CATEGORIES, DEMO_EMAIL, TERMS_OF_HISTORY, isCoopTerm };

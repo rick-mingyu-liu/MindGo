@@ -8,17 +8,14 @@ import {
   Target, 
   Plus,
   ArrowRight,
-  Brain,
   BarChart3,
   Sparkles,
   Info,
-  Eye,
   Edit,
   Settings as SettingsIcon,
-  Mail,
   ScanText } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
-import { api, investmentAPI } from '@/utils/api'
+import { api } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,8 +25,6 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLogo } from '@/components/BrandLogo'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import Swal from 'sweetalert2'
 import { categories as categoryTypeMap } from './transactions/new';
 import { useTranslation } from 'next-i18next'
 import { formatDay, formatDayRange } from '@/lib/date';
@@ -191,24 +186,6 @@ const categoryChartCopy: Record<CategoryView, { title: string; description: stri
   },
 }
 
-const INDEX_CARDS = [
-  {
-    symbol: '^GSPC',
-    label: 'S&P 500',
-    name: 'S&P 500 Index',
-  },
-  {
-    symbol: '^DJI',
-    label: 'DJI',
-    name: 'Dow Jones Industrial Average',
-  },
-  {
-    symbol: '^IXIC',
-    label: 'IXIC',
-    name: 'NASDAQ Composite',
-  },
-];
-
 export async function getStaticProps({ locale }: { locale: string }) {
   return {
     props: {
@@ -225,10 +202,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
   const { resolvedTheme } = useTheme();
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [indexRows, setIndexRows] = useState<any[]>([]);
-  const [indexLoading, setIndexLoading] = useState(true);
-  const [indexError, setIndexError] = useState('');
   const [categoryView, setCategoryView] = useState<CategoryView>('all');
   const [period, setPeriod] = useState<PeriodKey>('thisTerm');
   const { t, i18n } = useTranslation('common');
@@ -249,10 +222,9 @@ export default function Dashboard() {
       setLoading(true)
       const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
       const currency = prefs.currency || 'CAD';
-      const [summaryRes, goalsRes, watchlistRes, transactionsRes] = await Promise.all([
+      const [summaryRes, goalsRes, transactionsRes] = await Promise.all([
         api.get(`/summary/rolling?${PERIODS[period].query}&targetCurrency=${currency}`),
         api.get('/goals'),
-        api.get('/investments/watchlist'),
         api.get(`/transactions?limit=10&targetCurrency=${currency}`)
       ])
 
@@ -262,8 +234,7 @@ export default function Dashboard() {
 
       // Check if this is a new user (has very little data or sample data)
       const hasVeryLittleData = summaryRes.data.transactions?.length <= 6 && 
-                               goalsRes.data.goals.length <= 1 && 
-                               watchlistRes.data.watchlist.length <= 3
+                               goalsRes.data.goals.length <= 1
       
       // Show welcome message for users with sample data or very little data
       setIsNewUser(hasVeryLittleData)
@@ -275,25 +246,6 @@ export default function Dashboard() {
     }
   }, [period])
 
-  const handleSendReport = async () => {
-    try {
-      await api.post('/auth/test-email');
-      Swal.fire({
-        icon: 'success',
-        title: t('Report Sent!'),
-        text: t('Your financial report has been emailed to you. Check your inbox!'),
-        confirmButtonColor: '#facc15',
-      });
-    } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: t('Error'),
-        text: t('Failed to send financial report.'),
-        confirmButtonColor: '#f87171',
-      });
-    }
-  };
-
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) {
@@ -303,28 +255,6 @@ export default function Dashboard() {
 
     fetchDashboardData()
   }, [router, fetchDashboardData])
-
-  useEffect(() => {
-    const fetchIndices = async () => {
-      setIndexLoading(true);
-      setIndexError('');
-      try {
-        const results = await Promise.all(
-          INDEX_CARDS.map(idx => investmentAPI.getStockSnapshot(idx.symbol))
-        );
-        setIndexRows(results.map((res, i) => ({
-          ...INDEX_CARDS[i],
-          quote: res.data.quote,
-        })));
-      } catch (err) {
-        setIndexError('Failed to load index data');
-        setIndexRows([]);
-      } finally {
-        setIndexLoading(false);
-      }
-    };
-    fetchIndices();
-  }, []);
 
   // Listen for navigation events to refresh data when returning to dashboard
   useEffect(() => {
@@ -507,27 +437,13 @@ export default function Dashboard() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/ai-planning')}
-                >
-                  <Brain className="w-4 h-4 mr-2" />
-                  {t('AI Planning')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSendReport}
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  {t('Send Report')}
-                </Button>
-                <Button
-                  variant="outline"
                   onClick={() => router.push('/settings')}
                 >
                   <SettingsIcon className="w-4 h-4 mr-2" />
                   {t('Settings')}
                 </Button>
               </div>
-              {/* Mobile actions: FAB + menu */}
+              {/* Mobile actions: FAB + settings */}
               <div className="sm:hidden flex items-center gap-2">
                 <button
                   className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
@@ -536,27 +452,9 @@ export default function Dashboard() {
                 >
                   <Plus className="w-8 h-8" />
                 </button>
-                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="icon" className="ml-2">
-                      <SettingsIcon className="w-6 h-6" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="bottom" className="p-6 flex flex-col gap-4">
-                    <Button onClick={() => router.push('/ai-planning')}>
-                      <Brain className="w-4 h-4 mr-2" />
-                      {t('AI Planning')}
-                    </Button>
-                    <Button onClick={handleSendReport}>
-                      <Mail className="w-4 h-4 mr-2" />
-                      {t('Send Report')}
-                    </Button>
-                    <Button onClick={() => router.push('/settings')}>
-                      <SettingsIcon className="w-4 h-4 mr-2" />
-                      {t('Settings')}
-                    </Button>
-                  </SheetContent>
-                </Sheet>
+                <Button variant="outline" size="icon" onClick={() => router.push('/settings')} aria-label={t('Settings')}>
+                  <SettingsIcon className="w-6 h-6" />
+                </Button>
               </div>
             </div>
           </div>
@@ -583,8 +481,6 @@ export default function Dashboard() {
                     <ul className="text-blue-800 dark:text-blue-200 space-y-1 mb-4">
                       <li>• <strong>{t('Add your own transactions')}</strong> {t('by clicking "Add Transaction"')}</li>
                       <li>• <strong>{t('Create savings goals')}</strong> {t('to track your financial targets')}</li>
-                      <li>• <strong>{t('Get AI-powered financial advice')}</strong> {t('for personalized planning')}</li>
-                      <li>• <strong>{t('Track your interested stocks')}</strong> {t('to see how they perform and financial reports')}</li>
                       <li>• <strong>{t('Receive your weekly financial report')}</strong> {t('to highlight your financial performance')}</li>
                       <li>• <strong>{t('Manage your settings')}</strong> {t('to customize your experience')}</li>
                     </ul>
@@ -603,30 +499,6 @@ export default function Dashboard() {
                       >
                         <Target className="w-4 h-4 mr-2" />
                         {t('Create a Goal')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => router.push('/ai-planning')}
-                      >
-                        <Brain className="w-4 h-4 mr-2" />
-                        {t('AI Planning')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => router.push('/investments')}
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        {t('Add to Watchlist')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSendReport}
-                      >
-                        <Mail className="w-4 h-4 mr-2" />
-                        {t('Send Report')}
                       </Button>
                     </div>
                   </div>
@@ -927,9 +799,8 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Goals and Watchlist */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Savings Goals */}
+          {/* Savings Goals */}
+          <div className="grid grid-cols-1 gap-8">
             <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -979,59 +850,6 @@ export default function Dashboard() {
                     >
                       {t('Create Your First Goal')}
                     </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Investment Watchlist */}
-            <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{t('Investment Watchlist')}</CardTitle>
-                    <CardDescription>{t('Track your favorite stocks')}</CardDescription>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push('/investments')}
-                  >
-                    {t('View All')}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {indexLoading ? (
-                  <div className="text-center py-6">{t('Loading...')}</div>
-                ) : indexError ? (
-                  <div className="text-center py-6 text-red-600">{indexError}</div>
-                ) : (
-                  <div className="space-y-3">
-                    {indexRows.map((idx) => (
-                      <div key={idx.symbol} className="flex items-center justify-between p-3 border rounded-lg bg-background transition-shadow hover:shadow-md dark:hover:shadow-white/20 dark:hover:bg-white/5 dark:hover:border-white/20">
-                        <div>
-                          <div className="font-medium">{t(idx.label)}</div>
-                          <div className="text-sm text-muted-foreground">{t(idx.name)}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium">
-                            {idx.quote?.c ? formatCurrency(
-                              idx.quote.c,
-                              (idx.symbol === '^GSPC' || idx.symbol === '^DJI' || idx.symbol === '^IXIC')
-                                ? 'USD'
-                                : (idx.quote?.currency || defaultCurrency)
-                            ) : 'N/A'}
-                          </div>
-                          {typeof idx.quote?.dp === 'number' && (
-                            <Badge variant={idx.quote.dp >= 0 ? 'default' : 'destructive'}>
-                              {idx.quote.dp >= 0 ? '+' : ''}{idx.quote.dp.toFixed(2)}%
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 )}
               </CardContent>

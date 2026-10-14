@@ -71,12 +71,6 @@ api.interceptors.response.use(
         title: 'Resource not found',
         text: 'Resource not found.',
       })
-    } else if (response?.data?.code === 'ai_unavailable') {
-      Swal.fire({
-        icon: 'info',
-        title: 'AI planning unavailable',
-        text: response.data.error,
-      })
     } else if (response?.status >= 500) {
       Swal.fire({
         icon: 'error',
@@ -100,20 +94,6 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-export const investmentAPI = {
-  searchStocks: (query: string) => api.get(`/investments/search?query=${encodeURIComponent(query)}`),
-  getStockSnapshot: (symbol: string) => api.get(`/investments/snapshot/${symbol}`),
-  getStockNews: (symbol: string) => api.get(`/investments/news/${symbol}`),
-  getStockFinancials: (symbol: string) => api.get(`/investments/financials/${symbol}`),
-  getStockAnalysis: (symbol: string) => api.get(`/investments/analysis/${symbol}`),
-  getStockHistoricalData: (symbol: string, period: string = '1m') => api.get(`/investments/historical/${symbol}?period=${period}`),
-}
-
-export const goalAPI = {
-  createFromAIPlan: (data: { aiPlanId: number, name: string, target_amount: number, target_date?: string, description?: string }) =>
-    api.post('/goals/from-ai-plan', data),
-};
 
 export interface AccessToken {
   id: number

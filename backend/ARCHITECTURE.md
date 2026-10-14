@@ -27,7 +27,7 @@ Client (frontend / axios)
 │  middleware/                                                 │
 │    auth.ts       verifies JWT, sets req.user.userId          │
 │    rateLimiter.ts  authLimiter, per-route on 4 /auth routes  │
-│                    aiLimiter, on the /ai router              │
+│                    apiLimiter, general API budget           │
 └─────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -42,15 +42,15 @@ Client (frontend / axios)
 ┌───────────────────────┐   ┌─────────────────────────────────┐
 │ services/*.ts         │   │ db/connection.ts                │
 │  email, exchangeRate, │   │  query(text, params)            │
-│  finnhub, freeStock,  │   │  lazy pool, auto-close after    │
-│  aiPlanner, cleanup   │   │  5 min idle                     │
+│  moneyFacts, tokens, │   │  lazy pool, auto-close after    │
+│  cleanup, import     │   │  5 min idle                     │
 └───────────────────────┘   └─────────────────────────────────┘
         │                              │
         ▼                              ▼
    External APIs                   PostgreSQL
-   (Finnhub, Yahoo,                (users, transactions,
-    Alpha Vantage,                  savings_goals, watchlist,
-    DeepSeek, SMTP)                 ai_plans)
+   (exchange rates,               (users, transactions,
+    address validation,            savings_goals, access_tokens,
+    SMTP)                          import_batches, legacy tables)
         ▲
         │  cron / hourly timer (out-of-band, not request-driven)
 ┌─────────────────────────────────────────────────────────────┐
@@ -87,7 +87,7 @@ The global middleware runs in the order drawn, but two things sit outside it:
 |---|---|---|
 | **Layered MVC** | `routes/` → `controllers/` → `services/` → `db/` | Primary organizing pattern. No `View` (JSON API); the frontend is the view. |
 | **Chain of Responsibility** | Express middleware pipeline | `helmet → cors → json → auth → validation → controller → error handler`. |
-| **Strategy + fallback** | Stock data | `finnhubService → freeStockDataService → Alpha Vantage`, interchangeable sources with graceful degradation. |
+| **Strategy + fallback** | Address validation | MailboxLayer → local domain list; provider failure never blocks registration. |
 | **Singleton** | `schedulerService` (single class instance holding a `jobs` Map of `{ job, kind }`); lazy DB pool | One shared instance each. `kind` is `'cron'` or `'interval'` — it is what tells `stop()` which API it is holding, since the two job types share no methods. |
 | **Scheduler / publish-on-timer** | `schedulerService` (`node-cron` + self-rearming timers) | Time-driven, **not** Observer. |
 
@@ -131,8 +131,7 @@ These are minor and common in Express apps, but worth noting:
   [services/emailValidationService.ts](services/emailValidationService.ts) now;
   the controller makes one call, `validateEmail(email)`.
 
-  Worth noting as a **strategy/fallback** instance, the same shape the stock
-  services use: MailboxLayer is the primary, the domain list is the fallback,
+  This is a **strategy/fallback** instance: MailboxLayer is the primary, the domain list is the fallback,
   and the caller sees one function and one result shape (`{ valid, reason?,
   source }`). The rule it encodes — **a validator that cannot reach its service
   must not become a gate** — matters because the previous version turned a
@@ -146,3 +145,7 @@ These are minor and common in Express apps, but worth noting:
 - Supporting patterns: **middleware chain**, **strategy/fallback**, **singleton**.
 - Main structural smell remaining: the absent model layer. The scheduler's
   upward dependency on controllers is fixed.
+
+## Legacy feature retirement
+
+Stock provider services and one-shot AI generation have been removed. The authenticated investment router now reports 410 except for clearing the current user's archived watchlist through Settings. The AI router preserves only unexpired, owned plan history; generation and AI-plan-to-goal conversion report 410. No new stock or model calls are made. Both legacy tables remain; AI plans retain their 30-minute read-time expiry and hourly cleanup. MCP financial facts, imports, manual transactions and savings goals remain active.

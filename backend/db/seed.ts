@@ -26,7 +26,7 @@ async function seedDatabase(now: Date = new Date()): Promise<void> {
     console.log(`   replaced ${result.deleted} row(s) with ${result.inserted}`);
     console.log(`   ${data.transactions.length} transactions, ${data.transactions[0]?.date} → ${data.transactions.at(-1)?.date}`);
     console.log(`   ${data.terms.map(labelOf).join(', ')}`);
-    console.log(`   ${data.goals.length} goals, ${data.watchlist.length} watchlist symbols`);
+    console.log(`   ${data.goals.length} goals`);
     console.log('\n📋 Demo login:');
     console.log(`   Email: ${DEMO_EMAIL}`);
     console.log(`   Password: ${DEMO_PASSWORD}`);

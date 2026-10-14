@@ -361,7 +361,7 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       return r.rows[0]!.id;
     }
 
-    test('an expired AI plan is hidden from the list, the plan route and goal creation', async () => {
+    test('an expired AI plan is hidden from the list and plan route; goal creation is retired', async () => {
       const fresh = await insertPlan(alice.id, 1);
       const stale = await insertPlan(alice.id, 31);
 
@@ -377,7 +377,7 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       const goal = await auth(request(app).post('/goals/from-ai-plan')).send({
         aiPlanId: stale, name: 'From an expired plan', target_amount: 100, target_date: '2030-01-01',
       });
-      assert.equal(goal.status, 404);
+      assert.equal(goal.status, 410);
     });
 
     test('an expired verification link is refused while the account still exists', async () => {

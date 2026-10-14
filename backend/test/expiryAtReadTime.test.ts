@@ -4,7 +4,6 @@ import type { Request, Response } from 'express';
 import db = require('../db/connection');
 import config = require('../config');
 import aiController = require('../controllers/aiController');
-import goalController = require('../controllers/goalController');
 import authController = require('../controllers/authController');
 
 /**
@@ -84,16 +83,6 @@ describe('AI plans past their lifetime read as gone', () => {
     assert.equal((out.body as { pagination: { total: number } }).pagination.total, 0);
   });
 
-  test('POST /goals/from-ai-plan refuses an expired plan', async () => {
-    const { res, out } = fakeRes();
-    await goalController.createGoalFromAIPlan(
-      asReq({ body: { aiPlanId: 12, name: 'Laptop', target_amount: 1500, target_date: '2027-01-01' } }),
-      res
-    );
-    assert.equal(calls.length, 1, 'a goal was inserted from a plan that should have expired');
-    assertFiltersOnLifetime(calls[0]!.sql, calls[0]!.params);
-    assert.equal(out.status, 404);
-  });
 });
 
 describe('verification tokens expire on time, swept or not', () => {

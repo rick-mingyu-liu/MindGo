@@ -143,20 +143,10 @@ async function refreshDemoAccount({ create = false, now = new Date() }: RefreshO
       goalRows.flat()
     );
 
-    const watchRows = data.watchlist.map((w) => [userId, w.symbol, w.company_name]);
-    await client.query(
-      `INSERT INTO watchlist (user_id, symbol, company_name)
-       VALUES ${valuesClause(watchRows, 3)}`,
-      watchRows.flat()
-    );
-
-    // No AI plan is written. config.dataRetention.aiPlanMinutes is 30, so the
-    // cleanup job deletes one within half an hour — the old seed's plan was
-    // gone long before anyone logged in to see it.
-
+    // Archived watchlist and AI plans are cleared above, never regenerated.
     await client.query('COMMIT');
 
-    const inserted = txRows.length + goalRows.length + watchRows.length;
+    const inserted = txRows.length + goalRows.length;
     return { status, userId, deleted, inserted };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
