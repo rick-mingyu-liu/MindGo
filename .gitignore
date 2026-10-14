@@ -21,11 +21,5 @@ Thumbs.db
 # Dependencies (also covered by subproject .gitignore files)
 node_modules/
 
-# Implementation plans — kept locally, not in the repo (specs stay tracked)
-docs/superpowers/plans/
-
-# Runtime probes: keep reproducible source/reports, ignore local session output
-docs/superpowers/probes/**/*.private.json
-docs/superpowers/probes/**/private-config/
-docs/superpowers/probes/**/empty-cwd/
-docs/superpowers/probes/**/results.json
+# Documentation — kept locally, not in the repo
+/docs/
