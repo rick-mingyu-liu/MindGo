@@ -17,11 +17,16 @@ import { agentAPI, agentErrorCode, agentOutcomeUnknown, AgentContext, ConfirmReq
 // Visiting or updating a conversation must not change its place in history.
 const creationOrder = (items: Conversation[]) => [...items].sort((a, b) =>
   Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
+// The column default in schema.sql, kept until the first message names it.
+const DEFAULT_TITLE = 'New conversation'
+// Must equal the server's amount rule in services/agent/validation.ts.
+const AMOUNT_PATTERN = /^(0|[1-9]\d{0,7})\.\d{2}$/
 
 export default function AgentPage() {
   const { t, i18n } = useTranslation('common')
   const router = useRouter()
   const [available, setAvailable] = useState<boolean | null>(null)
+  const [storage, setStorage] = useState<boolean | null>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [state, setState] = useState<ConversationState | null>(null)
   const [context, setContext] = useState<AgentContext>({ currency: 'CAD', timezone: 'America/Toronto', language: 'auto' })
@@ -36,6 +41,13 @@ export default function AgentPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [retry, setRetry] = useState<{ conversationId: string; body: MessageRequest } | null>(null)
   const [confirmRetry, setConfirmRetry] = useState<ConfirmRequest | null>(null)
+  // A failed recovery was followed by a successful state refresh, so the
+  // pending draft is known to be unconfirmed and recovery may be dismissed.
+  const [confirmChecked, setConfirmChecked] = useState(false)
+  // The server rejected a save or confirmation because the draft moved on.
+  const [staleDraft, setStaleDraft] = useState(false)
+  const composer = useRef<HTMLTextAreaElement | null>(null)
+  const focusComposer = useRef(false)
   const controller = useRef<AbortController | null>(null)
   const activeRequest = useRef<{ conversationId: string; requestId: string } | null>(null)
   const generation = useRef(0)
@@ -66,7 +78,8 @@ export default function AgentPage() {
     let live = true
     agentAPI.status().then(async status => {
       if (!live) return
-      setAvailable(status.available)
+      setAvailable(status.available); setStorage(status.storage)
+      if (!status.storage) return
       // Existing history remains accessible when the provider is disabled.
       const items = await agentAPI.list()
       if (live) setConversations(creationOrder(items))
@@ -91,11 +104,22 @@ export default function AgentPage() {
   const unresolved = Boolean(retry || confirmRetry)
   const pendingDraft = state?.draft?.status === 'pending'
   const expired = Boolean(state?.draft && new Date(state.draft.expires_at).getTime() <= now)
-  const validRows = rows.length > 0 && rows.every(row => /^\d+\.\d{2}$/.test(row.amount) && Number(row.amount) > 0 && row.description.trim() && row.date)
-  const dateTime = (value: string) => {
-    try { return new Date(value).toLocaleString(i18n.language, { timeZone: context.timezone || undefined }) }
-    catch { return new Date(value).toLocaleString(i18n.language) }
+  const validRows = rows.length > 0 && rows.every(row => AMOUNT_PATTERN.test(row.amount) && Number(row.amount) > 0 && row.description.trim() && row.date)
+  // Deadlines name their zone, since the date timezone may not be the device's.
+  const dateTime = (value: string, zone = false) => {
+    const options: Intl.DateTimeFormatOptions = zone ? { timeZoneName: 'short' } : {}
+    try { return new Date(value).toLocaleString(i18n.language, { ...options, timeZone: context.timezone || undefined }) }
+    catch { return new Date(value).toLocaleString(i18n.language, options) }
   }
+  // A recovered request can report a run still executing elsewhere.
+  const stillProcessing = state?.run?.status === 'running' && !sending
+
+  // Return focus to the composer once a send or deletion has re-enabled it.
+  useEffect(() => {
+    if (!focusComposer.current || locked) return
+    focusComposer.current = false
+    composer.current?.focus()
+  })
 
   const load = async (id: string) => {
     setBusy(true); setError(''); setNotice('')
@@ -103,27 +127,33 @@ export default function AgentPage() {
       const next = await agentAPI.get(id)
       apply(next)
       if (next.run?.status !== 'running') setRetry(null)
-      setConfirmRetry(null)
+      setConfirmRetry(null); setStaleDraft(false)
     } catch (cause) { showError(cause) } finally { setBusy(false) }
   }
 
   const refresh = async () => {
     setBusy(true); setError('')
     try {
-      const status = await agentAPI.status(); setAvailable(status.available)
+      const status = await agentAPI.status(); setAvailable(status.available); setStorage(status.storage)
+      if (!status.storage) return
       setConversations(creationOrder(await agentAPI.list()))
       const conversationId = state?.conversation.id || retry?.conversationId
       if (conversationId) {
         const next = await agentAPI.get(conversationId); apply(next)
-        if (next.run && next.run.status !== 'running') setRetry(null)
+        // Nothing running: the saved request either finished (its reply is in
+        // this state) or never started (its text is still in the composer).
+        if (next.run?.status !== 'running') setRetry(null)
         // Keep an uncertain confirmation's exact request for safe replay.
       }
+      setStaleDraft(false)
     } catch (cause) { showError(cause) } finally { setBusy(false) }
   }
 
   const send = async (attempt?: { conversationId: string; body: MessageRequest }) => {
-    if (locked || dirty || confirmRetry || !available || (!attempt && !content.trim())) return
-    setBusy(true); setSending(true); setError(''); setNotice('')
+    // A replay keeps its requestId, so it may go out without a provider: the
+    // server answers an exact replay from saved state and refuses a new run.
+    if (locked || dirty || confirmRetry || (!available && !attempt) || (!attempt && !content.trim())) return
+    setBusy(true); setSending(true); setError(''); setNotice(''); setStaleDraft(false)
     const thisGeneration = ++generation.current
     const abort = new AbortController(); controller.current = abort
     let request = attempt
@@ -137,15 +167,14 @@ export default function AgentPage() {
       setRetry(request)
       const next = await agentAPI.send(conversationId, request.body, abort.signal)
       if (generation.current !== thisGeneration) return
-      apply(next); setRetry(null); setContent('')
+      apply(next); setRetry(null); setContent(''); focusComposer.current = next.run?.status !== 'running'
       if (next.run?.error_code) setError(next.run.error_code)
     } catch (cause) {
       if (generation.current !== thisGeneration) return
-      const code = agentErrorCode(cause)
       showError(cause)
       // Unknown transport outcomes retain the exact request ID. Explicit
       // server failures can be retried as a fresh turn after status refresh.
-      if (request && code !== 'agent_network_error') {
+      if (request && !agentOutcomeUnknown(cause)) {
         try {
           const next = await agentAPI.get(request.conversationId)
           if (generation.current === thisGeneration) { apply(next); setRetry(null) }
@@ -175,27 +204,44 @@ export default function AgentPage() {
       if (next.run?.status === 'cancelled') setNotice('agent.cancelled')
     } catch (cause) { showError(cause) } finally {
       setCancelling(false)
-      if (generation.current && controller.current?.signal.aborted) { setSending(false); setBusy(false); activeRequest.current = null; controller.current = null }
+      if (controller.current?.signal.aborted) { setSending(false); setBusy(false); activeRequest.current = null; controller.current = null }
     }
   }
 
   const mutateDraft = async (action: 'edit' | 'discard' | 'confirm', all = false) => {
     if (!state || (!state.draft && !confirmRetry) || locked || retry) return
-    setBusy(true); setError(''); setNotice('')
+    setBusy(true); setError(''); setNotice(''); setStaleDraft(false)
+    const recovering = action === 'confirm' && confirmRetry
+    const body = action !== 'confirm' ? null : confirmRetry || { version: state.draft!.version, rowIds: all ? rows.map(row => row.id) : selected, requestId: crypto.randomUUID() }
     try {
       let next: ConversationState
       if (action === 'edit') next = await agentAPI.edit(state.conversation.id, state.draft!.version, rows)
       else if (action === 'discard') next = await agentAPI.discard(state.conversation.id, state.draft!.version)
       else {
-        const body = confirmRetry || { version: state.draft!.version, rowIds: all ? rows.map(row => row.id) : selected, requestId: crypto.randomUUID() }
-        setConfirmRetry(body)
-        next = await agentAPI.confirm(state.conversation.id, body)
+        setConfirmRetry(body); setConfirmChecked(false)
+        next = await agentAPI.confirm(state.conversation.id, body!)
         setConfirmRetry(null); setNotice('agent.saved')
       }
       apply(next)
     } catch (cause) {
       showError(cause)
-      if (action === 'confirm' && !agentOutcomeUnknown(cause)) setConfirmRetry(null)
+      const code = agentErrorCode(cause)
+      if (action !== 'discard' && (code === 'agent_version_conflict' || code === 'agent_expired')) setStaleDraft(true)
+      // The router's catch-all 500 may follow a commit, so it stays recoverable.
+      if (action === 'confirm' && !agentOutcomeUnknown(cause) && code !== 'agent_request_failed') setConfirmRetry(null)
+      else if (recovering && body) {
+        // A replay failed again: check what the server holds. A draft that is no
+        // longer pending at this version, or a receipt for this request, means
+        // the request can no longer apply, so there is nothing left to recover.
+        try {
+          const next = await agentAPI.get(state.conversation.id)
+          apply(next)
+          const settled = next.draft?.status !== 'pending' || next.draft.version !== body.version
+            || next.receipts.some(receipt => receipt.request_id === body.requestId)
+          if (settled) setConfirmRetry(null)
+          else setConfirmChecked(true)
+        } catch { /* Keep the exact request for another recovery attempt. */ }
+      }
     } finally { setBusy(false) }
   }
 
@@ -205,7 +251,8 @@ export default function AgentPage() {
     try {
       await agentAPI.remove(state.conversation.id)
       setConversations(previous => previous.filter(item => item.id !== state.conversation.id))
-      setState(null); setRows([]); setContent(''); setRetry(null); setConfirmRetry(null); setDeleteOpen(false); setNotice('agent.deleted')
+      setState(null); setRows([]); setContent(''); setRetry(null); setConfirmRetry(null); setStaleDraft(false); setDeleteOpen(false); setNotice('agent.deleted')
+      focusComposer.current = true
     } catch (cause) { showError(cause) } finally { setBusy(false) }
   }
 
@@ -215,6 +262,10 @@ export default function AgentPage() {
     try { await agentAPI.undo(id); apply(await agentAPI.get(state.conversation.id)); setNotice('agent.undone') }
     catch (cause) { showError(cause) } finally { setBusy(false) }
   }
+
+  const dismissRecovery = () => { setConfirmRetry(null); setConfirmChecked(false) }
+  const statusText = cancelling ? 'agent.cancelling' : stillProcessing ? 'agent.stillProcessing' : running ? 'agent.working'
+    : notice || (storage === null && !error ? 'agent.checking' : '')
 
   return <>
     <Head><title>{t('agent.title')} - TermPocket</title></Head>
@@ -226,15 +277,18 @@ export default function AgentPage() {
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
         <p className="rounded-lg border bg-card p-3 text-xs leading-relaxed text-muted-foreground">{t('agent.privacy')}</p>
         {error && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">{t(`agent.errors.${error}`, { defaultValue: t('agent.errors.generic') })}</div>}
-        {notice && <p role="status" className="rounded-lg border border-green-600/30 bg-green-500/10 p-3 text-sm">{t(notice)}</p>}
-        {available === null && !error && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{t('agent.checking')}</p>}
-        {available === false && <p role="status" className="rounded-lg border bg-muted p-4 text-sm">{t('agent.unavailable')}</p>}
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+        {/* The single live region; the visible notices below are not announced twice. */}
+        <p role="status" aria-live="polite" className="sr-only">{statusText ? t(statusText) : ''}</p>
+        {notice && <p className="rounded-lg border border-green-600/30 bg-green-500/10 p-3 text-sm">{t(notice)}</p>}
+        {storage === null && !error && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{t('agent.checking')}</p>}
+        {storage === false && <p className="rounded-lg border bg-muted p-4 text-sm">{t('agent.disabled')}</p>}
+        {storage && available === false && <p className="rounded-lg border bg-muted p-4 text-sm">{t('agent.unavailable')}</p>}
+        {storage !== false && <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
           <aside className="min-w-0 space-y-3">
-            <div className="flex flex-wrap gap-2"><Button disabled={locked || dirty || unresolved} onClick={() => { setState(null); setRows([]); setContent(''); setNotice(''); setError('') }}><Plus />{t('agent.new')}</Button><Button variant="outline" size="icon" aria-label={t('agent.refresh')} disabled={busy || dirty || sending} onClick={refresh}><RefreshCw /></Button></div>
+            <div className="flex flex-wrap gap-2"><Button disabled={locked || dirty || unresolved} onClick={() => { setState(null); setRows([]); setContent(''); setNotice(''); setError('') }}><Plus />{t('agent.new')}</Button><Button variant="outline" size="icon" aria-label={t('agent.refresh')} disabled={busy || (dirty && !staleDraft) || sending} onClick={refresh}><RefreshCw /></Button></div>
             <h2 className="text-sm font-semibold">{t('agent.history')}</h2>
             <div className="flex max-h-64 gap-2 overflow-auto lg:max-h-[65vh] lg:flex-col">
-              {conversations.map(item => <button key={item.id} disabled={locked || dirty || unresolved} onClick={() => load(item.id)} aria-current={state?.conversation.id === item.id ? 'page' : undefined} className={`min-w-40 rounded-lg border p-3 text-left text-sm hover:bg-muted disabled:opacity-50 lg:min-w-0 ${state?.conversation.id === item.id ? 'border-primary bg-primary/5' : ''}`}><span className="line-clamp-2 break-words">{!item.title || item.title === 'New conversation' ? t('agent.new') : item.title}</span><time dateTime={item.created_at} className="mt-1 block text-xs text-muted-foreground">{dateTime(item.created_at)}</time></button>)}
+              {conversations.map(item => <button key={item.id} disabled={locked || dirty || unresolved} onClick={() => load(item.id)} aria-current={state?.conversation.id === item.id ? 'page' : undefined} className={`min-w-40 rounded-lg border p-3 text-left text-sm hover:bg-muted disabled:opacity-50 lg:min-w-0 ${state?.conversation.id === item.id ? 'border-primary bg-primary/5' : ''}`}><span className="line-clamp-2 break-words">{!item.title || item.title === DEFAULT_TITLE ? t('agent.untitled') : item.title}</span><time dateTime={item.created_at} className="mt-1 block text-xs text-muted-foreground">{dateTime(item.created_at)}</time></button>)}
               {!conversations.length && <p className="text-sm text-muted-foreground">{t('agent.noHistory')}</p>}
             </div>
           </aside>
@@ -246,41 +300,45 @@ export default function AgentPage() {
                 <label className="space-y-1 text-sm"><span>{t('agent.replyLanguage')}</span><select className={selectClass} value={context.language} disabled={locked || unresolved} onChange={e => setContext({ ...context, language: e.target.value as ReplyLanguage })}><option value="auto">{t('agent.autoLanguage')}</option><option value="en">English</option><option value="zh">中文</option></select></label>
               </div>
               <p className="text-xs text-muted-foreground">{t('agent.contextHint')}</p>
-              <div className="space-y-4" aria-label={t('agent.messages')}>
+              <div className="space-y-4" role="log" aria-live="polite" aria-label={t('agent.messages')}>
                 {!state?.messages.length && <div className="rounded-lg bg-muted/50 p-5"><p className="font-medium">{t('agent.start')}</p><p className="mt-2 text-sm text-muted-foreground">{t('agent.example')}</p></div>}
                 {state?.messages.map(message => <div key={message.id} className={`max-w-full whitespace-pre-wrap break-words rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-4 bg-primary/10 sm:ml-12' : 'mr-4 bg-muted sm:mr-12'}`}><p className="mb-2 text-xs font-semibold text-muted-foreground">{t(message.role === 'user' ? 'agent.you' : 'agent.assistant')}</p>{message.content}{message.status !== 'complete' && <p className="mt-2 text-xs text-muted-foreground">{t(`agent.messageStatus.${message.status}`)}</p>}</div>)}
               </div>
-              {running && <div role="status" className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />{t(cancelling ? 'agent.cancelling' : 'agent.working')}<Button variant="outline" size="sm" disabled={cancelling} onClick={cancel}>{t('agent.cancel')}</Button></div>}
+              {running && <div className="flex flex-wrap items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />{t(cancelling ? 'agent.cancelling' : stillProcessing ? 'agent.stillProcessing' : 'agent.working')}{stillProcessing && !cancelling && <Button variant="outline" size="sm" disabled={busy || dirty} onClick={refresh}><RefreshCw />{t('agent.refreshNow')}</Button>}<Button variant="outline" size="sm" disabled={cancelling} onClick={cancel}>{t('agent.cancel')}</Button></div>}
               {retry && !running && <div className="space-y-2 rounded-lg border p-3 text-sm"><p>{t('agent.recoverHint')}</p><Button variant="outline" disabled={locked} onClick={() => send(retry)}>{t('agent.recover')}</Button></div>}
               {(state?.run?.status === 'failed' || state?.run?.status === 'cancelled') && !retry && <div className="space-y-2"><p className="text-sm text-muted-foreground">{t('agent.failedHint')}</p><Button variant="outline" disabled={locked || dirty || unresolved || !available} onClick={() => {
                 const previous = [...state.messages].reverse().find(message => message.role === 'user')
                 if (previous) void send({ conversationId: state.conversation.id, body: { ...context, content: previous.content, requestId: crypto.randomUUID() } })
               }}>{t('agent.retryNew')}</Button></div>}
               <form onSubmit={event => { event.preventDefault(); void send() }} className="space-y-3">
-                <label className="block space-y-2 text-sm"><span className="font-medium">{t('agent.compose')}</span><Textarea rows={3} maxLength={4000} value={content} onChange={e => setContent(e.target.value)} disabled={locked || unresolved || available !== true} placeholder={t('agent.placeholder')} /></label>
+                <label className="block space-y-2 text-sm"><span className="font-medium">{t('agent.compose')}</span><Textarea ref={composer} rows={3} maxLength={4000} value={content} onChange={e => setContent(e.target.value)} disabled={locked || unresolved || available !== true} placeholder={t('agent.placeholder')} /></label>
                 <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('agent.reviewHint')}</p><Button type="submit" disabled={locked || unresolved || dirty || available !== true || !content.trim()}><Send />{t('agent.send')}</Button></div>
               </form>
               {state && <div className="border-t pt-3"><Button variant="ghost" size="sm" disabled={locked || unresolved} onClick={() => setDeleteOpen(true)}><Trash2 />{t('agent.deleteConversation')}</Button></div>}
             </CardContent></Card>
-            {state?.draft?.status === 'expired' && <p role="status" className="rounded-lg border p-4 text-sm">{t('agent.expired')}</p>}
-            {pendingDraft && <Card><CardHeader><CardTitle>{t('agent.review')}</CardTitle><p className="text-sm text-muted-foreground">{t('agent.version', { version: state.draft?.version })} · {expired ? t('agent.expired') : t('agent.expires', { date: dateTime(state.draft!.expires_at) })}</p></CardHeader><CardContent className="space-y-4">
+            {state?.draft?.status === 'expired' && <p className="rounded-lg border p-4 text-sm">{t('agent.expired')}</p>}
+            {pendingDraft && <Card><CardHeader><CardTitle>{t('agent.review')}</CardTitle><p className="text-sm text-muted-foreground">{t('agent.version', { version: state.draft?.version })} · {expired ? t('agent.expired') : t('agent.expires', { date: dateTime(state.draft!.expires_at, true) })}</p></CardHeader><CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">{t('agent.draftHint')}</p>
               <DraftEditor rows={rows} selected={selected} disabled={locked || unresolved || expired} onChange={setRows} onSelect={setSelected} />
-              {dirty && <p role="status" className="text-sm">{t('agent.unsaved')}</p>}
+              {dirty && <p className="text-sm">{t('agent.unsaved')}</p>}
+              {staleDraft && <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"><p>{t(dirty ? 'agent.staleDraftDirty' : 'agent.staleDraft')}</p><Button variant="outline" size="sm" disabled={busy || sending} onClick={refresh}><RefreshCw />{t('agent.refreshDraft')}</Button></div>}
               {!validRows && <p className="text-sm text-destructive">{t('agent.invalidRows')}</p>}
               <div className="flex flex-wrap gap-2">
                 {dirty && <><Button disabled={locked || !validRows || expired} variant="outline" onClick={() => mutateDraft('edit')}>{t('agent.saveEdits')}</Button><Button disabled={locked} variant="ghost" onClick={() => setRows(state.draft!.rows)}>{t('agent.resetEdits')}</Button><Button disabled={locked || unresolved} variant="outline" onClick={() => load(state.conversation.id)}>{t('agent.discardLocalReload')}</Button></>}
-                {confirmRetry ? <Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button> : <><Button disabled={locked || unresolved || dirty || !validRows || expired || !selected.length} onClick={() => mutateDraft('confirm')}>{t('agent.confirmSelected', { count: selected.length })}</Button><Button variant="outline" disabled={locked || unresolved || dirty || !validRows || expired} onClick={() => mutateDraft('confirm', true)}>{t('agent.confirmAll')}</Button></>}
+                {confirmRetry ? <><Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button>{confirmChecked && <Button variant="ghost" disabled={locked} onClick={dismissRecovery}>{t('agent.dismissRecovery')}</Button>}</> : <><Button disabled={locked || unresolved || dirty || !validRows || expired || !selected.length} onClick={() => mutateDraft('confirm')}>{t('agent.confirmSelected', { count: selected.length })}</Button><Button variant="outline" disabled={locked || unresolved || dirty || !validRows || expired} onClick={() => mutateDraft('confirm', true)}>{t('agent.confirmAll')}</Button></>}
                 <Button variant="ghost" disabled={locked || unresolved} onClick={() => mutateDraft('discard')}>{t('agent.discard')}</Button>
               </div>
             </CardContent></Card>}
-            {confirmRetry && !pendingDraft && <Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button>}
-            {state?.receipts.map(receipt => <Card key={receipt.id}><CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5"><div><p className="font-medium">{t(receipt.undone_at ? 'agent.receiptUndone' : 'agent.receiptSaved', { count: receipt.transaction_ids.length })}</p><p className="mt-1 text-xs text-muted-foreground">{receipt.undone_at ? dateTime(receipt.undone_at) : new Date(receipt.undo_until).getTime() <= now ? t('agent.undoExpired') : t('agent.undoUntil', { date: dateTime(receipt.undo_until) })}</p></div>{!receipt.undone_at && <Button variant="outline" disabled={locked || dirty || unresolved || new Date(receipt.undo_until).getTime() <= now} onClick={() => undo(receipt.id)}>{t('agent.undo')}</Button>}</CardContent></Card>)}
+            {confirmRetry && !pendingDraft && <div className="flex flex-wrap gap-2"><Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button>{confirmChecked && <Button variant="ghost" disabled={locked} onClick={dismissRecovery}>{t('agent.dismissRecovery')}</Button>}</div>}
+            {state?.receipts.map(receipt => <Card key={receipt.id}><CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5"><div><p className="font-medium">{t(receipt.undone_at ? 'agent.receiptUndone' : 'agent.receiptSaved', { count: receipt.transaction_ids.length })}</p><p className="mt-1 text-xs text-muted-foreground">{receipt.undone_at ? dateTime(receipt.undone_at) : new Date(receipt.undo_until).getTime() <= now ? t('agent.undoExpired') : t('agent.undoUntil', { date: dateTime(receipt.undo_until, true) })}</p></div>{!receipt.undone_at && <Button variant="outline" disabled={locked || dirty || unresolved || new Date(receipt.undo_until).getTime() <= now} onClick={() => undo(receipt.id)}>{t('agent.undo')}</Button>}</CardContent></Card>)}
           </div>
-        </div>
+        </div>}
       </main>
     </div>
-    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>{t('agent.deleteConversation')}</DialogTitle><DialogDescription>{t('agent.deleteWarning')}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setDeleteOpen(false)}>{t('agent.cancel')}</Button><Button variant="destructive" disabled={busy} onClick={removeConversation}>{t('agent.deleteConversation')}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent onCloseAutoFocus={event => {
+      // The trigger is gone with its conversation; continue at the composer.
+      if (!state) { event.preventDefault(); composer.current?.focus() }
+    }}><DialogHeader><DialogTitle>{t('agent.deleteConversation')}</DialogTitle><DialogDescription>{t('agent.deleteWarning')}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setDeleteOpen(false)}>{t('agent.cancel')}</Button><Button variant="destructive" disabled={busy} onClick={removeConversation}>{t('agent.deleteConversation')}</Button></DialogFooter></DialogContent></Dialog>
   </>
 }
 

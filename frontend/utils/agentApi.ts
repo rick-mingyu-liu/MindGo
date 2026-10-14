@@ -13,6 +13,8 @@ export interface Draft {
 }
 export interface Receipt {
   id: string; transaction_ids: number[]; undo_until: string; undone_at: string | null; created_at: string
+  // Older servers omit it; recovery then relies on the draft version alone.
+  request_id?: string
 }
 export interface ConversationState {
   conversation: Conversation
@@ -23,10 +25,15 @@ export interface ConversationState {
 }
 export interface MessageRequest extends AgentContext { requestId: string; content: string }
 export interface ConfirmRequest { version: number; rowIds: string[]; requestId: string }
+// storage: history, drafts, confirmation, undo and deletion work.
+// available: storage plus a configured provider, so new messages work too.
+export interface AgentStatus { available: boolean; storage: boolean }
 const path = (id: string) => `/agent/conversations/${encodeURIComponent(id)}`
 
 export const agentAPI = {
-  status: () => api.get<{ available: boolean }>('/agent/status').then(r => r.data),
+  // Servers predating the storage flag report only availability.
+  status: () => api.get<{ available: boolean; storage?: boolean }>('/agent/status')
+    .then((r): AgentStatus => ({ available: r.data.available, storage: r.data.storage ?? r.data.available })),
   list: () => api.get<{ conversations: Conversation[] }>('/agent/conversations').then(r => r.data.conversations),
   create: (context: AgentContext, signal?: AbortSignal) => api.post<{ conversation: Conversation }>('/agent/conversations', context, { signal }).then(r => r.data.conversation),
   get: (id: string) => api.get<ConversationState>(path(id)).then(r => r.data),
@@ -42,13 +49,16 @@ export const agentAPI = {
 
 export function agentErrorCode(error: unknown): string {
   const candidate = error as { response?: { status?: number; data?: { code?: string } } }
-  return candidate?.response?.data?.code
-    || (candidate?.response?.status === 429 ? 'agent_rate_limited' : 'agent_network_error')
+  if (candidate?.response?.data?.code) return candidate.response.data.code
+  if (!candidate?.response) return 'agent_network_error'
+  return candidate.response.status === 429 ? 'agent_rate_limited' : 'agent_request_failed'
 }
 
+// No response, or a server failure without an application code (a proxy or
+// gateway error), may have completed: keep the exact request for replay.
 export function agentOutcomeUnknown(error: unknown): boolean {
-  const candidate = error as { response?: { status?: number } }
-  return !candidate?.response || (candidate.response.status || 0) >= 500
+  const candidate = error as { response?: { status?: number; data?: { code?: string } } }
+  return !candidate?.response || ((candidate.response.status || 0) >= 500 && !candidate.response.data?.code)
 }
 
 export function agentUnavailable(error: unknown): boolean {

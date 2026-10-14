@@ -120,8 +120,11 @@ export default function Settings() {
     try {
       // Remove confirmation sources before deleting financial rows, so an
       // existing draft cannot commit after the transaction deletion finishes.
-      const agentCleared = await agentAPI.clear().then(() => true).catch(error => {
-        // A deployment with the feature disabled may not have its migration.
+      // A deployment with the feature disabled has no agent history to clear,
+      // and may not have its migration. If the check itself fails, attempt the
+      // deletion anyway so a real partial failure is still reported.
+      const agentEnabled = await agentAPI.status().then(status => status.storage, () => true)
+      const agentCleared = !agentEnabled ? null : await agentAPI.clear().then(() => true).catch(error => {
         // Clear existing app data, but never claim its agent history cleared.
         if (agentUnavailable(error)) return false
         throw error
@@ -133,9 +136,9 @@ export default function Settings() {
       ])
       setClearDialogOpen(false)
       await Swal.fire({
-        icon: agentCleared ? 'success' : 'info',
-        title: t(agentCleared ? 'All data cleared' : 'agent.clearPartialTitle'),
-        text: t(agentCleared ? 'agent.clearSuccess' : 'agent.clearPartialUnavailable'),
+        icon: agentCleared === false ? 'info' : 'success',
+        title: t(agentCleared === false ? 'agent.clearPartialTitle' : 'All data cleared'),
+        text: t(agentCleared === null ? 'agent.clearSuccessWithoutAgent' : agentCleared ? 'agent.clearSuccess' : 'agent.clearPartialUnavailable'),
         confirmButtonText: t('OK'),
       })
       router.push('/')
