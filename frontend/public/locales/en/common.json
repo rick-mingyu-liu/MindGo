@@ -431,7 +431,7 @@
     "example": "“I spent $12.50 on lunch and $3.25 on the bus today.”",
     "open": "Open conversation",
     "reviewHint": "Messages never save transactions. Only the confirmation buttons do.",
-    "privacy": "Your messages, relevant conversation history and pending entries are sent to DeepSeek for processing. Conversations are stored by TermPocket and may be accessed by authorized administrators. Avoid including passwords or account credentials.",
+    "privacy": "Conversations are stored by TermPocket and may be accessed by authorized administrators. Avoid including passwords or account credentials.",
     "back": "Back to dashboard",
     "new": "New conversation",
     "refresh": "Refresh status and history",
