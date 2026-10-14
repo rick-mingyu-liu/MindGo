@@ -1,11 +1,17 @@
 import OpenAI from 'openai';
 import config = require('../config');
 
-// OpenAI refusing for account reasons rather than failing: no credit left
-// (measured 2026-09-17: 429 credit_balance_exhausted), no quota, or throttled.
-const UNAVAILABLE_CODES = ['credit_balance_exhausted', 'insufficient_quota', 'rate_limit_exceeded'];
+// DeepSeek refusing for account or capacity reasons rather than failing, by
+// the statuses its error-code page lists: 401 the key is wrong or revoked,
+// 402 the balance is spent, 429 throttled, 503 overloaded. None of them is a
+// bug a retry by the user would expose, and each clears once someone tops up,
+// replaces the key or waits, so the page says "temporarily unavailable"
+// rather than a generic 500. A 401 counts because a dead key is how the
+// previous provider went down (OpenAI, 2026-10); the operator still sees the
+// real status in the log line generatePlan prints.
+const UNAVAILABLE_STATUSES = [401, 402, 429, 503];
 
-/** Thrown when OpenAI will not answer for now; the controller maps it to 503. */
+/** Thrown when DeepSeek will not answer for now; the controller maps it to 503. */
 class AiUnavailableError extends Error {
   constructor(cause: unknown) {
     super('AI service temporarily unavailable', { cause });
@@ -14,12 +20,12 @@ class AiUnavailableError extends Error {
 }
 
 /**
- * The one method this module calls on an OpenAI client, declared
+ * The one method this module calls on an OpenAI-SDK client, declared
  * structurally rather than as `OpenAI` itself. A real `OpenAI` instance has
  * far more surface than this and still satisfies it; so does the fake client
  * `test/aiUnavailable.test.ts` swaps in
  * (`{ chat: { completions: { create: async () => { throw failWith; } } } }`).
- * Typing `openai` as `OpenAI | null` would reject that fake, even though it
+ * Typing `deepseek` as `OpenAI | null` would reject that fake, even though it
  * works fine at runtime.
  */
 interface ChatCompletionsClient {
@@ -30,7 +36,7 @@ interface ChatCompletionsClient {
       // union of message-param variants, and a looser object type here is
       // not assignable to it under normal (contravariant) parameter
       // checking, which real `OpenAI` instances must satisfy to be assigned
-      // to `openai` below. The request body is never read back out of this
+      // to `deepseek` below. The request body is never read back out of this
       // interface, only constructed at the call site, so nothing is lost by
       // leaving it unchecked here.
       create(params: unknown): Promise<{ choices: Array<{ message: { content: string | null } }> }>;
@@ -74,27 +80,28 @@ interface FinancialData {
 class AIPlanner {
   // Public and writable, not readonly: test/aiUnavailable.test.ts reassigns
   // this directly in beforeEach.
-  openai: ChatCompletionsClient | null;
+  deepseek: ChatCompletionsClient | null;
 
   constructor() {
-    this.openai = null;
+    this.deepseek = null;
   }
 
   /**
-   * The OpenAI client, built on first use.
+   * The DeepSeek client (the `openai` SDK pointed at DeepSeek), built on
+   * first use.
    *
    * It cannot be built in the constructor: this module is exported as an
    * instance, so the constructor runs at require time, and the SDK throws when
-   * OPENAI_API_KEY is absent. That turned a missing optional key into a crash
+   * its API key is absent. That turned a missing optional key into a crash
    * before app.ts could even listen — the whole API, not just /ai — and it made
-   * the "OpenAI API key not configured" guard in generatePlan unreachable.
+   * the "API key not configured" guard in generatePlan unreachable.
    * Building it lazily lets that guard do its job.
    */
   get client(): ChatCompletionsClient {
-    if (!this.openai) {
-      this.openai = new OpenAI({ apiKey: config.apiKeys.openai });
+    if (!this.deepseek) {
+      this.deepseek = new OpenAI({ apiKey: config.apiKeys.deepseek, baseURL: config.ai.baseUrl });
     }
-    return this.openai;
+    return this.deepseek;
   }
 
   /**
@@ -106,8 +113,8 @@ class AIPlanner {
    */
   async generatePlan(userPrompt: string, financialData: FinancialData | null = null, language: string = 'en'): Promise<string | null> {
     try {
-      if (!config.apiKeys.openai) {
-        throw new Error('OpenAI API key not configured');
+      if (!config.apiKeys.deepseek) {
+        throw new Error('DeepSeek API key not configured');
       }
 
       // Build context from financial data if provided
@@ -155,7 +162,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
 
 
       const completion = await this.client.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.ai.model,
         messages: [
           {
             role: "system",
@@ -171,11 +178,16 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
         ],
         max_tokens: 1500,
         temperature: 0.7,
+        // DeepSeek reasons before answering unless told not to, and the
+        // reasoning counts against max_tokens and ignores temperature. A plan
+        // is a formatted answer, not a proof, so the plain mode is the one
+        // that matches what this request was tuned for.
+        thinking: { type: 'disabled' },
       });
 
       // completion.choices[0] is `| undefined` under noUncheckedIndexedAccess,
       // since the client's return type is a plain array with no guaranteed
-      // minimum length. OpenAI's chat completions endpoint always returns at
+      // minimum length. The chat completions endpoint always returns at
       // least one choice for a request that resolves rather than rejects, so
       // this cast is that assumption made explicit. If it's ever wrong, the
       // cast doesn't change what happens: choices[0] is still undefined at
@@ -189,13 +201,13 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       console.error('❌ Error generating AI plan:', error);
 
       // Duck-typed rather than narrowed to Error/AxiosError: the real failure
-      // this exists for is OpenAI's SDK error, but
+      // this exists for is the OpenAI SDK's APIError, but
       // test/aiUnavailable.test.ts throws a plain Error with .status/.code
       // bolted on (Object.assign(new Error(...), { status, code })), which is
       // exactly what this reads and nothing more.
       const err = error as { status?: unknown; code?: unknown; message: string };
 
-      if (err.status === 429 || UNAVAILABLE_CODES.includes(err.code as string)) {
+      if (UNAVAILABLE_STATUSES.includes(err.status as number)) {
         throw new AiUnavailableError(error);
       }
 
@@ -203,7 +215,7 @@ Be brief, helpful, and structured. Avoid paragraphs inside bullet points.
       // .message — unchanged from the original, which read error.message the
       // same way with no guard.
       if (err.message.includes('API key')) {
-        throw new Error('OpenAI API key not configured. Please set OPENAI_API_KEY in your environment variables.');
+        throw new Error('DeepSeek API key not configured. Please set DEEPSEEK_API_KEY in your environment variables.');
       }
 
       throw new Error('Failed to generate financial plan. Please try again later.');

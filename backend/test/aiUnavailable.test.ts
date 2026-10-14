@@ -7,14 +7,15 @@ import config = require('../config');
 import aiPlanner = require('../services/aiPlanner');
 
 /**
- * When OpenAI will not answer — the account is out of credit (measured
- * 2026-09-17: 429 credit_balance_exhausted) or rate-limited — every AI
- * endpoint said "Failed to generate AI plan" with a 500, which the frontend
- * shows as a generic server error. It is now a 503 with a code the page can
- * recognise, while any other failure stays a 500.
+ * When the AI provider will not answer, every AI endpoint used to say
+ * "Failed to generate AI plan" with a 500, which the frontend shows as a
+ * generic server error. It is now a 503 with a code the page can recognise,
+ * while any other failure stays a 500. The provider is DeepSeek; the statuses
+ * below are the ones its error-code page gives for a wrong or revoked key
+ * (401), an empty balance (402), throttling (429) and overload (503).
  *
  * Runs the real router with auth stubbed, the database stubbed and a fake
- * OpenAI client, so nothing leaves the process and nothing is billed.
+ * client, so nothing leaves the process and nothing is billed.
  */
 
 const authPath = require.resolve('../middleware/auth');
@@ -28,8 +29,8 @@ interface AiErrorResponse {
 let server: Server;
 let baseUrl: string;
 let failWith: Error;
-const originalKey = config.apiKeys.openai;
-const originalClient = aiPlanner.openai;
+const originalKey = config.apiKeys.deepseek;
+const originalClient = aiPlanner.deepseek;
 
 before(async () => {
   // A stub Module: only `exports` (the auth middleware itself) is ever read
@@ -56,13 +57,13 @@ after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
   delete require.cache[authPath];
   delete require.cache[routerPath];
-  config.apiKeys.openai = originalKey;
-  aiPlanner.openai = originalClient;
+  config.apiKeys.deepseek = originalKey;
+  aiPlanner.deepseek = originalClient;
 });
 
 beforeEach(() => {
-  config.apiKeys.openai = 'test-key';
-  aiPlanner.openai = {
+  config.apiKeys.deepseek = 'test-key';
+  aiPlanner.deepseek = {
     chat: { completions: { create: async () => { throw failWith; } } },
   };
   mock.method(db, 'query', async () => ({ rowCount: 0, rows: [] }));
@@ -71,19 +72,23 @@ beforeEach(() => {
 
 afterEach(() => mock.restoreAll());
 
-const openAiError = (status: number, code: string): Error =>
-  Object.assign(new Error(`${status} ${code}`), { status, code });
+// The shape the openai SDK throws for a non-2xx answer: an Error carrying
+// .status. DeepSeek's bodies are not OpenAI's, so .code is whatever they say
+// and is deliberately not what the mapping reads.
+const apiError = (status: number, message: string): Error =>
+  Object.assign(new Error(`${status} ${message}`), { status });
 const post = (path: string, body: unknown) => fetch(`${baseUrl}/ai${path}`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
 
-describe('AI endpoints when OpenAI will not answer', () => {
+describe('AI endpoints when DeepSeek will not answer', () => {
   const errors: [string, Error][] = [
-    ['out of credit', openAiError(429, 'credit_balance_exhausted')],
-    ['out of quota', openAiError(429, 'insufficient_quota')],
-    ['rate-limited', openAiError(429, 'rate_limit_exceeded')],
+    ['wrong or revoked key', apiError(401, 'Authentication Fails')],
+    ['out of balance', apiError(402, 'Insufficient Balance')],
+    ['rate-limited', apiError(429, 'Rate Limit Reached')],
+    ['overloaded', apiError(503, 'Server Overloaded')],
   ];
   const endpoints: [string, Record<string, unknown>][] = [
     ['/plan', { financialGoal: 'Save $1,000', includeFinancialData: false }],
@@ -103,10 +108,39 @@ describe('AI endpoints when OpenAI will not answer', () => {
     }
   }
 
-  test('any other OpenAI failure is still a 500', async () => {
-    failWith = openAiError(500, 'server_error');
+  for (const [label, error] of [
+    ['server error', apiError(500, 'Server Error')],
+    ['invalid parameters', apiError(422, 'Invalid Parameters')],
+  ] as const) {
+    test(`any other failure (${label}) is still a 500`, async () => {
+      failWith = error;
+      const res = await post('/plan', { financialGoal: 'Save $1,000', includeFinancialData: false });
+      assert.equal(res.status, 500);
+      assert.notEqual((await res.json() as AiErrorResponse).code, 'ai_unavailable');
+    });
+  }
+
+  test('no key configured is a 500 naming the missing setting, and never calls out', async () => {
+    config.apiKeys.deepseek = undefined;
+    let called = false;
+    aiPlanner.deepseek = { chat: { completions: { create: async () => { called = true; throw failWith; } } } };
     const res = await post('/plan', { financialGoal: 'Save $1,000', includeFinancialData: false });
     assert.equal(res.status, 500);
-    assert.notEqual((await res.json() as AiErrorResponse).code, 'ai_unavailable');
+    assert.match((await res.json() as AiErrorResponse).error, /DeepSeek API key/);
+    assert.equal(called, false);
+  });
+
+  test('asks DeepSeek for the configured model with thinking off', async () => {
+    let sent: { model?: unknown; thinking?: unknown } = {};
+    aiPlanner.deepseek = {
+      chat: { completions: { create: async (params: unknown) => {
+        sent = params as typeof sent;
+        return { choices: [{ message: { content: '# Summary' } }] };
+      } } },
+    };
+    const res = await post('/budget-recommendations', {});
+    assert.equal(res.status, 200);
+    assert.equal(sent.model, config.ai.model);
+    assert.deepEqual(sent.thinking, { type: 'disabled' });
   });
 });

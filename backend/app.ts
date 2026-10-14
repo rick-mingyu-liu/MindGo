@@ -69,7 +69,7 @@ app.use('/transactions', transactionRoutes);
 app.use('/summary', summaryRoutes);
 app.use('/goals', goalRoutes);
 app.use('/investments', investmentRoutes);
-// Every /ai call costs real OpenAI credit, so it gets its own hourly budget.
+// Every /ai call spends real DeepSeek balance, so it gets its own hourly budget.
 app.use('/ai', aiLimiter, aiRoutes);
 app.use('/import', importRoutes);
 // Read-only, for a personal agent; opened by an access token, never the login JWT.

@@ -50,7 +50,7 @@ Client (frontend / axios)
    External APIs                   PostgreSQL
    (Finnhub, Yahoo,                (users, transactions,
     Alpha Vantage,                  savings_goals, watchlist,
-    OpenAI, SMTP)                   ai_plans)
+    DeepSeek, SMTP)                 ai_plans)
         ▲
         │  cron / hourly timer (out-of-band, not request-driven)
 ┌─────────────────────────────────────────────────────────────┐

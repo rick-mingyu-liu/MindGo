@@ -60,7 +60,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 | **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
 | **Savings goals** | Targets with progress bars and days remaining; an AI plan can become a goal in one click. |
 | **Investment watchlist** | Quotes, company financials, news and market indices, with three data sources behind a fallback chain (Finnhub → Yahoo Finance → Alpha Vantage), so a missing API key degrades rather than breaks. |
-| **AI planning** | OpenAI-generated financial plans grounded in your actual transactions and your planning preferences (risk tolerance, life stage, experience). When the OpenAI account is out of credit or rate-limited, the page says *AI planning unavailable* instead of reporting a server error. |
+| **AI planning** | DeepSeek-generated financial plans grounded in your actual transactions and your planning preferences (risk tolerance, life stage, experience). When the DeepSeek account is out of balance, its key is revoked, or it is rate-limited or overloaded, the page says *AI planning unavailable* instead of reporting a server error. |
 | **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
 | **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, and planning preferences. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
 | **English and 中文** | Every user-facing string, in both languages. |
@@ -142,7 +142,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/mindgo
 JWT_SECRET=<at least 32 characters>
 
 # Optional. Each one degrades gracefully when absent.
-OPENAI_API_KEY=          # AI planning
+DEEPSEEK_API_KEY=        # AI planning (DEEPSEEK_MODEL optional, default deepseek-flash)
 FINNHUB_API_KEY=         # stock quotes (falls back to Yahoo Finance)
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
@@ -314,7 +314,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - the demo generator's evergreen properties at nine different "todays"
 - the startup config check, retention predicates, logger levels in production
 - the scheduler's timer plumbing, and the weekly report's next run **on a UTC clock**
-- every AI endpoint when OpenAI is out of credit or rate-limited
+- every AI endpoint when DeepSeek is out of balance, the key is revoked, or it is rate-limited or overloaded
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
 
@@ -411,7 +411,7 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `POST /budget-recommendations` | budget suggestions |
 | `POST /investment-advice` | investment commentary |
 
-20 requests per hour per IP. Generated plans expire 30 minutes after creation: from then on every endpoint treats them as gone. They are deleted physically by an hourly maintenance job that runs while the server is up, so an expired plan normally stays in the database for up to about another hour, and longer if the server was down or asleep. When OpenAI is out of credit or rate-limited, the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
+20 requests per hour per IP. Generated plans expire 30 minutes after creation: from then on every endpoint treats them as gone. They are deleted physically by an hourly maintenance job that runs while the server is up, so an expired plan normally stays in the database for up to about another hour, and longer if the server was down or asleep. When DeepSeek is out of balance, the key is revoked, or it is rate-limited or overloaded (its 401, 402, 429 or 503), the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
 
 ### `/mcp` — read-only, for a personal agent
 
@@ -440,7 +440,7 @@ The backend runs on **Render**, the frontend on **Vercel**, the database on **Ne
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
-**Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `OPENAI_API_KEY` and the email credentials in Render, and keep the OpenAI account in credit — AI planning reports itself unavailable otherwise.
+**Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `DEEPSEEK_API_KEY` and the email credentials in Render, and keep the DeepSeek account in balance — AI planning reports itself unavailable otherwise.
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
@@ -450,13 +450,13 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 ## Stack
 
-**Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai`.
+**Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai` (the SDK, pointed at DeepSeek).
 
 **Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
 
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
-**External services** — [Finnhub](https://finnhub.io/), Yahoo Finance and [Alpha Vantage](https://www.alphavantage.co/) for stock data; [OpenAI](https://openai.com/) for planning; [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
+**External services** — [Finnhub](https://finnhub.io/), Yahoo Finance and [Alpha Vantage](https://www.alphavantage.co/) for stock data; [DeepSeek](https://api-docs.deepseek.com/) for planning; [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
 
 ## Database
 
