@@ -1,0 +1,285 @@
+import { useEffect, useRef, useState } from 'react'
+import Head from 'next/head'
+import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { useTranslation } from 'next-i18next'
+import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
+import { ArrowLeft, Loader2, MessageSquare, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import DraftEditor, { currencies, selectClass } from '@/components/agent/DraftEditor'
+import { readPreferences } from '@/lib/preferences'
+import { agentAPI, agentErrorCode, agentOutcomeUnknown, AgentContext, ConfirmRequest, Conversation, ConversationState, DraftRow, MessageRequest, ReplyLanguage } from '@/utils/agentApi'
+
+export default function AgentPage() {
+  const { t, i18n } = useTranslation('common')
+  const router = useRouter()
+  const [available, setAvailable] = useState<boolean | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [state, setState] = useState<ConversationState | null>(null)
+  const [context, setContext] = useState<AgentContext>({ currency: 'CAD', timezone: 'America/Toronto', language: 'auto' })
+  const [content, setContent] = useState('')
+  const [rows, setRows] = useState<DraftRow[]>([])
+  const [selected, setSelected] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [retry, setRetry] = useState<{ conversationId: string; body: MessageRequest } | null>(null)
+  const [confirmRetry, setConfirmRetry] = useState<ConfirmRequest | null>(null)
+  const controller = useRef<AbortController | null>(null)
+  const activeRequest = useRef<{ conversationId: string; requestId: string } | null>(null)
+  const generation = useRef(0)
+  const [now, setNow] = useState(Date.now())
+
+  const apply = (next: ConversationState) => {
+    const pendingRows = next.draft?.status === 'pending' ? next.draft.rows : []
+    const sameConversation = state?.conversation.id === next.conversation.id
+    const newProposal = next.draft?.version !== state?.draft?.version
+      && (next.run?.id !== state?.run?.id || (state?.run?.status === 'running' && next.run?.status === 'complete'))
+    setState(next)
+    setContext({ currency: next.conversation.currency, timezone: next.conversation.timezone, language: next.conversation.language })
+    setRows(pendingRows)
+    // Editing, refreshing, and confirming a subset must not silently select
+    // rows the user excluded. A new proposal starts its own reviewed selection.
+    setSelected(previous => !sameConversation || newProposal
+      ? pendingRows.map(row => row.id)
+      : previous.filter(id => pendingRows.some(row => row.id === id)))
+    setConversations(previous => [next.conversation, ...previous.filter(item => item.id !== next.conversation.id)])
+    setNow(Date.now())
+  }
+  const showError = (cause: unknown) => setError(agentErrorCode(cause))
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) { void router.replace('/login'); return }
+    const preferences = readPreferences()
+    setContext({ currency: currencies.includes(preferences.currency) ? preferences.currency : 'CAD', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Toronto', language: preferences.language === 'system' ? 'auto' : preferences.language })
+    let live = true
+    agentAPI.status().then(async status => {
+      if (!live) return
+      setAvailable(status.available)
+      // Existing history remains accessible when the provider is disabled.
+      const items = await agentAPI.list()
+      if (live) setConversations(items)
+    }).catch(cause => { if (live) showError(cause) })
+    return () => { live = false; generation.current += 1; controller.current?.abort() }
+    // Initialize once; changing the display language must not restart a turn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Local expiry updates are timers, never network polling.
+  useEffect(() => {
+    const deadlines = [state?.draft?.expires_at, ...(state?.receipts.map(receipt => receipt.undo_until) || [])]
+      .filter((value): value is string => Boolean(value)).map(value => new Date(value).getTime()).filter(value => value > Date.now())
+    if (!deadlines.length) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(...deadlines) - Date.now() + 20)
+    return () => clearTimeout(timer)
+  }, [state, now])
+
+  const dirty = Boolean(state?.draft?.status === 'pending' && JSON.stringify(rows) !== JSON.stringify(state.draft.rows))
+  const running = sending || state?.run?.status === 'running'
+  const locked = busy || Boolean(running) || cancelling
+  const unresolved = Boolean(retry || confirmRetry)
+  const pendingDraft = state?.draft?.status === 'pending'
+  const expired = Boolean(state?.draft && new Date(state.draft.expires_at).getTime() <= now)
+  const validRows = rows.length > 0 && rows.every(row => /^\d+\.\d{2}$/.test(row.amount) && Number(row.amount) > 0 && row.description.trim() && row.date)
+  const dateTime = (value: string) => {
+    try { return new Date(value).toLocaleString(i18n.language, { timeZone: context.timezone || undefined }) }
+    catch { return new Date(value).toLocaleString(i18n.language) }
+  }
+
+  const load = async (id: string) => {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const next = await agentAPI.get(id)
+      apply(next)
+      if (next.run?.status !== 'running') setRetry(null)
+      setConfirmRetry(null)
+    } catch (cause) { showError(cause) } finally { setBusy(false) }
+  }
+
+  const refresh = async () => {
+    setBusy(true); setError('')
+    try {
+      const status = await agentAPI.status(); setAvailable(status.available)
+      setConversations(await agentAPI.list())
+      const conversationId = state?.conversation.id || retry?.conversationId
+      if (conversationId) {
+        const next = await agentAPI.get(conversationId); apply(next)
+        if (next.run && next.run.status !== 'running') setRetry(null)
+        // Keep an uncertain confirmation's exact request for safe replay.
+      }
+    } catch (cause) { showError(cause) } finally { setBusy(false) }
+  }
+
+  const send = async (attempt?: { conversationId: string; body: MessageRequest }) => {
+    if (locked || dirty || confirmRetry || !available || (!attempt && !content.trim())) return
+    setBusy(true); setSending(true); setError(''); setNotice('')
+    const thisGeneration = ++generation.current
+    const abort = new AbortController(); controller.current = abort
+    let request = attempt
+    try {
+      const conversationId = attempt?.conversationId || state?.conversation.id || (await agentAPI.create(context, abort.signal)).id
+      // Cancellation can happen while the initial conversation is being
+      // created. Even if creation committed, never send its message afterward.
+      if (generation.current !== thisGeneration || abort.signal.aborted) return
+      request = attempt || { conversationId, body: { ...context, content: content.trim(), requestId: crypto.randomUUID() } }
+      activeRequest.current = { conversationId, requestId: request.body.requestId }
+      setRetry(request)
+      const next = await agentAPI.send(conversationId, request.body, abort.signal)
+      if (generation.current !== thisGeneration) return
+      apply(next); setRetry(null); setContent('')
+      if (next.run?.error_code) setError(next.run.error_code)
+    } catch (cause) {
+      if (generation.current !== thisGeneration) return
+      const code = agentErrorCode(cause)
+      showError(cause)
+      // Unknown transport outcomes retain the exact request ID. Explicit
+      // server failures can be retried as a fresh turn after status refresh.
+      if (request && code !== 'agent_network_error') {
+        try {
+          const next = await agentAPI.get(request.conversationId)
+          if (generation.current === thisGeneration) { apply(next); setRetry(null) }
+        } catch { /* Preserve the recovery request. */ }
+      }
+    } finally {
+      if (generation.current === thisGeneration) { setBusy(false); setSending(false); controller.current = null; activeRequest.current = null }
+    }
+  }
+
+  const cancel = async () => {
+    const target = activeRequest.current || (state?.run?.status === 'running' ? { conversationId: state.conversation.id, requestId: state.run.id } : retry ? { conversationId: retry.conversationId, requestId: retry.body.requestId } : null)
+    if (!target) {
+      if (controller.current) {
+        generation.current += 1
+        controller.current.abort(); controller.current = null
+        setSending(false); setBusy(false); setRetry(null); setError(''); setNotice('agent.cancelled')
+      }
+      return
+    }
+    setCancelling(true); setError('')
+    try {
+      await agentAPI.cancel(target.conversationId, target.requestId)
+      generation.current += 1; controller.current?.abort()
+      const next = await agentAPI.get(target.conversationId)
+      apply(next); setRetry(null)
+      if (next.run?.status === 'cancelled') setNotice('agent.cancelled')
+    } catch (cause) { showError(cause) } finally {
+      setCancelling(false)
+      if (generation.current && controller.current?.signal.aborted) { setSending(false); setBusy(false); activeRequest.current = null; controller.current = null }
+    }
+  }
+
+  const mutateDraft = async (action: 'edit' | 'discard' | 'confirm', all = false) => {
+    if (!state || (!state.draft && !confirmRetry) || locked || retry) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      let next: ConversationState
+      if (action === 'edit') next = await agentAPI.edit(state.conversation.id, state.draft!.version, rows)
+      else if (action === 'discard') next = await agentAPI.discard(state.conversation.id, state.draft!.version)
+      else {
+        const body = confirmRetry || { version: state.draft!.version, rowIds: all ? rows.map(row => row.id) : selected, requestId: crypto.randomUUID() }
+        setConfirmRetry(body)
+        next = await agentAPI.confirm(state.conversation.id, body)
+        setConfirmRetry(null); setNotice('agent.saved')
+      }
+      apply(next)
+    } catch (cause) {
+      showError(cause)
+      if (action === 'confirm' && !agentOutcomeUnknown(cause)) setConfirmRetry(null)
+    } finally { setBusy(false) }
+  }
+
+  const removeConversation = async () => {
+    if (!state) return
+    setBusy(true); setError('')
+    try {
+      await agentAPI.remove(state.conversation.id)
+      setConversations(previous => previous.filter(item => item.id !== state.conversation.id))
+      setState(null); setRows([]); setContent(''); setRetry(null); setConfirmRetry(null); setDeleteOpen(false); setNotice('agent.deleted')
+    } catch (cause) { showError(cause) } finally { setBusy(false) }
+  }
+
+  const undo = async (id: string) => {
+    if (!state) return
+    setBusy(true); setError(''); setNotice('')
+    try { await agentAPI.undo(id); apply(await agentAPI.get(state.conversation.id)); setNotice('agent.undone') }
+    catch (cause) { showError(cause) } finally { setBusy(false) }
+  }
+
+  return <>
+    <Head><title>{t('agent.title')} - TermPocket</title></Head>
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-6">
+        <Button variant="ghost" size="icon" asChild><Link href="/" aria-label={t('agent.back')}><ArrowLeft /></Link></Button>
+        <div><h1 className="flex items-center gap-2 text-2xl font-bold"><MessageSquare className="h-6 w-6" />{t('agent.title')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('agent.subtitle')}</p></div>
+      </div></header>
+      <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
+        <p className="rounded-lg border bg-card p-3 text-xs leading-relaxed text-muted-foreground">{t('agent.privacy')}</p>
+        {error && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">{t(`agent.errors.${error}`, { defaultValue: t('agent.errors.generic') })}</div>}
+        {notice && <p role="status" className="rounded-lg border border-green-600/30 bg-green-500/10 p-3 text-sm">{t(notice)}</p>}
+        {available === null && !error && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{t('agent.checking')}</p>}
+        {available === false && <p role="status" className="rounded-lg border bg-muted p-4 text-sm">{t('agent.unavailable')}</p>}
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <aside className="min-w-0 space-y-3">
+            <div className="flex flex-wrap gap-2"><Button disabled={locked || dirty || unresolved} onClick={() => { setState(null); setRows([]); setContent(''); setNotice(''); setError('') }}><Plus />{t('agent.new')}</Button><Button variant="outline" size="icon" aria-label={t('agent.refresh')} disabled={busy || dirty || sending} onClick={refresh}><RefreshCw /></Button></div>
+            <h2 className="text-sm font-semibold">{t('agent.history')}</h2>
+            <div className="flex max-h-64 gap-2 overflow-auto lg:max-h-[65vh] lg:flex-col">
+              {conversations.map(item => <button key={item.id} disabled={locked || dirty || unresolved} onClick={() => load(item.id)} aria-current={state?.conversation.id === item.id ? 'page' : undefined} className={`min-w-40 rounded-lg border p-3 text-left text-sm hover:bg-muted disabled:opacity-50 lg:min-w-0 ${state?.conversation.id === item.id ? 'border-primary bg-primary/5' : ''}`}><span className="line-clamp-2 break-words">{!item.title || item.title === 'New conversation' ? t('agent.new') : item.title}</span><time dateTime={item.updated_at} className="mt-1 block text-xs text-muted-foreground">{dateTime(item.updated_at)}</time></button>)}
+              {!conversations.length && <p className="text-sm text-muted-foreground">{t('agent.noHistory')}</p>}
+            </div>
+          </aside>
+          <div className="min-w-0 space-y-5">
+            <Card><CardContent className="space-y-4 pt-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-sm"><span>{t('agent.defaultCurrency')}</span><select className={selectClass} value={context.currency} disabled={locked || unresolved} onChange={e => setContext({ ...context, currency: e.target.value })}>{currencies.map(currency => <option key={currency}>{currency}</option>)}</select></label>
+                <label className="space-y-1 text-sm"><span>{t('agent.timezone')}</span><Input value={context.timezone} disabled={locked || unresolved} onChange={e => setContext({ ...context, timezone: e.target.value })} /></label>
+                <label className="space-y-1 text-sm"><span>{t('agent.replyLanguage')}</span><select className={selectClass} value={context.language} disabled={locked || unresolved} onChange={e => setContext({ ...context, language: e.target.value as ReplyLanguage })}><option value="auto">{t('agent.autoLanguage')}</option><option value="en">English</option><option value="zh">中文</option></select></label>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('agent.contextHint')}</p>
+              <div className="space-y-4" aria-label={t('agent.messages')}>
+                {!state?.messages.length && <div className="rounded-lg bg-muted/50 p-5"><p className="font-medium">{t('agent.start')}</p><p className="mt-2 text-sm text-muted-foreground">{t('agent.example')}</p></div>}
+                {state?.messages.map(message => <div key={message.id} className={`max-w-full whitespace-pre-wrap break-words rounded-lg p-4 text-sm ${message.role === 'user' ? 'ml-4 bg-primary/10 sm:ml-12' : 'mr-4 bg-muted sm:mr-12'}`}><p className="mb-2 text-xs font-semibold text-muted-foreground">{t(message.role === 'user' ? 'agent.you' : 'agent.assistant')}</p>{message.content}{message.status !== 'complete' && <p className="mt-2 text-xs text-muted-foreground">{t(`agent.messageStatus.${message.status}`)}</p>}</div>)}
+              </div>
+              {running && <div role="status" className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />{t(cancelling ? 'agent.cancelling' : 'agent.working')}<Button variant="outline" size="sm" disabled={cancelling} onClick={cancel}>{t('agent.cancel')}</Button></div>}
+              {retry && !running && <div className="space-y-2 rounded-lg border p-3 text-sm"><p>{t('agent.recoverHint')}</p><Button variant="outline" disabled={locked} onClick={() => send(retry)}>{t('agent.recover')}</Button></div>}
+              {(state?.run?.status === 'failed' || state?.run?.status === 'cancelled') && !retry && <div className="space-y-2"><p className="text-sm text-muted-foreground">{t('agent.failedHint')}</p><Button variant="outline" disabled={locked || dirty || unresolved || !available} onClick={() => {
+                const previous = [...state.messages].reverse().find(message => message.role === 'user')
+                if (previous) void send({ conversationId: state.conversation.id, body: { ...context, content: previous.content, requestId: crypto.randomUUID() } })
+              }}>{t('agent.retryNew')}</Button></div>}
+              <form onSubmit={event => { event.preventDefault(); void send() }} className="space-y-3">
+                <label className="block space-y-2 text-sm"><span className="font-medium">{t('agent.compose')}</span><Textarea rows={3} maxLength={4000} value={content} onChange={e => setContent(e.target.value)} disabled={locked || unresolved || available !== true} placeholder={t('agent.placeholder')} /></label>
+                <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('agent.reviewHint')}</p><Button type="submit" disabled={locked || unresolved || dirty || available !== true || !content.trim()}><Send />{t('agent.send')}</Button></div>
+              </form>
+              {state && <div className="border-t pt-3"><Button variant="ghost" size="sm" disabled={locked || unresolved} onClick={() => setDeleteOpen(true)}><Trash2 />{t('agent.deleteConversation')}</Button></div>}
+            </CardContent></Card>
+            {state?.draft?.status === 'expired' && <p role="status" className="rounded-lg border p-4 text-sm">{t('agent.expired')}</p>}
+            {pendingDraft && <Card><CardHeader><CardTitle>{t('agent.review')}</CardTitle><p className="text-sm text-muted-foreground">{t('agent.version', { version: state.draft?.version })} · {expired ? t('agent.expired') : t('agent.expires', { date: dateTime(state.draft!.expires_at) })}</p></CardHeader><CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('agent.draftHint')}</p>
+              <DraftEditor rows={rows} selected={selected} disabled={locked || unresolved || expired} onChange={setRows} onSelect={setSelected} />
+              {dirty && <p role="status" className="text-sm">{t('agent.unsaved')}</p>}
+              {!validRows && <p className="text-sm text-destructive">{t('agent.invalidRows')}</p>}
+              <div className="flex flex-wrap gap-2">
+                {dirty && <><Button disabled={locked || !validRows || expired} variant="outline" onClick={() => mutateDraft('edit')}>{t('agent.saveEdits')}</Button><Button disabled={locked} variant="ghost" onClick={() => setRows(state.draft!.rows)}>{t('agent.resetEdits')}</Button><Button disabled={locked || unresolved} variant="outline" onClick={() => load(state.conversation.id)}>{t('agent.discardLocalReload')}</Button></>}
+                {confirmRetry ? <Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button> : <><Button disabled={locked || unresolved || dirty || !validRows || expired || !selected.length} onClick={() => mutateDraft('confirm')}>{t('agent.confirmSelected', { count: selected.length })}</Button><Button variant="outline" disabled={locked || unresolved || dirty || !validRows || expired} onClick={() => mutateDraft('confirm', true)}>{t('agent.confirmAll')}</Button></>}
+                <Button variant="ghost" disabled={locked || unresolved} onClick={() => mutateDraft('discard')}>{t('agent.discard')}</Button>
+              </div>
+            </CardContent></Card>}
+            {confirmRetry && !pendingDraft && <Button disabled={locked} onClick={() => mutateDraft('confirm')}>{t('agent.recoverConfirm')}</Button>}
+            {state?.receipts.map(receipt => <Card key={receipt.id}><CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5"><div><p className="font-medium">{t(receipt.undone_at ? 'agent.receiptUndone' : 'agent.receiptSaved', { count: receipt.transaction_ids.length })}</p><p className="mt-1 text-xs text-muted-foreground">{receipt.undone_at ? dateTime(receipt.undone_at) : new Date(receipt.undo_until).getTime() <= now ? t('agent.undoExpired') : t('agent.undoUntil', { date: dateTime(receipt.undo_until) })}</p></div>{!receipt.undone_at && <Button variant="outline" disabled={locked || dirty || unresolved || new Date(receipt.undo_until).getTime() <= now} onClick={() => undo(receipt.id)}>{t('agent.undo')}</Button>}</CardContent></Card>)}
+          </div>
+        </div>
+      </main>
+    </div>
+    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}><DialogContent><DialogHeader><DialogTitle>{t('agent.deleteConversation')}</DialogTitle><DialogDescription>{t('agent.deleteWarning')}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={busy} onClick={() => setDeleteOpen(false)}>{t('agent.cancel')}</Button><Button variant="destructive" disabled={busy} onClick={removeConversation}>{t('agent.deleteConversation')}</Button></DialogFooter></DialogContent></Dialog>
+  </>
+}
+
+export async function getStaticProps({ locale }: { locale: string }) {
+  return { props: { ...(await serverSideTranslations(locale, ['common'])) } }
+}

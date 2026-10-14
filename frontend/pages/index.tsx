@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLogo } from '@/components/BrandLogo'
+import AgentPanel from '@/components/agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
 import { categories as categoryTypeMap } from './transactions/new';
@@ -800,7 +801,7 @@ export default function Dashboard() {
           )}
 
           {/* Savings Goals */}
-          <div className="grid grid-cols-1 gap-8">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <Card className="transition-colors duration-200 hover:bg-muted/80 dark:hover:bg-white/2.5">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -854,6 +855,7 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+            <AgentPanel />
           </div>
 
           {/* Recent Transactions */}
@@ -932,4 +934,4 @@ export default function Dashboard() {
       </div>
     </>
   )
-} 
+}

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api, logout } from '@/utils/api'
+import { agentAPI, agentUnavailable } from '@/utils/agentApi'
 import { useTheme } from '@/contexts/ThemeContext'
 import AiConnections from '@/components/AiConnections'
 import OpenSourceAcknowledgements from '@/components/OpenSourceAcknowledgements'
@@ -117,16 +118,24 @@ export default function Settings() {
     if (clearing || deleteConfirmation !== 'DELETE') return
     setClearing(true)
     try {
+      // Remove confirmation sources before deleting financial rows, so an
+      // existing draft cannot commit after the transaction deletion finishes.
+      const agentCleared = await agentAPI.clear().then(() => true).catch(error => {
+        // A deployment with the feature disabled may not have its migration.
+        // Clear existing app data, but never claim its agent history cleared.
+        if (agentUnavailable(error)) return false
+        throw error
+      })
       await Promise.all([
         api.delete('/transactions/clear-all'),
         api.delete('/goals/clear-all'),
-        api.delete('/investments/watchlist/clear-all')
+        api.delete('/investments/watchlist/clear-all'),
       ])
       setClearDialogOpen(false)
       await Swal.fire({
-        icon: 'success',
-        title: t('All data cleared'),
-        text: t('Your transactions, goals and archived watchlist data have been deleted.'),
+        icon: agentCleared ? 'success' : 'info',
+        title: t(agentCleared ? 'All data cleared' : 'agent.clearPartialTitle'),
+        text: t(agentCleared ? 'agent.clearSuccess' : 'agent.clearPartialUnavailable'),
         confirmButtonText: t('OK'),
       })
       router.push('/')
@@ -331,7 +340,7 @@ export default function Settings() {
               </summary>
               <div className="space-y-4 px-6 pb-6">
                 <p className="text-sm text-muted-foreground">
-                  {t('Permanently delete all transactions, goals, and archived watchlist data.')}
+                  {t('agent.clearDescription')}
                 </p>
                 <Button variant="destructive" onClick={() => { setDeleteConfirmation(''); setClearDialogOpen(true) }} disabled={clearing}>
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -348,7 +357,7 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle>{t('Clear All Data')}</DialogTitle>
             <DialogDescription>
-              {t('This permanently deletes all your transactions, goals and archived watchlist data. It cannot be undone.')}
+              {t('agent.clearWarning')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
