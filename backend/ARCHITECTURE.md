@@ -52,10 +52,10 @@ Client (frontend / axios)
     Alpha Vantage,                  savings_goals, watchlist,
     OpenAI, SMTP)                   ai_plans)
         ▲
-        │  cron / setInterval (out-of-band, not request-driven)
+        │  cron / hourly timer (out-of-band, not request-driven)
 ┌─────────────────────────────────────────────────────────────┐
 │  services/schedulerService.ts  (Singleton)                   │
-│    weekly report emails + cleanup jobs                       │
+│    weekly report emails + hourly maintenance                 │
 └─────────────────────────────────────────────────────────────┘
         │  calls down into  →  services/cleanupService.ts
 ```
@@ -89,7 +89,7 @@ The global middleware runs in the order drawn, but two things sit outside it:
 | **Chain of Responsibility** | Express middleware pipeline | `helmet → cors → json → auth → validation → controller → error handler`. |
 | **Strategy + fallback** | Stock data | `finnhubService → freeStockDataService → Alpha Vantage`, interchangeable sources with graceful degradation. |
 | **Singleton** | `schedulerService` (single class instance holding a `jobs` Map of `{ job, kind }`); lazy DB pool | One shared instance each. `kind` is `'cron'` or `'interval'` — it is what tells `stop()` which API it is holding, since the two job types share no methods. |
-| **Scheduler / publish-on-timer** | `schedulerService` (`node-cron` + `setInterval`) | Time-driven, **not** Observer. |
+| **Scheduler / publish-on-timer** | `schedulerService` (`node-cron` + self-rearming timers) | Time-driven, **not** Observer. |
 
 ## Is there an Observer pattern?
 

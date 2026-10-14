@@ -411,7 +411,7 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `POST /budget-recommendations` | budget suggestions |
 | `POST /investment-advice` | investment commentary |
 
-20 requests per hour per IP. Generated plans are deleted 30 minutes after creation. When OpenAI is out of credit or rate-limited, the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
+20 requests per hour per IP. Generated plans expire 30 minutes after creation: from then on every endpoint treats them as gone. They are deleted physically by an hourly maintenance job that runs while the server is up, so an expired plan normally stays in the database for up to about another hour, and longer if the server was down or asleep. When OpenAI is out of credit or rate-limited, the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
 
 ### `/mcp` — read-only, for a personal agent
 

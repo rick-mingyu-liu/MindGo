@@ -10,23 +10,32 @@ import * as demoAccountService from './demoAccountService';
 // name -> { job, kind }. `kind` is what tells stop() and getStatus() which
 // API they are holding; the two types share no methods worth guessing at.
 type Job =
-  | { job: NodeJS.Timeout; kind: 'interval'; cancel?: () => void }
+  | { job: NodeJS.Timeout; kind: 'interval'; cancel: () => void; nextRun: () => Date | null }
   | { job: ScheduledTask; kind: 'cron' };
 
 const MAX_TIMER_DELAY = 2_147_483_647;
 
+/** What one maintenance run did with each cleanup. A failed one is `null`. */
+interface MaintenanceResult {
+  aiPlans: number | null;
+  unverifiedAccounts: number | null;
+}
+
 /**
  * Owns the two kinds of recurring work: a node-cron job for weekly reports, and
- * plain intervals for the retention deletions.
+ * self-rearming timers for the hourly maintenance sweep and the opt-in demo
+ * refresh.
  *
  * The two are not interchangeable, which is what the old `stop()` got wrong —
  * see the comment there.
  */
 class SchedulerService {
   jobs: Map<string, Job>;
+  private maintenanceRun: Promise<MaintenanceResult> | null;
 
   constructor() {
     this.jobs = new Map();
+    this.maintenanceRun = null;
   }
 
   // Initialize all scheduled jobs
@@ -37,7 +46,7 @@ class SchedulerService {
   }
 
   /**
-   * Runs an async task on an interval, and actually reports its failures.
+   * Runs an async task every `intervalMs`, and actually reports its failures.
    *
    * The shape this replaces was:
    *
@@ -52,71 +61,91 @@ class SchedulerService {
    * Awaiting inside an async callback is what makes both lines mean what they
    * say.
    *
+   * It is a chain of timeouts, not a setInterval, for three reasons:
+   * - The next run is armed only after the current one settles, so a slow run
+   *   can never overlap the next.
+   * - The first run is one full interval after scheduling, never at startup,
+   *   and missed runs are not replayed: after a suspended process wakes, it
+   *   runs once and starts a fresh interval.
+   * - Node clamps delays beyond ~24.9 days to 1ms. The opt-in 30-day demo
+   *   refresh waits in bounded chunks rather than becoming a rapid deletion
+   *   loop.
+   *
+   * A task that returns a number is reporting rows deleted, logged here; one
+   * that returns nothing does its own logging (maintenance reports each
+   * cleanup separately).
+   *
    * unref() so a retention timer never keeps the process alive on its own. The
    * pool's inactivity timer in db/connection.ts had exactly this problem, where
    * it silently held the test runner open.
    */
-  scheduleInterval(name: string, intervalMs: number, task: () => Promise<number>): void {
+  scheduleInterval(name: string, intervalMs: number, task: () => Promise<number | void>): void {
+    // Rescheduling a name replaces its chain rather than running two.
+    this.cancel(name);
+
     const run = async (): Promise<void> => {
       try {
         const deleted = await task();
-        const line = `${name}: deleted ${deleted} row(s)`;
-        // Only a real deletion is an audit event. These intervals fire 432
-        // times a day between them and almost always delete nothing; routing
-        // the zeros through audit too would bury the lines that matter in a
-        // production log. The zero case stays on the dev-only channel, where
-        // it is still useful for watching the schedule tick.
-        if (deleted > 0) {
-          logger.audit(line);
-        } else {
-          logger.info(line);
-        }
+        if (typeof deleted === 'number') logDeleted(name, deleted);
       } catch (error) {
         logger.error(`${name} failed`, error);
       }
     };
 
-    // Node clamps delays beyond ~24.9 days to 1ms. The opt-in 30-day demo
-    // refresh must wait in bounded chunks, never become a rapid deletion loop.
-    if (intervalMs > MAX_TIMER_DELAY) {
-      let cancelled = false;
-      let due = Date.now() + intervalMs;
-      const entry: Extract<Job, { kind: 'interval' }> = {
-        kind: 'interval',
-        job: setTimeout(wake, Math.min(intervalMs, MAX_TIMER_DELAY)),
-        cancel: () => {
-          cancelled = true;
-          clearTimeout(entry.job);
-        },
-      };
+    let cancelled = false;
+    let running = false;
+    let due = Date.now() + intervalMs;
+    const entry: Extract<Job, { kind: 'interval' }> = {
+      kind: 'interval',
+      job: setTimeout(wake, Math.min(intervalMs, MAX_TIMER_DELAY)),
+      cancel: () => {
+        cancelled = true;
+        clearTimeout(entry.job);
+      },
+      // Unknown while a run is in flight: the next one is armed when it ends.
+      nextRun: () => (running ? null : new Date(due)),
+    };
+    entry.job.unref();
+    this.jobs.set(name, entry);
+
+    function arm(): void {
+      if (cancelled) return;
+      entry.job = setTimeout(wake, Math.min(Math.max(1, due - Date.now()), MAX_TIMER_DELAY));
       entry.job.unref();
-      this.jobs.set(name, entry);
-
-      function arm(): void {
-        if (cancelled) return;
-        entry.job = setTimeout(wake, Math.min(Math.max(1, due - Date.now()), MAX_TIMER_DELAY));
-        entry.job.unref();
-      }
-
-      async function wake(): Promise<void> {
-        if (cancelled) return;
-        if (Date.now() < due) {
-          arm();
-          return;
-        }
-        await run();
-        // Start a fresh cycle after completion; never overlap refreshes or
-        // replay missed cycles after a suspended process wakes up.
-        due = Date.now() + intervalMs;
-        arm();
-      }
-      return;
     }
 
-    const timer = setInterval(run, intervalMs);
+    async function wake(): Promise<void> {
+      if (cancelled) return;
+      if (Date.now() < due) {
+        arm();
+        return;
+      }
+      running = true;
+      await run();
+      running = false;
+      due = Date.now() + intervalMs;
+      arm();
+    }
+  }
 
-    timer.unref();
-    this.jobs.set(name, { job: timer, kind: 'interval' });
+  /**
+   * One maintenance sweep: both retention deletions, back to back.
+   *
+   * Each is attempted whatever happened to the other, so a failing AI-plan
+   * cleanup never leaves expired accounts in place, or the reverse. A call made
+   * while a sweep is still running joins that sweep instead of starting a
+   * second one.
+   */
+  runMaintenance(): Promise<MaintenanceResult> {
+    if (!this.maintenanceRun) {
+      this.maintenanceRun = (async () => ({
+        aiPlans: await attempt('aiPlanCleanup', cleanupService.deleteOldAIPlans),
+        unverifiedAccounts: await attempt('accountCleanup', cleanupService.deleteUnverifiedAccounts),
+      }))().finally(() => {
+        this.maintenanceRun = null;
+      });
+    }
+    return this.maintenanceRun;
   }
 
   // Schedule weekly report emails
@@ -161,24 +190,11 @@ class SchedulerService {
     logger.info('Weekly reports scheduled');
   }
 
-  // Schedule cleanup tasks
+  // Schedule the hourly maintenance sweep, and the demo refresh if enabled
   scheduleCleanupTasks(): void {
-    this.scheduleInterval(
-      'aiCleanup',
-      config.cron.aiPlanCleanup,
-      // cleanupService returns the row count pg's DELETE reports, typed
-      // number | null because that is how @types/pg types it in general; a
-      // DELETE always reports one, so this is a no-op coercion in practice,
-      // same as `deleted += null` coercing to a no-op in the pre-TypeScript
-      // version of this arithmetic.
-      () => cleanupService.deleteOldAIPlans().then((count) => count ?? 0)
-    );
-
-    this.scheduleInterval(
-      'accountCleanup',
-      config.cron.unverifiedAccountCleanup,
-      () => cleanupService.deleteUnverifiedAccounts().then((count) => count ?? 0)
-    );
+    this.scheduleInterval('maintenance', config.cron.maintenance, async () => {
+      await this.runMaintenance();
+    });
 
     // The demo refresh is opt-in. It deletes every row of the demo account
     // before rewriting them, and it identifies that account by `is_demo`
@@ -192,6 +208,8 @@ class SchedulerService {
         () => demoAccountService.refreshDemoAccountOnSchedule()
       );
       logger.audit(`Demo refresh scheduled: every ${config.cron.demoRefresh}ms`);
+    } else {
+      this.cancel('demoRefresh');
     }
 
     // Audit rather than info: with the zero-row runs silent in production, a
@@ -199,9 +217,18 @@ class SchedulerService {
     // needed deleting" and "the jobs were never mounted". This one line at boot
     // separates the two.
     logger.audit(
-      `Retention jobs scheduled: aiCleanup every ${config.cron.aiPlanCleanup}ms, ` +
-      `accountCleanup every ${config.cron.unverifiedAccountCleanup}ms`
+      `Retention jobs scheduled: maintenance (aiPlanCleanup, accountCleanup) every ${config.cron.maintenance}ms, ` +
+      'first run one interval from now'
     );
+  }
+
+  /** Cancels one job, if it is scheduled. */
+  private cancel(name: string): void {
+    const entry = this.jobs.get(name);
+    if (!entry) return;
+    if (entry.kind === 'interval') entry.cancel();
+    else entry.job.stop();
+    this.jobs.delete(name);
   }
 
   /**
@@ -215,16 +242,10 @@ class SchedulerService {
    * call kept that from mattering.
    */
   stop(): void {
-    for (const [name, entry] of this.jobs) {
-      if (entry.kind === 'interval') {
-        if (entry.cancel) entry.cancel();
-        else clearInterval(entry.job);
-      } else {
-        entry.job.stop();
-      }
+    for (const name of [...this.jobs.keys()]) {
+      this.cancel(name);
       logger.info(`Stopped scheduled job: ${name}`);
     }
-    this.jobs.clear();
   }
 
   /**
@@ -241,10 +262,40 @@ class SchedulerService {
       status[name] = {
         kind: entry.kind,
         scheduled: true,
-        nextRun: entry.kind === 'cron' ? (entry.job.getNextRun()?.toISOString() ?? null) : null,
+        nextRun: entry.kind === 'cron'
+          ? (entry.job.getNextRun()?.toISOString() ?? null)
+          : (entry.nextRun()?.toISOString() ?? null),
       };
     }
     return status;
+  }
+}
+
+/**
+ * Only a real deletion is an audit event. The sweep almost always deletes
+ * nothing; routing the zeros through audit too would bury the lines that
+ * matter in a production log. The zero case stays on the dev-only channel,
+ * where it is still useful for watching the schedule tick.
+ */
+function logDeleted(name: string, deleted: number): void {
+  const line = `${name}: deleted ${deleted} row(s)`;
+  if (deleted > 0) {
+    logger.audit(line);
+  } else {
+    logger.info(line);
+  }
+}
+
+/** Runs one cleanup, logs its outcome, and returns its count (null if it failed). */
+async function attempt(name: string, cleanup: () => Promise<number | null>): Promise<number | null> {
+  try {
+    // pg types rowCount as number | null; a DELETE always reports one.
+    const deleted = (await cleanup()) ?? 0;
+    logDeleted(name, deleted);
+    return deleted;
+  } catch (error) {
+    logger.error(`${name} failed`, error);
+    return null;
   }
 }
 

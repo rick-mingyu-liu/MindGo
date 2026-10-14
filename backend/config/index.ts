@@ -114,8 +114,13 @@ const config = {
     weeklyReports: '0 19 * * 0', // Every Sunday at 7pm, in `timezone`
     // Settings promises 7 p.m.; the host's clock is UTC, so say whose 7 p.m.
     timezone: 'America/Toronto',
-    aiPlanCleanup: 5 * 60 * 1000, // 5 minutes
-    unverifiedAccountCleanup: 10 * 60 * 1000, // 10 minutes
+    // One hourly sweep runs both retention deletions. They used to run every
+    // 5 and 10 minutes, which touched the database often enough that Neon,
+    // which suspends after about 5 idle minutes, almost never could. Deletion
+    // is housekeeping only: expiry is enforced where the rows are read (AI
+    // plans) or used (verification tokens), so a later sweep never lets an
+    // expired row back in.
+    maintenance: 60 * 60 * 1000, // 1 hour
     demoRefresh: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
 
@@ -135,11 +140,22 @@ const config = {
     resendCooldown: 60 * 60 * 1000, // 1 hour
   },
 
-  // How long deleted-by-schedule rows are allowed to live. These are minutes
-  // because they are interpolated into a Postgres INTERVAL.
+  // How long rows live before the hourly maintenance sweep may delete them.
+  // An AI plan's lifetime is enforced at read time, so physical deletion only
+  // lags it (by up to one sweep while the process runs, longer if it was down
+  // or asleep). An unverified account becomes deletable once it is older than
+  // unverifiedAccountMinutes *and* its verification link has expired, or once
+  // it is older than unverifiedAccountMaxMinutes whatever its link says; at
+  // that point registering the same address again replaces it on the spot,
+  // without waiting for the sweep. These are minutes because they are
+  // interpolated into a Postgres INTERVAL.
   dataRetention: {
     aiPlanMinutes: 30,
     unverifiedAccountMinutes: 30,
+    // A hard cap: without it, re-sending the link every half hour (resend is
+    // unauthenticated and takes only an address) would keep someone else's
+    // unverified registration of an address alive forever.
+    unverifiedAccountMaxMinutes: 24 * 60,
   },
 
   validation: {
