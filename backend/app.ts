@@ -15,7 +15,7 @@ validateConfig();
 import logger = require('./utils/logger');
 import ErrorHandler = require('./utils/errorHandler');
 import schedulerService = require('./services/schedulerService');
-import { apiLimiter, aiLimiter } from './middleware/rateLimiter';
+import { apiLimiter } from './middleware/rateLimiter';
 
 // Import routes
 import authRoutes = require('./routes/auth');
@@ -78,8 +78,7 @@ app.use('/transactions', transactionRoutes);
 app.use('/summary', summaryRoutes);
 app.use('/goals', goalRoutes);
 app.use('/investments', investmentRoutes);
-// Every /ai call spends real DeepSeek balance, so it gets its own hourly budget.
-app.use('/ai', aiLimiter, aiRoutes);
+app.use('/ai', aiRoutes);
 app.use('/import', importRoutes);
 // The signed-in user's tokens for /mcp, managed with the login JWT.
 app.use('/access-tokens', accessTokenRoutes);

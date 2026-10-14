@@ -2,6 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import goalController = require('../controllers/goalController');
 import auth = require('../middleware/auth');
+import { aiPlanningRetired } from '../controllers/retiredFeatures';
 
 const router = express.Router();
 
@@ -28,6 +29,6 @@ router.delete('/clear-all', goalController.clearAllGoals);
 router.put('/:id', goalValidation, goalController.updateGoal);
 router.delete('/:id', goalController.deleteGoal);
 router.put('/:id/progress', progressValidation, goalController.updateProgress);
-router.post('/from-ai-plan', goalController.createGoalFromAIPlan);
+router.post('/from-ai-plan', aiPlanningRetired);
 
 export = router;

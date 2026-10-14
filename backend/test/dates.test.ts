@@ -5,8 +5,6 @@ import express from 'express';
 import { types } from 'pg';
 import db = require('../db/connection');
 import { toDay, monthOf, formatDay, monthSpan } from '../utils/dates';
-import aiController = require('../controllers/aiController');
-import type { TransactionRow } from '../types/db';
 
 /**
  * A DATE column is a calendar day. Everything here exists because the code
@@ -130,45 +128,6 @@ describe('monthSpan', () => {
   });
 });
 
-describe('getMonthCount', () => {
-  // getMonthCount only ever reads .date (confirmed by reading
-  // controllers/aiController.ts), so a fixture built from just the dates
-  // still needs the rest of TransactionRow's fields filled with placeholder,
-  // correctly-typed values rather than the field the test actually varies.
-  const txn = (date: string): TransactionRow => ({
-    id: 0,
-    user_id: null,
-    amount: '0.00',
-    description: '',
-    category: '',
-    type: 'expense',
-    date,
-    currency: 'CAD',
-    source: 'manual',
-    created_at: null,
-    updated_at: null,
-  });
-
-  test('counts the months a set of transactions spans', () => {
-    assert.equal(aiController.getMonthCount([
-      txn('2026-08-28'), txn('2026-05-01'), txn('2026-07-15'),
-    ]), 4);
-  });
-
-  test('is 1 for a single month, and 0 for nothing', () => {
-    assert.equal(aiController.getMonthCount([txn('2026-08-28'), txn('2026-08-01')]), 1);
-    assert.equal(aiController.getMonthCount([]), 0);
-  });
-
-  test('does not lose a month to the first of the month', () => {
-    // The divisor of every "average monthly spend" the planner produces. One
-    // month too many understates the average and the plan built on it.
-    const saved = process.env.TZ;
-    process.env.TZ = 'America/Toronto';
-    assert.equal(aiController.getMonthCount([txn('2026-06-01'), txn('2026-08-01')]), 3);
-    process.env.TZ = saved;
-  });
-});
 
 /**
  * The grouping the dashboard's month chart is built from, through the real

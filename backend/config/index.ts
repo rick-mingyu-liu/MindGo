@@ -68,22 +68,7 @@ const config = {
   },
 
   apiKeys: {
-    deepseek: process.env.DEEPSEEK_API_KEY,
-    finnhub: process.env.FINNHUB_API_KEY,
-    finnhubToken: process.env.FINNHUB_TOKEN,
-    // 'demo' is Alpha Vantage's public sandbox key: it answers, but only for a
-    // couple of hardcoded symbols. Fine as a fallback, useless as a config.
-    alphaVantage: process.env.ALPHA_VANTAGE_API_KEY || 'demo',
     mailboxLayer: process.env.MAILBOXLAYER_API_KEY,
-  },
-
-  // DeepSeek speaks OpenAI's chat-completions protocol, so the `openai` SDK
-  // talks to it with only the base URL changed. deepseek-flash is the
-  // cheaper of the two models its docs listed on 2026-10-14; deepseek-v4-pro
-  // is the other.
-  ai: {
-    baseUrl: 'https://api.deepseek.com',
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
   },
 
   // Rate limiting. Defaults are unchanged from when these were hardcoded in
@@ -97,8 +82,6 @@ const config = {
     // Covers /register, /login, /resend-verification and /test-email together,
     // per IP — so five is five across all of them, not five each.
     authMax: intFromEnv('RATE_LIMIT_AUTH_MAX', 5),
-    aiWindowMs: 60 * 60 * 1000,
-    aiMax: intFromEnv('RATE_LIMIT_AI_MAX', 20),
     // Per user, not per IP: each screenshot parse queries the user's
     // transactions and may reach the LLM fallback.
     importMax: intFromEnv('RATE_LIMIT_IMPORT_MAX', 30),

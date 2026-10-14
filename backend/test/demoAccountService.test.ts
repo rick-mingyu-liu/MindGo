@@ -95,6 +95,12 @@ describe('what it identifies the demo account by', () => {
   });
 });
 
+test('refresh clears archived watchlist rows without creating new stock data', async () => {
+  await refreshDemoAccount({ create: false });
+  assert.ok(ran(/^DELETE FROM watchlist WHERE user_id = \$1$/));
+  assert.equal(ran(/^INSERT INTO watchlist/), false);
+});
+
 describe('when no account is flagged', () => {
   beforeEach(() => { demoRows = []; });
 

@@ -23,17 +23,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// AI endpoints rate limiter
-const aiLimiter = rateLimit({
-  windowMs: config.rateLimit.aiWindowMs,
-  max: config.rateLimit.aiMax,
-  message: {
-    error: 'Too many AI requests, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 // Screenshot parsing, keyed on the user rather than the IP. Mount after auth.
 const importLimiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
@@ -58,4 +47,4 @@ const accessTokenLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export { apiLimiter, authLimiter, aiLimiter, importLimiter, accessTokenLimiter };
+export { apiLimiter, authLimiter, importLimiter, accessTokenLimiter };
