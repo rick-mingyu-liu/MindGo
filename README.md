@@ -1,13 +1,15 @@
-# MindGo
+# TermPocket
+
+**Your money, term by term.**
 
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://www.postgresql.org/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
 
-A personal finance app built around the **Waterloo term**, not the calendar month.
+TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
 
-A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. MindGo tracks income, expenses, savings goals and a stock watchlist against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
+A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. TermPocket tracks income, expenses, savings goals and a stock watchlist against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
 
 **Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
 
@@ -70,7 +72,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 Open **Import from screenshot** on the dashboard or the transactions page, then drop, pick or paste up to five images at a time.
 
 ```
-Your browser                                            MindGo API
+Your browser                                        TermPocket API
   screenshot ──▶ Web Worker: PaddleOCR PP-OCRv6 small
                  (ONNX Runtime Web, WASM)
                  text lines + boxes ──── POST /import/parse ──▶ rows → layout → parser → checks
@@ -413,7 +415,7 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 ### `/mcp` — read-only, for a personal agent
 
-MindGo as an [MCP](https://modelcontextprotocol.io) server, so an agent such as [DearByte](https://github.com/dearbyte-labs/DearByte) can read your numbers. `POST /mcp` speaks JSON-RPC 2.0 and takes a **personal access token**, never the login JWT:
+TermPocket as an [MCP](https://modelcontextprotocol.io) server, so an agent such as [DearByte](https://github.com/dearbyte-labs/DearByte) can read your numbers. `POST /mcp` speaks JSON-RPC 2.0 and takes a **personal access token**, never the login JWT:
 
 ```bash
 cd backend

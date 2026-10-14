@@ -1,4 +1,4 @@
-# MindGo Backend — Architecture & Design Patterns
+# TermPocket Backend — Architecture & Design Patterns
 
 The backend is a **layered MVC-style Express REST API**. It follows a
 `route → middleware → controller → service → database` layering. There is **no
