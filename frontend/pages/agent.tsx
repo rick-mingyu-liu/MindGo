@@ -14,6 +14,10 @@ import DraftEditor, { currencies, selectClass } from '@/components/agent/DraftEd
 import { readPreferences } from '@/lib/preferences'
 import { agentAPI, agentErrorCode, agentOutcomeUnknown, AgentContext, ConfirmRequest, Conversation, ConversationState, DraftRow, MessageRequest, ReplyLanguage } from '@/utils/agentApi'
 
+// Visiting or updating a conversation must not change its place in history.
+const creationOrder = (items: Conversation[]) => [...items].sort((a, b) =>
+  Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id))
+
 export default function AgentPage() {
   const { t, i18n } = useTranslation('common')
   const router = useRouter()
@@ -50,7 +54,7 @@ export default function AgentPage() {
     setSelected(previous => !sameConversation || newProposal
       ? pendingRows.map(row => row.id)
       : previous.filter(id => pendingRows.some(row => row.id === id)))
-    setConversations(previous => [next.conversation, ...previous.filter(item => item.id !== next.conversation.id)])
+    setConversations(previous => creationOrder([next.conversation, ...previous.filter(item => item.id !== next.conversation.id)]))
     setNow(Date.now())
   }
   const showError = (cause: unknown) => setError(agentErrorCode(cause))
@@ -65,7 +69,7 @@ export default function AgentPage() {
       setAvailable(status.available)
       // Existing history remains accessible when the provider is disabled.
       const items = await agentAPI.list()
-      if (live) setConversations(items)
+      if (live) setConversations(creationOrder(items))
     }).catch(cause => { if (live) showError(cause) })
     return () => { live = false; generation.current += 1; controller.current?.abort() }
     // Initialize once; changing the display language must not restart a turn.
@@ -107,7 +111,7 @@ export default function AgentPage() {
     setBusy(true); setError('')
     try {
       const status = await agentAPI.status(); setAvailable(status.available)
-      setConversations(await agentAPI.list())
+      setConversations(creationOrder(await agentAPI.list()))
       const conversationId = state?.conversation.id || retry?.conversationId
       if (conversationId) {
         const next = await agentAPI.get(conversationId); apply(next)
@@ -230,7 +234,7 @@ export default function AgentPage() {
             <div className="flex flex-wrap gap-2"><Button disabled={locked || dirty || unresolved} onClick={() => { setState(null); setRows([]); setContent(''); setNotice(''); setError('') }}><Plus />{t('agent.new')}</Button><Button variant="outline" size="icon" aria-label={t('agent.refresh')} disabled={busy || dirty || sending} onClick={refresh}><RefreshCw /></Button></div>
             <h2 className="text-sm font-semibold">{t('agent.history')}</h2>
             <div className="flex max-h-64 gap-2 overflow-auto lg:max-h-[65vh] lg:flex-col">
-              {conversations.map(item => <button key={item.id} disabled={locked || dirty || unresolved} onClick={() => load(item.id)} aria-current={state?.conversation.id === item.id ? 'page' : undefined} className={`min-w-40 rounded-lg border p-3 text-left text-sm hover:bg-muted disabled:opacity-50 lg:min-w-0 ${state?.conversation.id === item.id ? 'border-primary bg-primary/5' : ''}`}><span className="line-clamp-2 break-words">{!item.title || item.title === 'New conversation' ? t('agent.new') : item.title}</span><time dateTime={item.updated_at} className="mt-1 block text-xs text-muted-foreground">{dateTime(item.updated_at)}</time></button>)}
+              {conversations.map(item => <button key={item.id} disabled={locked || dirty || unresolved} onClick={() => load(item.id)} aria-current={state?.conversation.id === item.id ? 'page' : undefined} className={`min-w-40 rounded-lg border p-3 text-left text-sm hover:bg-muted disabled:opacity-50 lg:min-w-0 ${state?.conversation.id === item.id ? 'border-primary bg-primary/5' : ''}`}><span className="line-clamp-2 break-words">{!item.title || item.title === 'New conversation' ? t('agent.new') : item.title}</span><time dateTime={item.created_at} className="mt-1 block text-xs text-muted-foreground">{dateTime(item.created_at)}</time></button>)}
               {!conversations.length && <p className="text-sm text-muted-foreground">{t('agent.noHistory')}</p>}
             </div>
           </aside>

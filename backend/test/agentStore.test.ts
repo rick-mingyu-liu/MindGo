@@ -22,6 +22,21 @@ describe('agent storage safety', { skip: !enabled }, () => {
     alice = users[0]!; bob = users[1]!;
   });
   after(async () => { if (db) { await db.query('DELETE FROM users WHERE id=ANY($1::int[])', [users]); await db.getPool().end(); } });
+  test('conversation order follows creation time and stays stable after visits and messages', async () => {
+    const older = await store.createConversation(bob, settings);
+    const newer = await store.createConversation(bob, settings);
+    const sameTime = await store.createConversation(bob, settings);
+    await db.query("UPDATE agent_conversations SET created_at='2026-01-01T00:00:00Z',updated_at='2030-01-01T00:00:00Z' WHERE id=$1", [older.id]);
+    await db.query("UPDATE agent_conversations SET created_at='2026-01-02T00:00:00Z',updated_at='2026-01-02T00:00:00Z' WHERE id=ANY($1::uuid[])", [[newer.id,sameTime.id]]);
+    const expected = [...[newer.id,sameTime.id].sort().reverse(),older.id];
+    assert.deepEqual((await store.listConversations(bob)).map(c=>c.id), expected);
+    await store.getConversation(bob, older.id);
+    const requestId = randomUUID();
+    await store.beginTurn(bob,older.id,{...settings,requestId,content:'Fictional follow-up'});
+    await store.finishTurn(bob,older.id,requestId,{text:'Please provide an amount.'});
+    assert.deepEqual((await store.listConversations(bob)).map(c=>c.id), expected);
+    for (const id of expected) await store.deleteConversation(bob,id);
+  });
   test('concurrent identical confirmations write a selected subset once; changed nonce reuse conflicts', async () => {
     const s = await proposal(); const input = { version: s.draft!.version, rowIds: [s.draft!.rows[0]!.id], requestId: randomUUID() };
     const results = await Promise.all([store.confirmDraft(alice,s.conversation.id,input), store.confirmDraft(alice,s.conversation.id,input)]);

@@ -434,7 +434,7 @@
   "Currency exchange rates": "货币汇率",
   "Email address validation when configured": "配置后用于验证电子邮箱地址",
   "agent": {
-    "title": "对话记账",
+    "title": "和 Pocky 一起记账",
     "subtitle": "描述真实的收入或支出，逐笔核对后再保存。",
     "example": "“今天午餐花了12.50加元，坐公交花了3.25加元。”",
     "open": "打开对话",
@@ -456,7 +456,7 @@
     "messages": "对话消息",
     "start": "你想记下哪笔收支？",
     "you": "你",
-    "assistant": "记账助手",
+    "assistant": "Pocky",
     "working": "正在准备回复和草稿……尚未保存任何账目。",
     "cancelling": "正在取消……",
     "cancel": "取消",

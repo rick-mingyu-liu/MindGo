@@ -426,7 +426,7 @@
   "Currency exchange rates": "Currency exchange rates",
   "Email address validation when configured": "Email address validation when configured",
   "agent": {
-    "title": "Record with AI",
+    "title": "Record with Pocky",
     "subtitle": "Describe real income or spending. Review every entry before saving.",
     "example": "“I spent $12.50 on lunch and $3.25 on the bus today.”",
     "open": "Open conversation",
@@ -448,7 +448,7 @@
     "messages": "Conversation messages",
     "start": "What would you like to record?",
     "you": "You",
-    "assistant": "Assistant",
+    "assistant": "Pocky",
     "working": "Preparing a reply and draft… Nothing has been saved.",
     "cancelling": "Cancelling…",
     "cancel": "Cancel",

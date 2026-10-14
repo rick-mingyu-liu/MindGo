@@ -85,7 +85,7 @@ export async function createConversation(userId:number,settings:ConversationSett
   });
 }
 export async function listConversations(userId:number):Promise<Conversation[]> {
-  return owned(userId,async client=>(await client.query<Conversation>(`SELECT ${conversationColumns} FROM agent_conversations WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 100`,[userId])).rows);
+  return owned(userId,async client=>(await client.query<Conversation>(`SELECT ${conversationColumns} FROM agent_conversations WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100`,[userId])).rows);
 }
 export async function getConversation(userId:number,id:string):Promise<ConversationState> {
   return owned(userId,async client=>{await conversation(client,userId,id);return state(client,userId,id);});
