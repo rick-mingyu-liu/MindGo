@@ -165,7 +165,7 @@ export default function ImportPage() {
   return (
     <>
       <Head>
-        <title>Import transactions - MindGo</title>
+        <title>Import transactions - TermPocket</title>
         <meta name="description" content="Import transactions from bank screenshots and receipts" />
       </Head>
 
@@ -192,7 +192,7 @@ export default function ImportPage() {
             <CardContent className="space-y-4 pt-6">
               <p className="flex items-start gap-2 text-sm text-muted-foreground">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                {t('Screenshots are read on this device. Only the recognised text is sent to MindGo, and nothing is saved until you confirm.')}
+                {t('Screenshots are read on this device. Only the recognised text is sent to TermPocket, and nothing is saved until you confirm.')}
               </p>
               <DropZone
                 onFiles={addFiles}

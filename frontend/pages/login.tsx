@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
@@ -11,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useTheme } from '@/contexts/ThemeContext'
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
@@ -23,7 +23,6 @@ interface LoginForm {
 
 export default function Login() {
   const router = useRouter()
-  const { resolvedTheme } = useTheme()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
@@ -132,24 +131,16 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - MindGo</title>
-        <meta name="description" content="Sign in to your MindGo account" />
+        <title>Login - TermPocket</title>
+        <meta name="description" content="Sign in to your TermPocket account" />
       </Head>
 
       <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-white dark:bg-gray-950 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex justify-center">
-              <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
-                width={160}
-                height={160}
-                className="h-24 w-auto aurora-glow"
-                priority
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+            <h1 className="mx-auto mb-4 flex justify-center">
+              <BrandLogo className="h-14 sm:h-16" priority />
+            </h1>
             <button
               onClick={() => setShowIntro(true)}
               className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer transition-colors"
@@ -320,14 +311,23 @@ export default function Login() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
+                src="/brand/termpocket-icon.svg"
+                alt=""
+                aria-hidden="true"
                 width={60}
                 height={60}
-                className="h-15 w-auto"
+                className="h-14 w-14 shrink-0 dark:hidden"
+              />
+              <Image
+                src="/brand/termpocket-icon-dark.svg"
+                alt=""
+                aria-hidden="true"
+                width={60}
+                height={60}
+                className="hidden h-14 w-14 shrink-0 dark:block"
               />
               <div>
-                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">{t('Welcome to MindGo')}</h2>
+                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">{t('Welcome to TermPocket')}</h2>
                 <p className="text-sm text-muted-foreground">{t('Your AI-Powered Personal Finance Companion')}</p>
               </div>
             </DialogTitle>
@@ -424,7 +424,7 @@ export default function Login() {
             {/* Call to Action */}
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                {t('Ready to take control of your financial future? Start your journey with MindGo today.')}
+                {t('Ready to take control of your financial future? Start your journey with TermPocket today.')}
               </p>
               <div className="flex gap-3 justify-center">
                 <Button onClick={() => router.push('/register')}>

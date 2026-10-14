@@ -146,7 +146,7 @@ export default function Transactions() {
   return (
     <>
       <Head>
-        <title>Transactions - MindGo</title>
+        <title>Transactions - TermPocket</title>
         <meta name="description" content="View and manage your recent transactions" />
       </Head>
 

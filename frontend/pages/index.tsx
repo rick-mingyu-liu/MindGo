@@ -25,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { BrandLogo } from '@/components/BrandLogo'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
@@ -465,7 +466,7 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>Dashboard - MindGo</title>
+        <title>Dashboard - TermPocket</title>
         <meta name="description" content="Your personal finance dashboard" />
       </Head>
 
@@ -473,9 +474,11 @@ export default function Dashboard() {
         {/* Header */}
         <header className="border-b bg-card">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-6">
-              <div>
-                <h1 className="text-3xl font-bold aurora-text">{t('MindGo')}</h1>
+            <div className="flex justify-between items-center gap-4 py-6">
+              <div className="shrink-0">
+                <h1 className="mb-1 leading-none">
+                  <BrandLogo className="h-10 sm:h-12" priority />
+                </h1>
                 <p className="text-muted-foreground">{t('Your financial overview')}</p>
               </div>
               {/* Desktop actions */}
@@ -572,7 +575,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-blue-900 dark:text-white mb-2">
-                      {t('Welcome to MindGo! 🎉')}
+                      {t('Welcome to TermPocket! 🎉')}
                     </h3>
                     <p className="text-blue-800 dark:text-blue-200 mb-4">
                       {t("You've started your journey to financial freedom. Let's get you started with some basic steps:")}

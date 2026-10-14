@@ -160,7 +160,7 @@ export default function Settings() {
   return (
     <>
       <Head>
-        <title>Settings - MindGo</title>
+        <title>Settings - TermPocket</title>
         <meta name="description" content="Manage your app settings and preferences" />
       </Head>
 
