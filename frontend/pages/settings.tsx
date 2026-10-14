@@ -13,7 +13,6 @@ import {
   Monitor,
   LogOut,
   BookOpen,
-  Brain,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api, logout } from '@/utils/api'
@@ -44,18 +43,6 @@ import {
   savePreferences,
 } from '@/lib/preferences'
 
-interface PlanningPreferences {
-  riskTolerance: string
-  lifeStage: string
-  investmentExperience: string
-}
-
-const PLANNING_DEFAULTS: PlanningPreferences = {
-  riskTolerance: 'moderate',
-  lifeStage: 'worker',
-  investmentExperience: 'beginner',
-}
-
 const THEMES = [
   { value: 'light', icon: Sun, label: 'Light', hint: 'Clean and bright interface' },
   { value: 'dark', icon: Moon, label: 'Dark', hint: 'Easy on the eyes' },
@@ -64,7 +51,7 @@ const THEMES = [
 
 /**
  * Every control here takes effect and is kept the moment it changes — there
- * is no Save button to forget. Currency, language and planning preferences
+ * is no Save button to forget. Currency and language
  * live in this browser; the weekly report switch is the one server setting.
  */
 export default function Settings() {
@@ -72,7 +59,6 @@ export default function Settings() {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const { t, i18n } = useTranslation('common')
   const [preferences, setPreferences] = useState<UserPreferences>({ currency: 'CAD', language: 'system' })
-  const [planningPrefs, setPlanningPrefs] = useState<PlanningPreferences>(PLANNING_DEFAULTS)
   // null until the server says; the switch is disabled rather than guessing.
   const [weeklyReports, setWeeklyReports] = useState<boolean | null>(null)
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
@@ -85,10 +71,6 @@ export default function Settings() {
       return
     }
     setPreferences(readPreferences())
-    try {
-      const saved = JSON.parse(localStorage.getItem('planningPrefs') || 'null')
-      if (saved) setPlanningPrefs({ ...PLANNING_DEFAULTS, ...saved })
-    } catch {}
 
     api.get('/auth/profile')
       .then(({ data }) => {
@@ -111,13 +93,6 @@ export default function Settings() {
     const locale = resolveLanguage(language)
     i18n.changeLanguage(locale)
     router.push(router.asPath, router.asPath, { locale })
-  }
-
-  const changePlanning = (changes: Partial<PlanningPreferences>) => {
-    const next = { ...planningPrefs, ...changes }
-    setPlanningPrefs(next)
-    localStorage.setItem('planningPrefs', JSON.stringify(next))
-    saved()
   }
 
   const changeWeeklyReports = async (checked: boolean) => {
@@ -147,7 +122,7 @@ export default function Settings() {
       await Swal.fire({
         icon: 'success',
         title: t('All data cleared'),
-        text: t('Your transactions, goals and watchlist have been deleted.'),
+        text: t('Your transactions, goals and archived watchlist data have been deleted.'),
         confirmButtonText: t('OK'),
       })
       router.push('/')
@@ -310,58 +285,6 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  {t('Financial Planning Preferences')}
-                </CardTitle>
-                <CardDescription>
-                  {t('These preferences will be used to personalize your AI financial planning and investment suggestions.')}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="risk">{t('Risk Tolerance')}</Label>
-                    <Select value={planningPrefs.riskTolerance} onValueChange={(v) => changePlanning({ riskTolerance: v })}>
-                      <SelectTrigger id="risk"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">{t('Low')}</SelectItem>
-                        <SelectItem value="moderate">{t('Moderate')}</SelectItem>
-                        <SelectItem value="high">{t('High')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="life-stage">{t('Life Stage')}</Label>
-                    <Select value={planningPrefs.lifeStage} onValueChange={(v) => changePlanning({ lifeStage: v })}>
-                      <SelectTrigger id="life-stage"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">{t('Student')}</SelectItem>
-                        <SelectItem value="worker">{t('Worker')}</SelectItem>
-                        <SelectItem value="retired">{t('Retired')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="experience">{t('Investment Experience')}</Label>
-                    <Select
-                      value={planningPrefs.investmentExperience}
-                      onValueChange={(v) => changePlanning({ investmentExperience: v })}
-                    >
-                      <SelectTrigger id="experience"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="beginner">{t('Beginner')}</SelectItem>
-                        <SelectItem value="intermediate">{t('Intermediate')}</SelectItem>
-                        <SelectItem value="advanced">{t('Advanced')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             <AiConnections />
 
             <Card>
@@ -395,7 +318,7 @@ export default function Settings() {
                       {t('Clear All Data')}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      {t('Permanently delete all transactions, goals, and watchlist data.')}
+                      {t('Permanently delete all transactions, goals, and archived watchlist data.')}
                     </p>
                   </div>
                   <Button variant="destructive" onClick={() => setClearDialogOpen(true)} disabled={clearing}>
@@ -421,7 +344,7 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle>{t('Clear All Data')}</DialogTitle>
             <DialogDescription>
-              {t('This permanently deletes all your transactions, goals and watchlist. It cannot be undone.')}
+              {t('This permanently deletes all your transactions, goals and archived watchlist data. It cannot be undone.')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

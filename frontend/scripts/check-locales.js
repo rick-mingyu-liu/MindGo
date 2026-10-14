@@ -39,8 +39,8 @@ for (const locale of fs.readdirSync(LOCALES_DIR)) {
     continue;
   }
 
-  // Track keys per indent depth so nested blocks (e.g. "stock") keep their own
-  // namespace — "Close" at top level and stock.Close are different keys.
+  // Track keys per indent depth so nested blocks (e.g. "dialog") keep their own
+  // namespace — "Close" at top level and dialog.Close are different keys.
   const seen = new Map();
   raw.split('\n').forEach((line, i) => {
     const m = line.match(KEY_RE);
@@ -110,7 +110,7 @@ function collectKeys(dir, found = new Set()) {
 /**
  * Mirrors how i18next actually resolves a key, which is not just a dotted path.
  *
- * It walks the key as a path first ('stock.Close' -> { stock: { Close } }), and
+ * It walks the key as a path first ('dialog.Close' -> { dialog: { Close } }), and
  * if that finds nothing it falls back to the literal flat key. That fallback is
  * `ignoreJSONStructure`, which defaults to true. Without it every key that
  * merely *contains* a dot — 'Saving...', or any sentence ending in one — looks
