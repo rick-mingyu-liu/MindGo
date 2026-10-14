@@ -93,6 +93,9 @@ const config = {
     // Per user, not per IP: each screenshot parse queries the user's
     // transactions and may reach the LLM fallback.
     importMax: intFromEnv('RATE_LIMIT_IMPORT_MAX', 30),
+    // Per user: creating and revoking MCP access tokens together. Each create
+    // mints a credential, and a person managing a handful needs few.
+    accessTokenMax: intFromEnv('RATE_LIMIT_ACCESS_TOKEN_MAX', 20),
   },
 
   // Screenshot import. The OCR itself runs in the browser; these bound what

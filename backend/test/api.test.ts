@@ -40,6 +40,7 @@ if (HAVE_DB) {
   // branched on NODE_ENV in the middleware.
   process.env.RATE_LIMIT_AUTH_MAX = '10000';
   process.env.RATE_LIMIT_API_MAX = '10000';
+  process.env.RATE_LIMIT_ACCESS_TOKEN_MAX = '10000';
 }
 
 describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to run' }, () => {
@@ -437,6 +438,94 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
 
       const left = await db.query<{ email: string }>('SELECT email FROM users WHERE email = ANY($1)', [[stale, live, alice.email]]);
       assert.deepEqual(left.rows.map((row) => row.email).sort(), [live, alice.email].sort());
+    });
+  });
+
+  describe('MCP access tokens, managed from the web', () => {
+    const asUser = (req: Test, token: string): Test => req.set('Authorization', `Bearer ${token}`);
+    const create = (token: string, name = 'agent'): Test => asUser(request(app).post('/access-tokens'), token).send({ name });
+    const mcp = (secret: string, body: object): Test =>
+      request(app).post('/mcp').set('Authorization', `Bearer ${secret}`).send(body);
+
+    test('a token created through the API opens /mcp, and revoking it closes it', async () => {
+      const created = await create(aliceToken, 'DearByte');
+      assert.equal(created.status, 201, JSON.stringify(created.body));
+      assert.equal(created.headers['cache-control'], 'no-store');
+      const { token, secret } = created.body as { token: { id: number; name: string }; secret: string };
+      assert.match(secret, /^mgo_/);
+      assert.equal(token.name, 'DearByte');
+
+      const init = await mcp(secret, { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
+      assert.equal(init.status, 200, JSON.stringify(init.body));
+      assert.ok(init.body.result.serverInfo);
+      const tools = await mcp(secret, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
+      assert.equal(tools.status, 200);
+      assert.ok(tools.body.result.tools.length > 0);
+
+      const list = await asUser(request(app).get('/access-tokens'), aliceToken);
+      assert.equal(list.status, 200);
+      const listed = list.body.tokens.find((t: { id: number }) => t.id === token.id);
+      assert.ok(listed.last_used_at, 'using the token did not mark it used');
+      assert.ok(!JSON.stringify(list.body).includes(secret));
+      assert.ok(!JSON.stringify(list.body).includes('token_hash'));
+
+      const revoked = await asUser(request(app).delete(`/access-tokens/${token.id}`), aliceToken);
+      assert.equal(revoked.status, 200);
+      assert.deepEqual(revoked.body, { revoked: true });
+      assert.equal((await mcp(secret, { jsonrpc: '2.0', id: 3, method: 'tools/list' })).status, 401);
+
+      const again = await asUser(request(app).delete(`/access-tokens/${token.id}`), aliceToken);
+      assert.equal(again.status, 404);
+    });
+
+    test('one user cannot list or revoke another user\'s token', async () => {
+      const created = await create(aliceToken);
+      assert.equal(created.status, 201);
+      const { token, secret } = created.body as { token: { id: number }; secret: string };
+
+      const bobList = await asUser(request(app).get('/access-tokens'), bobToken);
+      assert.equal(bobList.status, 200);
+      assert.ok(!bobList.body.tokens.some((t: { id: number }) => t.id === token.id));
+
+      const bobRevoke = await asUser(request(app).delete(`/access-tokens/${token.id}`), bobToken);
+      assert.equal(bobRevoke.status, 404);
+      // Still alive for its owner.
+      assert.equal((await mcp(secret, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).status, 200);
+      await asUser(request(app).delete(`/access-tokens/${token.id}`), aliceToken);
+    });
+
+    test('ten creations at once leave exactly the limit, and the rest are refused', async () => {
+      const carol = await seedUser();
+      const res = await login(carol.email);
+      assert.equal(res.status, 200);
+      const carolToken: string = res.body.token;
+
+      const answers = await Promise.all(Array.from({ length: 10 }, (_, i) => create(carolToken, `parallel ${i}`)));
+      const statuses = answers.map((a) => a.status).sort();
+      assert.equal(statuses.filter((s) => s === 201).length, 5, statuses.join(','));
+      assert.equal(statuses.filter((s) => s === 409).length, 5, statuses.join(','));
+      for (const a of answers.filter((x) => x.status === 409)) assert.equal(a.body.code, 'token_limit');
+
+      const active = await db.query<{ n: number }>(
+        'SELECT COUNT(*)::int AS n FROM access_tokens WHERE user_id = $1 AND revoked_at IS NULL', [carol.id]
+      );
+      assert.equal(active.rows[0]!.n, 5);
+    });
+
+    test('the service itself holds the limit when called in parallel, as the CLI calls it', async () => {
+      const service: typeof import('../services/accessTokens') = require('../services/accessTokens');
+      const dave = await seedUser();
+      const results = await Promise.allSettled(Array.from({ length: 10 }, (_, i) => service.createToken(dave.id, `direct ${i}`)));
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      assert.equal(fulfilled.length, service.MAX_TOKENS_PER_USER);
+      assert.equal(rejected.length, 10 - service.MAX_TOKENS_PER_USER);
+      for (const r of rejected) assert.ok(r.reason instanceof RangeError, String(r.reason));
+
+      const active = await db.query<{ n: number }>(
+        'SELECT COUNT(*)::int AS n FROM access_tokens WHERE user_id = $1 AND revoked_at IS NULL', [dave.id]
+      );
+      assert.equal(active.rows[0]!.n, service.MAX_TOKENS_PER_USER);
     });
   });
 });
