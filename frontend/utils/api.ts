@@ -3,6 +3,9 @@ import Swal from 'sweetalert2'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
+// Where a personal agent connects to read totals; configured in its MCP client.
+export const MCP_ENDPOINT_URL = `${API_BASE_URL}/mcp`
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -45,6 +48,13 @@ api.interceptors.response.use(
     // they concern, so it is exempt too.
     const isAuthEndpoint = error.config?.url?.includes('/auth/')
     const handledByCaller = isAuthEndpoint || error.config?.url?.includes('/import')
+
+    // The AI connections section reports its own 4xx next to the form or row
+    // they concern — the token limit, a bad name, or a token already revoked
+    // in another tab — so none of them should also raise a generic dialog.
+    const ownsClientErrors = error.config?.url?.startsWith('/access-tokens')
+      && response?.status >= 400 && response?.status < 500 && response?.status !== 401
+    if (ownsClientErrors) return Promise.reject(error)
 
     if (response?.status === 401) {
       // Unauthorized - redirect to login
@@ -104,5 +114,20 @@ export const goalAPI = {
   createFromAIPlan: (data: { aiPlanId: number, name: string, target_amount: number, target_date?: string, description?: string }) =>
     api.post('/goals/from-ai-plan', data),
 };
+
+export interface AccessToken {
+  id: number
+  name: string
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export const accessTokenAPI = {
+  list: () => api.get<{ tokens: AccessToken[], limit: number }>('/access-tokens'),
+  // The secret comes back once, in this response, and is never retrievable again.
+  create: (name: string) => api.post<{ token: AccessToken, secret: string }>('/access-tokens', { name }),
+  revoke: (id: number) => api.delete<{ revoked: true }>(`/access-tokens/${id}`),
+}
 
 export { api }
