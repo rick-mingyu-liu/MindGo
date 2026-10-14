@@ -71,8 +71,9 @@ interface ParsedAiResponse {
 }
 
 /**
- * Answers 503 when OpenAI will not take requests for now (no credit, rate
- * limit), so the page can say so instead of reporting a server fault.
+ * Answers 503 when DeepSeek will not take requests for now (no balance, a
+ * dead key, rate limit, overload), so the page can say so instead of
+ * reporting a server fault.
  */
 function answerIfUnavailable(res: Response, error: unknown): boolean {
   if (!(error instanceof Error) || error.name !== 'AiUnavailableError') return false;
@@ -188,8 +189,8 @@ const aiController = {
       // .message -- unchanged from the original, which read error.message
       // the same way with no guard.
       const err = error as { message: string };
-      if (err.message.includes('OpenAI API key')) {
-        return res.status(500).json({ error: 'AI service not configured. Please set up OpenAI API key.' });
+      if (err.message.includes('DeepSeek API key')) {
+        return res.status(500).json({ error: 'AI service not configured. Please set up DeepSeek API key.' });
       }
 
       res.status(500).json({ error: 'Failed to generate AI plan' });

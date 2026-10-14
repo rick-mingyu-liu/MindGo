@@ -15,7 +15,7 @@ import config = require('./index');
 
 /** Optional variables, and what stops working without each. */
 const OPTIONAL: [string, string][] = [
-  ['OPENAI_API_KEY', 'AI plans and investment advice (/ai) will fail'],
+  ['DEEPSEEK_API_KEY', 'AI plans and investment advice (/ai) will fail'],
   ['EMAIL_USER', 'no verification or weekly-report email can be sent'],
   ['EMAIL_PASS', 'no verification or weekly-report email can be sent'],
   ['FINNHUB_API_KEY', 'stock quotes fall back to the free Yahoo / Alpha Vantage path'],
