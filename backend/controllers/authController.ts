@@ -8,6 +8,7 @@ import config = require('../config');
 import { maskEmail } from '../utils/privacy';
 import { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } from '../services/emailService';
 import { validateEmail } from '../services/emailValidationService';
+import { reclaimStaleUnverifiedAccount } from '../services/cleanupService';
 
 // The columns the SELECT below names — narrower than the full UserRow.
 interface ExistingUserRow {
@@ -103,13 +104,21 @@ const authController = {
       );
 
       if (existingUser.rows.length > 0) {
-        const isVerified = existingUser.rows[0]?.email_verified;
-        if (isVerified) {
-          console.log(`[Register] Attempt to register an already verified address: ${maskEmail(email)}`);
-        } else {
-          console.log(`[Register] Attempt to re-register an unverified address: ${maskEmail(email)}`);
+        const existingId = existingUser.rows[0]!.id;
+        if (existingUser.rows[0]!.email_verified) {
+          console.log(`[Register] Attempt to register an already verified address: user ${existingId}`);
+          return res.status(400).json({ error: 'User already exists' });
         }
-        return res.status(400).json({ error: 'User already exists' });
+        // An unverified registration whose link has lapsed (or that has hit
+        // the hard cap) is due for deletion anyway; the hourly sweep may just
+        // not have reached it. Replace it now, so whether the address can be
+        // registered again never depends on when the sweep last ran. One still
+        // inside its window is left alone: its owner may be about to verify.
+        if (!(await reclaimStaleUnverifiedAccount(email))) {
+          console.log(`[Register] Attempt to re-register an unverified address: user ${existingId}`);
+          return res.status(400).json({ error: 'User already exists' });
+        }
+        console.log(`[Register] Replaced stale unverified registration: user ${existingId}`);
       }
 
       // Hash password

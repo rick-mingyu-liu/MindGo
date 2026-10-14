@@ -2,6 +2,8 @@ import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import scheduler = require('../services/schedulerService');
 import logger = require('../utils/logger');
+import db = require('../db/connection');
+import config = require('../config');
 import type { ScheduledTask } from 'node-cron';
 import { spawnSync } from 'node:child_process';
 
@@ -121,7 +123,7 @@ describe('long refresh intervals', () => {
 describe('scheduleInterval', () => {
   beforeEach(() => {
     scheduler.jobs.clear();
-    mock.timers.enable({ apis: ['setInterval'] });
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   });
 
   afterEach(() => {
@@ -223,7 +225,7 @@ describe('scheduleInterval, on a real timer', () => {
 describe('stop', () => {
   beforeEach(() => {
     scheduler.jobs.clear();
-    mock.timers.enable({ apis: ['setInterval'] });
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
     mock.method(logger, 'info', () => {});
   });
 
@@ -275,7 +277,7 @@ describe('stop', () => {
 describe('getStatus', () => {
   beforeEach(() => {
     scheduler.jobs.clear();
-    mock.timers.enable({ apis: ['setInterval'] });
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
     mock.method(logger, 'info', () => {});
   });
 
@@ -308,9 +310,10 @@ describe('getStatus', () => {
     assert.equal(scheduler.getStatus().weeklyReports!.nextRun, when.toISOString());
   });
 
-  test('an interval has no next run to report', () => {
+  test('an interval reports when it runs next', () => {
+    const start = Date.now();
     scheduler.scheduleInterval('test', 1000, async () => 0);
-    assert.equal(scheduler.getStatus().test!.nextRun, null);
+    assert.equal(scheduler.getStatus().test!.nextRun, new Date(start + 1000).toISOString());
   });
 });
 
@@ -319,12 +322,20 @@ describe('what the retention jobs report', () => {
   // NODE_ENV === 'development', so in production the record of what these jobs
   // deleted did not exist. Errors always printed, so a *failing* cleanup was
   // visible and a *successful* one was not.
+  let savedDemo: boolean;
+
   beforeEach(() => {
     scheduler.jobs.clear();
-    mock.timers.enable({ apis: ['setInterval'] });
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+    // The boot audit line below counts lines; a DEMO_REFRESH_ENABLED in the
+    // environment would add a second one.
+    savedDemo = config.demo.refreshEnabled;
+    config.demo.refreshEnabled = false;
   });
 
   afterEach(() => {
+    scheduler.stop();
+    config.demo.refreshEnabled = savedDemo;
     mock.timers.reset();
     mock.restoreAll();
   });
@@ -350,8 +361,8 @@ describe('what the retention jobs report', () => {
   });
 
   test('a run that deleted nothing is not', async () => {
-    // These two intervals fire 432 times a day between them and almost always
-    // delete nothing. Auditing the zeros would bury the lines that matter.
+    // The sweep almost always deletes nothing. Auditing the zeros would bury
+    // the lines that matter.
     const { audits, infos } = await runOnce(0);
     assert.equal(audits.length, 0);
     assert.equal(infos.length, 1);
@@ -374,6 +385,35 @@ describe('what the retention jobs report', () => {
     assert.match(printed.join('\n'), /\[AUDIT\].*accountCleanup: deleted 7 row\(s\)/);
   });
 
+  test('a maintenance run audits each cleanup that deleted rows, in production too', async () => {
+    // The real job does not return a count for scheduleInterval to log; each
+    // cleanup is logged by itself. Asserted through the real logger with
+    // console logging off, as production runs it.
+    const printed: string[] = [];
+    const savedEnabled = logger.enabled;
+    logger.enabled = false;
+    mock.method(console, 'log', (...a: unknown[]) => printed.push(a.map(String).join(' ')));
+    mock.method(db, 'query', async (text: string) => ({ rowCount: text.includes('ai_plans') ? 3 : 2, rows: [] }));
+
+    await scheduler.runMaintenance();
+
+    logger.enabled = savedEnabled;
+    const log = printed.join('\n');
+    assert.match(log, /\[AUDIT\].*aiPlanCleanup: deleted 3 row\(s\)/);
+    assert.match(log, /\[AUDIT\].*accountCleanup: deleted 2 row\(s\)/);
+  });
+
+  test('a maintenance run that deleted nothing stays off the production log', async () => {
+    const audits: string[] = [];
+    mock.method(logger, 'audit', (msg: string) => audits.push(msg));
+    mock.method(logger, 'info', () => {});
+    mock.method(db, 'query', async () => ({ rowCount: 0, rows: [] }));
+
+    await scheduler.runMaintenance();
+
+    assert.deepEqual(audits, []);
+  });
+
   test('scheduling the jobs is itself audited, so an idle log is not ambiguous', async () => {
     // With zero-row runs silent, a production log containing no deletion lines
     // cannot otherwise be told apart from one where the jobs never mounted.
@@ -384,8 +424,206 @@ describe('what the retention jobs report', () => {
     scheduler.scheduleCleanupTasks();
 
     assert.equal(audits.length, 1);
-    assert.match(audits[0]!, /aiCleanup/);
+    assert.match(audits[0]!, /maintenance/);
+    assert.match(audits[0]!, /aiPlanCleanup/);
     assert.match(audits[0]!, /accountCleanup/);
+    assert.match(audits[0]!, new RegExp(`every ${config.cron.maintenance}ms`));
+  });
+});
+
+describe('hourly maintenance', () => {
+  /**
+   * Both retention deletions share one hourly sweep. They used to run every 5
+   * and 10 minutes, which left Neon (suspends after ~5 idle minutes) almost no
+   * window to scale to zero. These pin what the sweep may and may not do to
+   * the database: db.query is mocked, and every call to it is a query Neon
+   * would have had to wake up for.
+   */
+  const hour = config.cron.maintenance;
+  let sql: string[];
+  let errors: string[];
+  let savedDemo: boolean;
+
+  beforeEach(() => {
+    savedDemo = config.demo.refreshEnabled;
+    config.demo.refreshEnabled = false;
+    scheduler.jobs.clear();
+    sql = [];
+    errors = [];
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+    mock.method(logger, 'info', () => {});
+    mock.method(logger, 'audit', () => {});
+    mock.method(logger, 'error', (message: string) => errors.push(message));
+  });
+
+  afterEach(() => {
+    scheduler.stop();
+    config.demo.refreshEnabled = savedDemo;
+    mock.timers.reset();
+    mock.restoreAll();
+  });
+
+  function answer(handler: (text: string) => Promise<{ rowCount: number; rows: [] }>): void {
+    mock.method(db, 'query', (text: string) => {
+      sql.push(text);
+      return handler(text);
+    });
+  }
+  const deletesFrom = (table: string) => sql.filter((text) => new RegExp(`^DELETE FROM ${table}\\b`).test(text)).length;
+
+  test('is one hourly job', () => {
+    scheduler.scheduleCleanupTasks();
+    assert.equal(hour, 60 * 60 * 1000);
+    assert.deepEqual([...scheduler.jobs.keys()], ['maintenance']);
+  });
+
+  test('queries nothing at startup or before the first hour is up', async () => {
+    answer(async () => ({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+    await drain();
+    mock.timers.tick(hour - 1);
+    await drain();
+    assert.deepEqual(sql, []);
+  });
+
+  test('runs both cleanups in the same run, once an hour', async () => {
+    answer(async () => ({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(hour);
+    await drain();
+    assert.equal(sql.length, 2);
+    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
+
+    mock.timers.tick(hour);
+    await drain();
+    assert.equal(sql.length, 4);
+  });
+
+  test('a failing cleanup does not stop the other one', async () => {
+    for (const failing of ['ai_plans', 'users']) {
+      sql = [];
+      errors = [];
+      answer(async (text) => {
+        if (text.startsWith(`DELETE FROM ${failing}`)) throw new Error('connection terminated');
+        return { rowCount: 1, rows: [] };
+      });
+      const result = await scheduler.runMaintenance();
+      assert.equal(deletesFrom('ai_plans'), 1, `ai_plans skipped when ${failing} failed`);
+      assert.equal(deletesFrom('users'), 1, `users skipped when ${failing} failed`);
+      assert.deepEqual(errors, [failing === 'ai_plans' ? 'aiPlanCleanup failed' : 'accountCleanup failed']);
+      assert.deepEqual(result, failing === 'ai_plans'
+        ? { aiPlans: null, unverifiedAccounts: 1 }
+        : { aiPlans: 1, unverifiedAccounts: null });
+      mock.restoreAll();
+      mock.method(logger, 'info', () => {});
+      mock.method(logger, 'audit', () => {});
+      mock.method(logger, 'error', (message: string) => errors.push(message));
+    }
+  });
+
+  test('a slow run is never overlapped by the next', async () => {
+    let release: () => void = () => {};
+    answer((text) => text.startsWith('DELETE FROM ai_plans')
+      ? new Promise((resolve) => { release = () => resolve({ rowCount: 0, rows: [] }); })
+      : Promise.resolve({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+
+    mock.timers.tick(hour);
+    await drain();
+    // Stuck on the first query for five more hours: nothing new starts.
+    for (let i = 0; i < 5; i++) {
+      mock.timers.tick(hour);
+      await drain();
+    }
+    assert.equal(deletesFrom('ai_plans'), 1);
+
+    // A direct call during the run joins it rather than starting another.
+    const joined = scheduler.runMaintenance();
+    await drain();
+    assert.equal(deletesFrom('ai_plans'), 1);
+
+    release();
+    await joined;
+    await drain();
+    assert.equal(deletesFrom('users'), 1);
+
+    // The next run is a full hour after this one finished.
+    mock.timers.tick(hour - 1);
+    await drain();
+    assert.equal(deletesFrom('ai_plans'), 1);
+    mock.timers.tick(1);
+    await drain();
+    assert.equal(deletesFrom('ai_plans'), 2);
+
+    // Let that second run finish: the scheduler is a singleton, and a run left
+    // hanging here would be joined by every later test's runMaintenance().
+    release();
+    await drain();
+    await drain();
+  });
+
+  test('missed hours are not replayed after downtime', async () => {
+    // A suspended or stalled process wakes up with several hours overdue: one
+    // sweep, then a fresh hour, not a burst of catch-up runs.
+    answer(async () => ({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(6 * hour);
+    await drain();
+    assert.equal(deletesFrom('ai_plans'), 1);
+    mock.timers.tick(hour - 1);
+    await drain();
+    assert.equal(deletesFrom('ai_plans'), 1);
+  });
+
+  test('stop() cancels future runs', async () => {
+    answer(async () => ({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(hour);
+    await drain();
+    assert.equal(sql.length, 2);
+
+    scheduler.stop();
+    mock.timers.tick(10 * hour);
+    await drain();
+    assert.equal(sql.length, 2);
+    assert.deepEqual(scheduler.getStatus(), {});
+  });
+
+  test('scheduling twice replaces the job instead of running two', async () => {
+    answer(async () => ({ rowCount: 0, rows: [] }));
+    scheduler.scheduleCleanupTasks();
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(hour);
+    await drain();
+    assert.equal(sql.length, 2);
+  });
+
+  test('reports no next run while one is in flight', async () => {
+    let release: () => void = () => {};
+    answer(() => new Promise((resolve) => { release = () => resolve({ rowCount: 0, rows: [] }); }));
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(hour);
+    await drain();
+    assert.equal(scheduler.getStatus().maintenance!.nextRun, null);
+
+    // Drain both cleanups; then the next run is an hour from now.
+    release();
+    await drain();
+    release();
+    await drain();
+    await drain();
+    assert.equal(scheduler.getStatus().maintenance!.nextRun, new Date(Date.now() + hour).toISOString());
+  });
+
+  test('reports when it runs next', () => {
+    const start = Date.now();
+    scheduler.scheduleCleanupTasks();
+    assert.deepEqual(scheduler.getStatus().maintenance, {
+      kind: 'interval',
+      scheduled: true,
+      nextRun: new Date(start + hour).toISOString(),
+    });
   });
 });
 
@@ -436,12 +674,19 @@ describe('the demo refresh is opt-in', () => {
       'nothing in the production log says the job is running');
   });
 
+  test('rescheduling with it turned off removes an earlier one', () => {
+    config.demo.refreshEnabled = true;
+    scheduler.scheduleCleanupTasks();
+    config.demo.refreshEnabled = false;
+    scheduler.scheduleCleanupTasks();
+    assert.equal(scheduler.jobs.has('demoRefresh'), false);
+  });
+
   test('the retention jobs are unaffected either way', () => {
     for (const enabled of [false, true]) {
       config.demo.refreshEnabled = enabled;
       scheduler.scheduleCleanupTasks();
-      assert.ok(scheduler.jobs.has('aiCleanup'));
-      assert.ok(scheduler.jobs.has('accountCleanup'));
+      assert.ok(scheduler.jobs.has('maintenance'));
       scheduler.stop();
     }
   });

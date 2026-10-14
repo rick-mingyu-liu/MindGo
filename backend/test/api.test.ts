@@ -345,4 +345,98 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
       ]);
     });
   });
+
+  describe('expiry is enforced on read, whatever the hourly sweep has done', () => {
+    // The retention sweep runs hourly, so expired rows can still exist. These
+    // run the real filters against Postgres: an expired row must behave as
+    // gone while it is physically still there.
+    const minutesAgo = (m: number): string => `NOW() - make_interval(mins => ${m})`;
+
+    async function insertPlan(userId: number, ageMinutes: number): Promise<number> {
+      const r = await db.query<{ id: number }>(
+        `INSERT INTO ai_plans (user_id, prompt, response, created_at) VALUES ($1, 'p', 'r', ${minutesAgo(ageMinutes)}) RETURNING id`,
+        [userId]
+      );
+      return r.rows[0]!.id;
+    }
+
+    test('an expired AI plan is hidden from the list, the plan route and goal creation', async () => {
+      const fresh = await insertPlan(alice.id, 1);
+      const stale = await insertPlan(alice.id, 31);
+
+      const list = await auth(request(app).get('/ai/plans'));
+      assert.equal(list.status, 200);
+      const ids = list.body.plans.map((p: { id: number }) => p.id);
+      assert.ok(ids.includes(fresh));
+      assert.ok(!ids.includes(stale), 'expired plan listed');
+
+      assert.equal((await auth(request(app).get(`/ai/plans/${stale}`))).status, 404);
+      assert.equal((await auth(request(app).get(`/ai/plans/${fresh}`))).status, 200);
+
+      const goal = await auth(request(app).post('/goals/from-ai-plan')).send({
+        aiPlanId: stale, name: 'From an expired plan', target_amount: 100, target_date: '2030-01-01',
+      });
+      assert.equal(goal.status, 404);
+    });
+
+    test('an expired verification link is refused while the account still exists', async () => {
+      const token = crypto.randomUUID().replace(/-/g, '');
+      const r = await db.query<{ id: number }>(
+        `INSERT INTO users (email, password_hash, first_name, last_name, email_verified,
+                            email_verification_token, email_verification_expires, created_at)
+         VALUES ($1, 'x', 'Unverified', 'Test', FALSE, $2, ${minutesAgo(1)}, ${minutesAgo(31)}) RETURNING id`,
+        [`it-${crypto.randomUUID()}@example.invalid`, token]
+      );
+      users.push(r.rows[0]!.id);
+
+      const res = await request(app).get(`/auth/verify-email/${token}`);
+      assert.equal(res.status, 400);
+      const after = await db.query<{ email_verified: boolean }>('SELECT email_verified FROM users WHERE id = $1', [r.rows[0]!.id]);
+      assert.equal(after.rows[0]!.email_verified, false);
+    });
+
+    async function insertUnverified(createdAgo: string, expires: string, email = `it-${crypto.randomUUID()}@example.invalid`): Promise<number> {
+      const r = await db.query<{ id: number }>(
+        `INSERT INTO users (email, password_hash, first_name, last_name, email_verified,
+                            email_verification_token, email_verification_expires, created_at)
+         VALUES ($1, 'x', 'Unverified', 'Test', FALSE, $2, ${expires}, ${createdAgo}) RETURNING id`,
+        [email, crypto.randomUUID()]
+      );
+      users.push(r.rows[0]!.id);
+      return r.rows[0]!.id;
+    }
+    const inMinutes = (m: number): string => `NOW() + make_interval(mins => ${m})`;
+
+    test('the sweep deletes stale unverified accounts and spares one with a live resent link', async () => {
+      // Note: this runs the real sweep, so it also deletes any other stale
+      // unverified account in the test database. That is why TEST_DATABASE_URL
+      // must be a throwaway; the assertion only looks at this test's rows.
+      const cleanup: typeof import('../services/cleanupService') = require('../services/cleanupService');
+      const expired = await insertUnverified(minutesAgo(45), minutesAgo(15));
+      const resent = await insertUnverified(minutesAgo(45), inMinutes(20));
+      const pastCap = await insertUnverified(minutesAgo(25 * 60), inMinutes(20));
+
+      await cleanup.deleteUnverifiedAccounts();
+
+      const left = await db.query<{ id: number }>('SELECT id FROM users WHERE id = ANY($1)', [[expired, resent, pastCap]]);
+      assert.deepEqual(left.rows.map((row) => row.id), [resent]);
+    });
+
+    test('register can reclaim exactly the accounts the sweep would delete', async () => {
+      const cleanup: typeof import('../services/cleanupService') = require('../services/cleanupService');
+      const address = () => `it-${crypto.randomUUID()}@example.invalid`;
+      const stale = address();
+      const live = address();
+      await insertUnverified(minutesAgo(45), minutesAgo(15), stale);
+      await insertUnverified(minutesAgo(45), inMinutes(20), live);
+
+      assert.equal(await cleanup.reclaimStaleUnverifiedAccount(stale), true);
+      assert.equal(await cleanup.reclaimStaleUnverifiedAccount(live), false);
+      // A verified account is never reclaimable, however old.
+      assert.equal(await cleanup.reclaimStaleUnverifiedAccount(alice.email), false);
+
+      const left = await db.query<{ email: string }>('SELECT email FROM users WHERE email = ANY($1)', [[stale, live, alice.email]]);
+      assert.deepEqual(left.rows.map((row) => row.email).sort(), [live, alice.email].sort());
+    });
+  });
 });

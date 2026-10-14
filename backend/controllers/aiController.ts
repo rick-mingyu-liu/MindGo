@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import { query } from '../db/connection';
 import aiPlanner = require('../services/aiPlanner');
+import config = require('../config');
+import { aiPlanIsLive } from '../services/cleanupService';
 import { monthOf, monthSpan } from '../utils/dates';
 import type { TransactionRow, TransactionType, AiPlanRow, SavingsGoalRow } from '../types/db';
 
@@ -431,13 +433,13 @@ const aiController = {
       const offset = (Number(page) - 1) * Number(limit);
 
       const plans = await query<AiPlanRow>(
-        'SELECT * FROM ai_plans WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-        [req.user.userId, parseInt(limit), offset]
+        `SELECT * FROM ai_plans WHERE user_id = $1 AND ${aiPlanIsLive(4)} ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+        [req.user.userId, parseInt(limit), offset, config.dataRetention.aiPlanMinutes]
       );
 
       const countResult = await query<{ count: string }>(
-        'SELECT COUNT(*) FROM ai_plans WHERE user_id = $1',
-        [req.user.userId]
+        `SELECT COUNT(*) FROM ai_plans WHERE user_id = $1 AND ${aiPlanIsLive(2)}`,
+        [req.user.userId, config.dataRetention.aiPlanMinutes]
       );
 
       // COUNT(*) with no GROUP BY always returns exactly one row.
@@ -465,8 +467,8 @@ const aiController = {
       const { id } = req.params;
 
       const plan = await query<AiPlanRow>(
-        'SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2',
-        [id, req.user.userId]
+        `SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2 AND ${aiPlanIsLive(3)}`,
+        [id, req.user.userId, config.dataRetention.aiPlanMinutes]
       );
 
       if (plan.rows.length === 0) {

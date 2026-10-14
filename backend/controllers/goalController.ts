@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import { query } from '../db/connection';
+import config = require('../config');
+import { aiPlanIsLive } from '../services/cleanupService';
 import { getExchangeRate } from '../services/exchangeRateService';
 import type { SavingsGoalRow, AiPlanRow } from '../types/db';
 
@@ -248,8 +250,10 @@ const goalController = {
       }
       // Check if AI plan exists and belongs to user
       const planResult = await query<AiPlanRow>(
-        'SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2',
-        [aiPlanId, req.user.userId]
+        // An expired plan is gone as far as the user is concerned, whether or
+        // not the hourly sweep has deleted it yet.
+        `SELECT * FROM ai_plans WHERE id = $1 AND user_id = $2 AND ${aiPlanIsLive(3)}`,
+        [aiPlanId, req.user.userId, config.dataRetention.aiPlanMinutes]
       );
       if (planResult.rows.length === 0) {
         return res.status(404).json({ error: 'AI plan not found' });
