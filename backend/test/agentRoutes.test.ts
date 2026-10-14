@@ -1,0 +1,105 @@
+import { test, beforeEach, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import request from 'supertest';
+import jwt from 'jsonwebtoken';
+import config = require('../config');
+import store = require('../services/agent/store');
+import runtime = require('../services/agent/runtime');
+import { AgentError } from '../services/agent/types';
+import agentRoutes = require('../routes/agent');
+const app = express(); app.use(express.json()); app.use('/agent', agentRoutes);
+const conversationId = '00000000-0000-4000-8000-000000000001';
+const requestId = '00000000-0000-4000-8000-000000000002';
+const secret = 'fictional-agent-route-secret';
+const token = jwt.sign({ userId: 77, email: 'fictional@example.invalid' }, secret);
+const originalSecret = config.jwt.secret;
+let originalAgent: typeof config.agent;
+const body = { requestId, content: '昨天买菜三十八块五', currency: 'CAD', timezone: 'America/Toronto', language: 'auto' };
+const state = { conversation: {id:conversationId,currency:'CAD',timezone:'America/Toronto',language:'auto'}, messages:[], draft:null,receipts:[],run:{id:requestId,status:'complete',error_code:null} };
+let financialWrites: number; let printed: unknown[][];
+beforeEach(() => {
+  originalAgent = {...config.agent}; config.agent.enabled = true; config.agent.apiKey = 'fictional-not-used'; config.jwt.secret = secret;
+  financialWrites = 0; printed = [];
+  mock.method(console, 'error', (...args:unknown[]) => printed.push(args));
+  mock.method(store, 'beginTurn', async () => ({ started:true,state,history:[],pendingRows:[] }));
+  mock.method(store, 'assertRunActive', async () => {});
+  mock.method(store, 'finishTurn', async () => state);
+  mock.method(store, 'failTurn', async () => state);
+  mock.method(store, 'cancelRun', async () => state);
+  mock.method(store, 'confirmDraft', async () => { financialWrites++; return state; });
+  mock.method(runtime, 'runAgent', async () => ({ text:'Please review the draft.',usage:{inputTokens:10,outputTokens:8},toolCalls:1 }));
+});
+afterEach(() => { Object.assign(config.agent,originalAgent); config.jwt.secret=originalSecret; mock.restoreAll(); });
+const post = (payload:object=body) => request(app).post(`/agent/conversations/${conversationId}/messages`).auth(token,{type:'bearer'}).send(payload);
+test('status and conversation routes require login', async () => {
+  assert.equal((await request(app).get('/agent/status')).status,401);
+  assert.equal((await request(app).post('/agent/conversations').send({})).status,401);
+});
+test('disabled agent does not touch persistence or runtime', async () => {
+  config.agent.enabled=false;
+  mock.method(store,'beginTurn',async()=>assert.fail('database queried'));
+  assert.deepEqual((await request(app).get('/agent/status').auth(token,{type:'bearer'})).body,{available:false});
+  const res=await post();assert.equal(res.status,503);assert.equal(res.body.code,'agent_unavailable');
+});
+test('conversational agreement never invokes financial confirmation',async()=>{
+  for(const content of ['yes','okay','好的']) assert.equal((await post({...body,content})).status,200);
+  assert.equal(financialWrites,0);
+});
+test('identity comes from login, never from request or model',async()=>{
+  let seen=false;
+  mock.method(store,'beginTurn',async(userId:number,id:string)=>{assert.equal(userId,77);assert.equal(id,conversationId);seen=true;return {started:true,state,history:[],pendingRows:[]};});
+  assert.equal((await post()).status,200);assert.equal(seen,true);
+  assert.equal((await post({...body,user_id:99})).status,400);
+});
+test('malformed IDs, preferences and messages fail before admission',async()=>{
+  mock.method(store,'beginTurn',async()=>assert.fail('admitted invalid input'));
+  for(const invalid of [{...body,requestId:'no'},{...body,content:''},{...body,content:'x'.repeat(4001)},{...body,timezone:'No/SuchZone'},{...body,currency:'XYZ'},{...body,language:'fr'}])assert.equal((await post(invalid)).status,400);
+});
+test('exact replay does not call provider again',async()=>{
+  mock.method(store,'beginTurn',async()=>({started:false,state,history:[],pendingRows:[]}));
+  mock.method(runtime,'runAgent',async()=>assert.fail('duplicate provider call'));
+  assert.equal((await post()).status,200);
+});
+test('provider errors remain safe and never confirm writes',async()=>{
+  mock.method(runtime,'runAgent',async()=>{throw new Error('secret financial description and credential');});
+  const res=await post();assert.equal(res.status,502);assert.equal(res.body.code,'agent_provider_error');
+  assert.doesNotMatch(JSON.stringify([res.body,printed]),/secret financial|credential/);assert.equal(financialWrites,0);
+});
+test('other-user resources keep indistinguishable not-found response',async()=>{
+  mock.method(store,'beginTurn',async()=>{throw new AgentError('agent_not_found',404);});
+  assert.equal((await post()).status,404);
+});
+test('confirmation accepts only reviewed version, selection and nonce',async()=>{
+  const url=`/agent/conversations/${conversationId}/confirm`;const good={version:1,rowIds:[requestId],requestId};
+  assert.equal((await request(app).post(url).auth(token,{type:'bearer'}).send({...good,amount:'900.00'})).status,400);assert.equal(financialWrites,0);
+  assert.equal((await request(app).post(url).auth(token,{type:'bearer'}).send(good)).status,200);assert.equal(financialWrites,1);
+});
+test('saved history remains readable when only the provider key is missing',async()=>{
+  config.agent.apiKey=undefined;
+  mock.method(store,'getConversation',async()=>state);
+  assert.equal((await request(app).get(`/agent/conversations/${conversationId}`).auth(token,{type:'bearer'})).status,200);
+  assert.equal((await post()).status,503);
+});
+test('explicit cancellation aborts a running provider and never publishes its draft',async()=>{
+  let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});
+  mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>{announce();return new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409)),{once:true}));});
+  mock.method(store,'finishTurn',async()=>assert.fail('late proposal persisted'));
+  const pending=post().then(res=>res);await entered;
+  const cancelled=await request(app).post(`/agent/conversations/${conversationId}/runs/${requestId}/cancel`).auth(token,{type:'bearer'});
+  assert.equal(cancelled.status,200);assert.equal((await pending).body.code,'agent_cancelled');assert.equal(financialWrites,0);
+});
+test('application deadline aborts a provider and persists a safe timeout',async()=>{
+  config.agent.timeoutMs=25;let failed='';
+  mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409)),{once:true})));
+  mock.method(store,'failTurn',async(_user:number,_conversation:string,_run:string,code:string)=>{failed=code;return state;});
+  const result=await post();assert.equal(result.status,504);assert.equal(failed,'agent_timeout');assert.equal(financialWrites,0);
+});
+test('process concurrency limit releases its slot after cancellation',async()=>{
+  config.agent.maxConcurrentRuns=1;
+  let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});
+  mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>{announce();return new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409)),{once:true}));});
+  const pending=post().then(res=>res);await entered;assert.equal((await post()).status,429);
+  await request(app).post(`/agent/conversations/${conversationId}/runs/${requestId}/cancel`).auth(token,{type:'bearer'});await pending;
+  mock.method(runtime,'runAgent',async()=>({text:'Ready',usage:{inputTokens:1,outputTokens:1},toolCalls:0}));assert.equal((await post()).status,200);
+});

@@ -27,6 +27,7 @@ import aiRoutes = require('./routes/ai');
 import importRoutes = require('./routes/import');
 import mcpRoutes = require('./routes/mcp');
 import accessTokenRoutes = require('./routes/accessTokens');
+import agentRoutes = require('./routes/agent');
 
 const app = express();
 const PORT = config.port;
@@ -82,6 +83,7 @@ app.use('/ai', aiRoutes);
 app.use('/import', importRoutes);
 // The signed-in user's tokens for /mcp, managed with the login JWT.
 app.use('/access-tokens', accessTokenRoutes);
+app.use('/agent', agentRoutes);
 // Read-only, for a personal agent; opened by an access token, never the login JWT.
 app.use('/mcp', mcpRoutes);
 

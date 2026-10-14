@@ -71,6 +71,26 @@ const config = {
     mailboxLayer: process.env.MAILBOXLAYER_API_KEY,
   },
 
+  // Deliberate opt-in; only the confirmation endpoint may write transactions.
+  agent: {
+    enabled: process.env.AGENT_ENABLED === 'true',
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+    timeoutMs: 90_000,
+    maxTurns: 10,
+    maxToolCalls: 8,
+    maxConcurrentRuns: 4,
+    maxTurnsPerHour: 20,
+    maxInputChars: 4000,
+    maxOutputChars: 8000,
+    maxOutputTokens: 4000,
+    maxHistoryChars: 24_000,
+    maxHistoryMessages: 30,
+    maxRows: 12,
+    maxTotalTokens: 32_000,
+    maxToolOutputChars: 16_000,
+  },
+
   // Rate limiting. Defaults are unchanged from when these were hardcoded in
   // middleware/rateLimiter.ts; they are here so they can be tuned per
   // environment. `apiMax` in particular is worth watching: the dashboard fires
