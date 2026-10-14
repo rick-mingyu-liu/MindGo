@@ -9,7 +9,7 @@
 
 TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
 
-A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. TermPocket tracks income, expenses, savings goals and a stock watchlist against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
+A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. TermPocket tracks income, expenses and savings goals against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
 
 **Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
 
@@ -58,11 +58,9 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 | **Transactions** | Income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in, and every total is shown in the display currency you choose. |
 | **Screenshot import** | Drop in screenshots from a bank app, a receipt photo, Uber, Uber Eats or WeChat Pay. The text is read **in your browser**, every row is checked and flagged, and nothing is saved until you confirm. [Details below](#screenshot-import). |
 | **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
-| **Savings goals** | Targets with progress bars and days remaining; an AI plan can become a goal in one click. |
-| **Investment watchlist** | Quotes, company financials, news and market indices, with three data sources behind a fallback chain (Finnhub → Yahoo Finance → Alpha Vantage), so a missing API key degrades rather than breaks. |
-| **AI planning** | DeepSeek-generated financial plans grounded in your actual transactions and your planning preferences (risk tolerance, life stage, experience). When the DeepSeek account is out of balance, its key is revoked, or it is rate-limited or overloaded, the page says *AI planning unavailable* instead of reporting a server error. |
+| **Savings goals** | Create and edit targets with progress bars and days remaining. |
 | **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
-| **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, and planning preferences. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
+| **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, and read-only AI connections. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
 | **English and 中文** | Every user-facing string, in both languages. |
 
 ---
@@ -142,8 +140,6 @@ DATABASE_URL=postgresql://user:password@localhost:5432/mindgo
 JWT_SECRET=<at least 32 characters>
 
 # Optional. Each one degrades gracefully when absent.
-DEEPSEEK_API_KEY=        # AI planning (DEEPSEEK_MODEL optional, default deepseek-flash)
-FINNHUB_API_KEY=         # stock quotes (falls back to Yahoo Finance)
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
 EMAIL_PASS=
@@ -221,7 +217,7 @@ backend/                        Express + PostgreSQL API (TypeScript)
 │   │   ├── duplicates.ts       possible_duplicate lookup
 │   │   └── parse.ts            confidence, flags, output
 │   ├── schedulerService.ts     weekly email (cron, Toronto time) + cleanup intervals
-│   └── …                       email, AI, exchange rates, stock data
+│   └── …                       email, exchange rates, financial facts
 ├── types/
 │   ├── db.ts                   one interface per table — edit with schema.sql
 │   ├── express.d.ts            req.user, merged into Express’s own Request
@@ -306,7 +302,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 
 ### Tests
 
-[`backend/test/`](backend/test/) holds the application's tests — **519 across 31 files**, run by `node --test`. No test framework is installed and none is needed.
+[`backend/test/`](backend/test/) holds the application's tests, run by `node --test`. No test framework is installed and none is needed.
 
 **Unit tests always run**, with no database and no network. They cover the things that fail silently:
 
@@ -314,7 +310,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - the demo generator's evergreen properties at nine different "todays"
 - the startup config check, retention predicates, logger levels in production
 - the scheduler's timer plumbing, and the weekly report's next run **on a UTC clock**
-- every AI endpoint when DeepSeek is out of balance, the key is revoked, or it is rate-limited or overloaded
+- retired stock and one-shot AI endpoints return authenticated retirement responses without database or provider calls; legacy history and archived-data deletion remain available
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
 
@@ -389,29 +385,17 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `PUT /:id/progress` | update progress |
 | `GET /stats` | aggregates |
 | `DELETE /clear-all` | delete every goal |
-| `POST /from-ai-plan` | turn an AI plan into a goal |
+| `POST /from-ai-plan` | retired; returns `410 Gone` |
 
-### `/investments`
-| | |
-|---|---|
-| `GET /watchlist`, `POST /watchlist` | list, add |
-| `DELETE /watchlist/:id`, `DELETE /watchlist/clear-all` | remove |
-| `GET /snapshot/:symbol` | current quote |
-| `GET /historical/:symbol` | price history |
-| `GET /financials/:symbol`, `GET /news/:symbol`, `GET /analysis/:symbol` | company detail |
-| `GET /market-overview` | S&P 500, Dow, NASDAQ |
-| `GET /watchlist/ai-summary` | a written summary of the watchlist |
-| `GET /search` | symbol search |
+### Retired stock and one-shot planning endpoints
 
-### `/ai`
-| | |
-|---|---|
-| `POST /plan` | generate a financial plan |
-| `GET /plans`, `GET /plans/:id` | plan history |
-| `POST /budget-recommendations` | budget suggestions |
-| `POST /investment-advice` | investment commentary |
+Stock/watchlist features and the old AI Planning interface are retired. `/investments` bookmarks redirect to the dashboard; `/ai-planning` bookmarks redirect to savings goals. The proposed conversational agent is not yet implemented or advertised as available.
 
-20 requests per hour per IP. Generated plans expire 30 minutes after creation: from then on every endpoint treats them as gone. They are deleted physically by an hourly maintenance job that runs while the server is up, so an expired plan normally stays in the database for up to about another hour, and longer if the server was down or asleep. When DeepSeek is out of balance, the key is revoked, or it is rate-limited or overloaded (its 401, 402, 429 or 503), the generating endpoints answer **`503`** with `{ "code": "ai_unavailable" }`.
+Authenticated stock operations under `/investments` return **`410 Gone`**. The one retained mutation is `DELETE /investments/watchlist/clear-all`: Settings uses it to delete the user's archived watchlist rows alongside transactions and goals. No stock quote, search, news or analysis provider is called.
+
+`POST /ai/plan`, `/ai/budget-recommendations`, `/ai/investment-advice` and `/goals/from-ai-plan` return **`410 Gone`**. `GET /ai/plans` and `GET /ai/plans/:id` remain authenticated, read-only legacy history endpoints. Existing plans expire 30 minutes after creation, enforced at read time and physically swept by the existing hourly maintenance job. No new one-shot plans can be created.
+
+The `watchlist` and `ai_plans` tables remain in the schema; this retirement needs no database migration and does not delete existing rows. Archived watchlist rows remain until the user clears them or the owning account is deleted. A future storage removal requires a separately reviewed data transition.
 
 ### `/mcp` — read-only, for a personal agent
 
@@ -503,7 +487,7 @@ The backend runs on **Render**, the frontend on **Vercel**, the database on **Ne
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
-**Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set `DEEPSEEK_API_KEY` and the email credentials in Render, and keep the DeepSeek account in balance — AI planning reports itself unavailable otherwise.
+**Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set the email credentials in Render when enabling email reports. Stock-provider and DeepSeek credentials are no longer used by the application; the isolated agent compatibility probe uses its own explicitly supplied DeepSeek credential.
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
@@ -513,17 +497,17 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 ## Stack
 
-**Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`, `openai` (the SDK, pointed at DeepSeek).
+**Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`.
 
 **Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
 
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
-**External services** — [Finnhub](https://finnhub.io/), Yahoo Finance and [Alpha Vantage](https://www.alphavantage.co/) for stock data; [DeepSeek](https://api-docs.deepseek.com/) for planning; [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
+**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
 
 ## Database
 
-Six tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches`. `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` (`manual` | `ocr` | `ocr_llm`, migration `011`) records where a row came from; `import_batches` holds one row per confirmed screenshot import — counts only, never text or amounts.
+Seven tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches`, `access_tokens`. `watchlist` and `ai_plans` are legacy storage retained under the retirement policy above. `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` (`manual` | `ocr` | `ocr_llm`, migration `011`) records where a row came from; `import_batches` holds one row per confirmed screenshot import — counts only, never text or amounts.
 
 ## Known gaps
 
