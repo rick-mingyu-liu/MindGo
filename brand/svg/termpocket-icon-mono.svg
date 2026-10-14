@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="76.5 82 1100 1100" role="img">
+  <title>TermPocket</title>
+  <path fill="#000000" d="M131 470C131 380 195 326 262 322Q626.5 300 991 322C1058 326 1122 380 1122 470V700H131Z"/>
+  <path fill="#FFFFFF" d="M238 560V275A105 105 0 0 1 343 170H910A105 105 0 0 1 1015 275V560Z"/>
+  <path fill="#000000" d="M238 325V275A105 105 0 0 1 343 170H910A105 105 0 0 1 1015 275V325Z"/>
+  <rect x="389" y="97.5" width="105" height="190" rx="52.5" fill="#000000" stroke="#FFFFFF" stroke-width="15"/>
+  <rect x="759" y="97.5" width="105" height="190" rx="52.5" fill="#000000" stroke="#FFFFFF" stroke-width="15"/>
+  <path fill="#000000" d="M131 445Q626.5 607 1122 445V775C1122 970 853 1130 686.5 1164Q626.5 1183 566.5 1164C400 1130 131 970 131 775Z"/>
+  <path fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" d="M185 562L238.5 578.6M300.7 595.2L355.3 607.5M418.7 618.8L474.2 626.3M538.4 632.1L594.3 634.6M658.7 634.6L714.6 632.1M778.8 626.3L834.3 618.8M897.7 607.5L952.3 595.2M1014.5 578.6L1068 562"/>
+</svg>
