@@ -101,7 +101,7 @@ export default function NewTransaction() {
   return (
     <>
       <Head>
-        <title>Add Transaction - Personal Finance App</title>
+        <title>Add Transaction - TermPocket</title>
         <meta name="description" content="Add a new transaction" />
       </Head>
 

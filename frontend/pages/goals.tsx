@@ -150,7 +150,7 @@ export default function Goals() {
   return (
     <>
       <Head>
-        <title>{t('Savings Goals')} - MindGo</title>
+        <title>{t('Savings Goals')} - TermPocket</title>
         <meta name="description" content={t('Manage your savings goals')} />
       </Head>
 

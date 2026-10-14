@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Image from 'next/image'
+import { BrandLogo } from '@/components/BrandLogo'
 import { CheckCircle, XCircle, Mail, ArrowRight } from 'lucide-react'
 import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useTheme } from '@/contexts/ThemeContext'
 import { useTranslation } from 'next-i18next'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
 
 export default function VerifyEmail() {
   const router = useRouter()
-  const { resolvedTheme } = useTheme()
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -76,7 +74,7 @@ export default function VerifyEmail() {
   const getStatusDescription = () => {
     switch (verificationStatus) {
       case 'success':
-        return t('Your email has been verified. You can now log in to your MindGo account.')
+        return t('Your email has been verified. You can now log in to your TermPocket account.')
       case 'error':
         return message ? t(message) : t('There was an error verifying your email address.')
       default:
@@ -87,24 +85,16 @@ export default function VerifyEmail() {
   return (
     <>
       <Head>
-        <title>Verify Email - MindGo</title>
-        <meta name="description" content="Verify your MindGo account email" />
+        <title>Verify Email - TermPocket</title>
+        <meta name="description" content="Verify your TermPocket account email" />
       </Head>
 
       <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex justify-center">
-              <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
-                width={160}
-                height={160}
-                className="h-24 w-auto aurora-glow"
-                priority
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+            <h1 className="mx-auto mb-4 flex justify-center">
+              <BrandLogo className="h-14 sm:h-16" priority />
+            </h1>
           </div>
         </div>
 

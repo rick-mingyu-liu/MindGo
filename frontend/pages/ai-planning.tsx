@@ -219,7 +219,7 @@ export default function AIPlanning() {
   return (
     <>
       <Head>
-        <title>{t('AI Financial Planning')} - MindGo</title>
+        <title>{t('AI Financial Planning')} - TermPocket</title>
         <meta name="description" content={t('Get AI-powered financial planning advice')} />
       </Head>
       <div className="min-h-screen bg-background">

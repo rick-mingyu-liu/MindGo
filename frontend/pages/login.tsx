@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, TrendingUp, Shield, Target, BarChart3, Users, Zap, Volume2, Users2, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, TrendingUp, Shield, Target, CalendarRange, ScanText, Coins, Sparkles, AlertCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useTheme } from '@/contexts/ThemeContext'
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
@@ -23,7 +23,6 @@ interface LoginForm {
 
 export default function Login() {
   const router = useRouter()
-  const { resolvedTheme } = useTheme()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
@@ -132,24 +131,16 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login - MindGo</title>
-        <meta name="description" content="Sign in to your MindGo account" />
+        <title>Login - TermPocket</title>
+        <meta name="description" content="Sign in to your TermPocket account" />
       </Head>
 
       <div className="min-h-screen relative flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-white dark:bg-gray-950 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex justify-center">
-              <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
-                width={160}
-                height={160}
-                className="h-24 w-auto aurora-glow"
-                priority
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+            <h1 className="mx-auto mb-4 flex justify-center">
+              <BrandLogo className="h-14 sm:h-16" priority />
+            </h1>
             <button
               onClick={() => setShowIntro(true)}
               className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline cursor-pointer transition-colors"
@@ -320,113 +311,116 @@ export default function Login() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
+                src="/brand/termpocket-icon.svg"
+                alt=""
+                aria-hidden="true"
                 width={60}
                 height={60}
-                className="h-15 w-auto"
+                className="h-14 w-14 shrink-0 dark:hidden"
+              />
+              <Image
+                src="/brand/termpocket-icon-dark.svg"
+                alt=""
+                aria-hidden="true"
+                width={60}
+                height={60}
+                className="hidden h-14 w-14 shrink-0 dark:block"
               />
               <div>
-                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">{t('Welcome to MindGo')}</h2>
-                <p className="text-sm text-muted-foreground">{t('Your AI-Powered Personal Finance Companion')}</p>
+                <h2 className="text-2xl font-bold text-green-700 dark:text-green-400">{t('Welcome to TermPocket')}</h2>
+                <p className="text-sm text-muted-foreground">{t('Your money, term by term.')}</p>
               </div>
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Mission Statement */}
             <div className="text-center py-4">
-              <h3 className="text-xl font-semibold mb-2 text-green-700 dark:text-green-400">{t('Our Mission')}</h3>
+              <h3 className="text-xl font-semibold mb-2 text-green-700 dark:text-green-400">{t('Built for student life')}</h3>
               <p className="text-muted-foreground">
-                {t('To democratize financial intelligence by providing everyone with AI-powered tools to make smarter financial decisions, track their progress, and achieve their goals.')}
+                {t('A study term spends and a co-op term earns. TermPocket helps university and college students in Canada follow their money the way they live it: one four-month term at a time, through study terms, co-op placements, internships and summer breaks.')}
               </p>
             </div>
 
-            {/* Key Features */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Smart Investment Tracking')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Real-time stock analysis, K-charts, and AI-powered investment insights to help you make informed decisions.')}
-                    </p>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg shrink-0">
+                  <CalendarRange className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <Target className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Goal Setting & Tracking')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Set financial goals, track your progress, and get personalized recommendations to stay on target.')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                    <BarChart3 className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Expense Analytics')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Comprehensive spending analysis with AI-powered insights to identify saving opportunities.')}
-                    </p>
-                  </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Term by term')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('See income, spending and savings for this term, last term or the whole year, so a co-op term and a study term are easy to compare.')}</p>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
-                    <Zap className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('AI Financial Planning')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Get personalized financial plans, budget recommendations, and investment advice powered by AI.')}
-                    </p>
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg shrink-0">
+                  <ScanText className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
-                    <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Secure & Private')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Bank-level security with end-to-end encryption to keep your financial data safe and private.')}
-                    </p>
-                  </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Import from a screenshot')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Add transactions from a screenshot of your banking app, a receipt, Uber, Uber Eats or WeChat Pay. The image is read on your device and never uploaded, and nothing is saved until you confirm.')}</p>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
-                    <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Community Driven')}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {t('Join a community of financially conscious individuals sharing insights and strategies.')}
-                    </p>
-                  </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-lg shrink-0">
+                  <Target className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Savings goals')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Set a target amount and a date, and watch your progress toward it.')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg shrink-0">
+                  <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Six currencies')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Record money in CAD, USD, EUR, GBP, AUD or CNY, and see your totals in the currency you choose.')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg shrink-0">
+                  <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('AI planning')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Ask for a budget or savings plan built from your own numbers. Treat it as a starting point, not professional financial advice.')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg shrink-0">
+                  <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Investment watchlist')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Follow stocks you care about with price charts, news and an AI summary of your watchlist.')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg shrink-0">
+                  <Mail className="h-5 w-5 text-orange-600 dark:text-orange-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Weekly report')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('Get a summary of your week by email every Sunday evening. Turn it off any time in Settings.')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-teal-100 dark:bg-teal-900 rounded-lg shrink-0">
+                  <Shield className="h-5 w-5 text-teal-600 dark:text-teal-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Private by design')}</h4>
+                  <p className="text-sm text-muted-foreground">{t('TermPocket never connects to your bank. Passwords are stored hashed, and screenshots stay on your device.')}</p>
                 </div>
               </div>
             </div>
 
-            {/* Call to Action */}
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                {t('Ready to take control of your financial future? Start your journey with MindGo today.')}
+                {t('TermPocket is free, in English and Chinese. Try the demo account, or create your own.')}
               </p>
-              <div className="flex gap-3 justify-center">
+              <div className="flex gap-3 justify-center flex-wrap">
                 <Button onClick={() => router.push('/register')}>
                   {t('Get Started Free')}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -437,51 +431,17 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Ads and Collaboration Opportunities */}
-            <div className="border-t border-border pt-6">
-              <h3 className="text-xl font-semibold mb-4 text-green-700 dark:text-green-400">{t('Partnership & Collaboration')}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                      <Volume2 className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Advertising Opportunities')}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Reach our engaged community of financially conscious users. We offer targeted advertising solutions for financial services, investment products, and educational content.')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-teal-100 dark:bg-teal-900 rounded-lg">
-                      <Users2 className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-green-700 dark:text-green-400">{t('Collaboration Opportunities')}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {t('Partner with us to create innovative financial solutions. We\'re open to strategic partnerships, API integrations, and joint ventures that benefit our users.')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-6 text-center">
-                <p className="text-sm text-muted-foreground mb-3">
-                  {t('Interested in advertising or collaboration? Get in touch with us.')}
-                </p>
-                <a 
-                  href="mailto:mindgofinance@gmail.com" 
-                  className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-                >
-                  {t('Contact Us')}
-                  <Mail className="ml-2 h-4 w-4" />
-                </a>
-              </div>
+            <div className="border-t border-border pt-6 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                {t('Questions, feedback or ideas? We would love to hear from you.')}
+              </p>
+              <a
+                href="mailto:rickmyliu@gmail.com"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+              >
+                {t('Contact Us')}
+                <Mail className="ml-2 h-4 w-4" aria-hidden="true" />
+              </a>
             </div>
           </div>
         </DialogContent>

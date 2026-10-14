@@ -177,7 +177,7 @@ export default function EditTransaction() {
   return (
     <>
       <Head>
-        <title>Edit Transaction - Personal Finance App</title>
+        <title>Edit Transaction - TermPocket</title>
         <meta name="description" content="Edit your transaction" />
       </Head>
 

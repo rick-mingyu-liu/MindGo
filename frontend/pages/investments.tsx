@@ -228,7 +228,7 @@ export default function Investments() {
   return (
     <>
       <Head>
-        <title>{t('Investment Watchlist')} - MindGo</title>
+        <title>{t('Investment Watchlist')} - TermPocket</title>
         <meta name="description" content={t('Track your favorite stocks')} />
       </Head>
 

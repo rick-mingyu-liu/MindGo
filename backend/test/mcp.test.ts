@@ -112,10 +112,14 @@ describe('who gets in', () => {
 describe('the protocol', () => {
   test('initialize, a notification, and tools/list', async () => {
     const init = (await (await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })).json()) as {
-      result: { protocolVersion: string; capabilities: unknown };
+      result: { protocolVersion: string; capabilities: unknown; serverInfo: { name: string; title: string } };
     };
     assert.equal(init.result.protocolVersion, '2025-06-18');
     assert.deepEqual(init.result.capabilities, { tools: {} });
+    // `name` is what agent configs key on and survived the TermPocket rename;
+    // only the display `title` carries the brand.
+    assert.equal(init.result.serverInfo.name, 'mindgo');
+    assert.equal(init.result.serverInfo.title, 'TermPocket');
 
     const note = await rpc({ jsonrpc: '2.0', method: 'notifications/initialized' });
     assert.equal(note.status, 202);

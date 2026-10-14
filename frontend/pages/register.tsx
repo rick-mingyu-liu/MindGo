@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Image from 'next/image'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '@/utils/api'
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useTheme } from '@/contexts/ThemeContext'
 import Swal from 'sweetalert2'
 import { useTranslation } from 'next-i18next'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
@@ -75,7 +74,6 @@ const validateEmail = (email: string) => {
 
 export default function Register() {
   const router = useRouter()
-  const { resolvedTheme } = useTheme()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -127,7 +125,7 @@ export default function Register() {
         Swal.fire({
           icon: 'success',
           title: 'Registration successful!',
-          text: 'Welcome to MindGo.',
+          text: 'Welcome to TermPocket.',
         })
         router.push('/')
       }
@@ -160,24 +158,16 @@ export default function Register() {
     return (
       <>
         <Head>
-          <title>Check Your Email - MindGo</title>
-          <meta name="description" content="Verify your MindGo account" />
+          <title>Check Your Email - TermPocket</title>
+          <meta name="description" content="Verify your TermPocket account" />
         </Head>
 
         <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
           <div className="sm:mx-auto sm:w-full sm:max-w-md">
             <div className="text-center">
-              <div className="mx-auto mb-4 flex justify-center">
-                <Image
-                  src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                  alt="MindGo Logo"
-                  width={160}
-                  height={160}
-                  className="h-24 w-auto aurora-glow"
-                  priority
-                />
-              </div>
-              <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+              <h1 className="mx-auto mb-4 flex justify-center">
+                <BrandLogo className="h-14 sm:h-16" priority />
+              </h1>
             </div>
           </div>
 
@@ -234,24 +224,16 @@ export default function Register() {
   return (
     <>
       <Head>
-        <title>Register - MindGo</title>
-        <meta name="description" content="Create your MindGo account" />
+        <title>Register - TermPocket</title>
+        <meta name="description" content="Create your TermPocket account" />
       </Head>
 
       <div className="min-h-screen bg-white dark:bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 aurora-particles">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex justify-center">
-              <Image
-                src={resolvedTheme === 'dark' ? "/MindGo_dark.png" : "/MindGo.png"}
-                alt="MindGo Logo"
-                width={160}
-                height={160}
-                className="h-24 w-auto aurora-glow"
-                priority
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-green-700 dark:text-green-400 aurora-text">{t('MindGo')}</h1>
+            <h1 className="mx-auto mb-4 flex justify-center">
+              <BrandLogo className="h-14 sm:h-16" priority />
+            </h1>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t('Create your account')}</p>
           </div>
         </div>
