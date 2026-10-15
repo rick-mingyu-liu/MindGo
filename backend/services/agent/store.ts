@@ -15,6 +15,8 @@ const receiptColumns = 'id,request_id,transaction_ids,undo_until,undone_at,creat
 const runColumns = 'id,status,error_code';
 const proposalColumns = 'id,action,goal_id,before,after,status,expires_at,result_goal_id';
 const limits = config.agent;
+/** pg_advisory_xact_lock key for the all-users daily admission count; any fixed bigint nothing else uses. */
+const ADMISSION_LOCK = 7_406_221_501;
 
 // A failed ROLLBACK leaves the connection in an unknown transaction state, so
 // it is destroyed rather than returned to the pool; the original error wins.
@@ -135,6 +137,13 @@ export async function beginTurn(userId:number,id:string,input:TurnInput,canStart
     if((await client.query("SELECT id FROM agent_runs WHERE user_id=$1 AND status='running'",[userId])).rowCount) throw new AgentError('agent_busy',409);
     const admitted=await client.query<{count:string}>("SELECT count(*) FROM agent_admissions WHERE user_id=$1 AND created_at>now()-interval '1 hour'",[userId]);
     if(Number(admitted.rows[0]!.count)>=limits.maxTurnsPerHour) throw new AgentError('agent_rate_limited',429);
+    const today=await client.query<{count:string}>("SELECT count(*) FROM agent_admissions WHERE user_id=$1 AND created_at>now()-interval '24 hours'",[userId]);
+    if(Number(today.rows[0]!.count)>=limits.maxTurnsPerDay) throw new AgentError('agent_daily_limit',429);
+    // The owner lock only serializes one user's admissions; this one serializes
+    // everyone's until COMMIT, so concurrent users cannot overshoot the total.
+    await client.query('SELECT pg_advisory_xact_lock($1)',[ADMISSION_LOCK]);
+    const everyone=await client.query<{count:string}>("SELECT count(*) FROM agent_admissions WHERE created_at>now()-interval '24 hours'");
+    if(Number(everyone.rows[0]!.count)>=limits.maxTurnsPerDayAllUsers) throw new AgentError('agent_daily_capacity',429);
     const count=await client.query<{count:string}>('SELECT count(*) FROM agent_messages WHERE conversation_id=$1 AND user_id=$2',[id,userId]);
     // Leave room for this turn's user message and the assistant reply.
     if(Number(count.rows[0]!.count)+2>limits.maxMessagesPerConversation) throw new AgentError('agent_conversation_full',409);

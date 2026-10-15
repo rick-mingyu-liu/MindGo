@@ -84,6 +84,11 @@ const config = {
     // Extra turns are refused with agent_busy. Raise only with the memory to match.
     maxConcurrentRuns: intFromEnv('AGENT_MAX_CONCURRENT_RUNS', 1),
     maxTurnsPerHour: 20,
+    // The provider bill is what these bound: sign-up is open, and the hourly
+    // limit alone lets one account start 480 turns a day. Both are a rolling
+    // 24 hours over agent_admissions, which history deletion does not clear.
+    maxTurnsPerDay: intFromEnv('AGENT_MAX_TURNS_PER_DAY', 60),
+    maxTurnsPerDayAllUsers: intFromEnv('AGENT_MAX_TURNS_PER_DAY_ALL_USERS', 600),
     maxInputChars: 4000,
     maxOutputChars: 8000,
     maxOutputTokens: 4000,
