@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import axios from 'axios'
 import { api } from '@/utils/api'
 import { categories } from '../new'
 import { Button } from '@/components/ui/button'
@@ -54,19 +55,8 @@ export default function EditTransaction() {
   const fetchTransaction = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/transactions`)
-      const transactions = response.data.transactions
-      const targetTransaction = transactions.find((t: Transaction) => t.id === parseInt(id as string))
-      
-      if (!targetTransaction) {
-        Swal.fire({
-          icon: 'error',
-          title: t('Transaction not found'),
-          text: t('The transaction you are trying to edit does not exist.')
-        })
-        router.push('/transactions')
-        return
-      }
+      const response = await api.get(`/transactions/${id}`)
+      const targetTransaction: Transaction = response.data.transaction
 
       setFormData({
         description: targetTransaction.description,
@@ -78,11 +68,20 @@ export default function EditTransaction() {
       })
     } catch (error) {
       console.error('Error fetching transaction:', error)
-      Swal.fire({
-        icon: 'error',
-        title: t('Failed to load transaction'),
-        text: t('There was an error loading the transaction. Please try again later.')
-      })
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined
+      if (status === 404 || status === 400) {
+        Swal.fire({
+          icon: 'error',
+          title: t('Transaction not found'),
+          text: t('The transaction you are trying to edit does not exist.')
+        })
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: t('Failed to load transaction'),
+          text: t('There was an error loading the transaction. Please try again later.')
+        })
+      }
       router.push('/transactions')
     } finally {
       setLoading(false)

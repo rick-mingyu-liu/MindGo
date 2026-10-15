@@ -3,6 +3,8 @@ import { validationResult, FieldValidationError } from 'express-validator';
 import { query } from '../db/connection';
 import { getExchangeRate } from '../services/exchangeRateService';
 import type { TransactionRow } from '../types/db';
+import { decodeCursor, encodeCursor } from '../utils/transactionCursor';
+import { toDay } from '../utils/dates';
 import { errorSummary } from '../utils/errorSummary';
 
 /** A transactions row, plus its amount converted to the caller's requested currency. */
@@ -32,15 +34,13 @@ const transactionController = {
   // Get all transactions for user
   async getTransactions(req: Request, res: Response) {
     try {
-      // No express-validator chain runs on this route, so these are read
-      // exactly as the original code read them off req.query: untyped
-      // strings when present, with page/limit defaulting only on undefined,
-      // matching a destructuring default's own behaviour. page/limit stay
-      // the raw strings (parsed only at the specific sites below that
-      // originally parsed them) -- '-' and '*' already coerce with ToNumber,
-      // which is what Number() does and parseInt() does not: parsing here
-      // would silently floor a fractional page/limit before offset is
-      // computed, turning '?page=5.7&limit=3' from OFFSET 14.1 into OFFSET 12.
+      // listValidation (routes/transactions.ts) vets page and limit; the rest
+      // are read as untyped strings off req.query.
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const page = (req.query.page as string | undefined) ?? '1';
       const limit = (req.query.limit as string | undefined) ?? '50';
       const type = req.query.type as string | undefined;
@@ -48,11 +48,20 @@ const transactionController = {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const targetCurrency = req.query.targetCurrency as string | undefined;
-      const offset = (Number(page) - 1) * Number(limit);
+      const cursor = req.query.before === undefined ? null : decodeCursor(req.query.before);
+      // With a cursor the position comes from it, never from page.
+      const offset = cursor ? 0 : (Number(page) - 1) * Number(limit);
 
       let sql = 'SELECT * FROM transactions WHERE user_id = $1';
       const params: unknown[] = [req.user.userId];
       let paramCount = 1;
+
+      // Rows strictly below the cursor in (date DESC, id DESC) order.
+      if (cursor) {
+        params.push(cursor.date, cursor.id);
+        paramCount += 2;
+        sql += ` AND (date, id) < ($${paramCount - 1}::date, $${paramCount})`;
+      }
 
       // Add filters
       if (type) {
@@ -80,8 +89,9 @@ const transactionController = {
       }
 
       // Add ordering and pagination
-      sql += ` ORDER BY date DESC, created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-      params.push(parseInt(limit), offset);
+      sql += ` ORDER BY date DESC, id DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+      // One row beyond the page tells whether another page exists.
+      params.push(parseInt(limit) + 1, offset);
 
       const transactions = await query<TransactionRow>(sql, params);
 
@@ -132,7 +142,9 @@ const transactionController = {
         rateCache[key] = rate;
         return rate;
       }
-      const convertedTransactions: TransactionWithConversion[] = await Promise.all(transactions.rows.map(async (tx): Promise<TransactionWithConversion> => {
+      const hasMore = transactions.rows.length > parseInt(limit);
+      const pageRows = hasMore ? transactions.rows.slice(0, parseInt(limit)) : transactions.rows;
+      const convertedTransactions: TransactionWithConversion[] = await Promise.all(pageRows.map(async (tx): Promise<TransactionWithConversion> => {
         let convertedAmount = parseFloat(tx.amount);
         let convertedCurrency = tx.currency || displayCurrency;
         if (tx.currency && tx.currency !== displayCurrency) {
@@ -153,10 +165,17 @@ const transactionController = {
         };
       }));
 
+      // A row beyond the page means another page exists.
+      const last = pageRows[pageRows.length - 1];
+      const lastDay = last ? toDay(last.date) : null;
+      const nextCursor = hasMore && last && lastDay ? encodeCursor(lastDay, last.id) : null;
+
       res.json({
         transactions: convertedTransactions,
+        nextCursor,
+        // With a cursor the position is not a page number, so none is reported.
         pagination: {
-          page: parseInt(page),
+          ...(cursor ? {} : { page: parseInt(page) }),
           limit: parseInt(limit),
           total: totalCount,
           pages: Math.ceil(totalCount / Number(limit))
@@ -296,9 +315,37 @@ const transactionController = {
     }
   },
 
+  // One transaction, owned by the caller. Another user's id is a plain 404.
+  async getTransaction(req: Request, res: Response) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const result = await query<TransactionRow>(
+        'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
+        [req.params.id, req.user.userId]
+      );
+      const transaction = result.rows[0];
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      res.json({ transaction });
+    } catch (error) {
+      console.error('Get transaction error:', errorSummary(error));
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
   // Delete transaction
   async deleteTransaction(req: Request, res: Response) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const { id } = req.params;
 
       // Check if transaction belongs to user

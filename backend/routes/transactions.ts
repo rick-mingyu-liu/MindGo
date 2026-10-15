@@ -1,5 +1,6 @@
 import express from 'express';
-import { body, query } from 'express-validator';
+import { body, query, param } from 'express-validator';
+import { decodeCursor } from '../utils/transactionCursor';
 import config = require('../config');
 import transactionController = require('../controllers/transactionController');
 import auth = require('../middleware/auth');
@@ -62,17 +63,38 @@ const autoDeleteValidation = [
     .withMessage('months must be a whole number between 1 and 60'),
 ];
 
+// Listing is paged: the largest page is 200 rows, and the default stays 50.
+// These used to be read unvalidated, so ?limit=1000000 asked the database for
+// everything and ?page=0 produced a negative OFFSET (a 500).
+const listValidation = [
+  query('page').optional().not().isArray().withMessage('page must be given once')
+    .bail().isInt({ min: 1, max: 1_000_000 })
+    .withMessage('page must be a whole number between 1 and 1000000'),
+  query('limit').optional().not().isArray().withMessage('limit must be given once')
+    .bail().isInt({ min: 1, max: 200 })
+    .withMessage('limit must be a whole number between 1 and 200'),
+  // Keyset paging: the cursor a previous response returned as nextCursor.
+  query('before').optional().not().isArray().withMessage('before must be given once')
+    .bail().custom((value) => decodeCursor(value) !== null)
+    .withMessage('before is not a valid cursor'),
+];
+
+const idValidation = [
+  param('id').isInt({ min: 1, max: 2147483647 }).withMessage('id must be a positive whole number'),
+];
+
 // Routes
-router.get('/', transactionController.getTransactions);
+router.get('/', listValidation, transactionController.getTransactions);
 router.post('/', transactionValidation, transactionController.createTransaction);
 router.post('/import', importValidation, transactionController.importTransactions);
 router.get('/categories', transactionController.getCategories);
 router.delete('/clear-all', transactionController.clearAllTransactions);
 router.delete('/auto-delete', autoDeleteValidation, transactionController.autoDeleteOldTransactions);
 router.get('/retention-settings', transactionController.getDataRetentionSettings);
+router.get('/:id', idValidation, transactionController.getTransaction);
 router.put('/retention-settings', transactionController.updateDataRetentionSettings);
-router.put('/:id', transactionValidation, transactionController.updateTransaction);
-router.delete('/:id', transactionController.deleteTransaction);
+router.put('/:id', idValidation, transactionValidation, transactionController.updateTransaction);
+router.delete('/:id', idValidation, transactionController.deleteTransaction);
 
 
 export = router;
