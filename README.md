@@ -128,7 +128,7 @@ Open the dashboard's **Record with Pocky** panel or `/agent`. Pocky is TermPocke
 
 Only the confirmation endpoint creates financial records. Confirmation binds the reviewed draft version and selected row IDs to a retry key; retrying the same confirmation cannot insert the batch twice. Pending drafts last 24 hours from the model proposal; manual edits and partial confirmation keep that deadline. Each saved batch offers ten-minute undo, which refuses if any of its transactions was edited or deleted afterward. Conversation deletion clears its messages and drafts while keeping saved transactions; Settings' broader clear-all action separately deletes financial records too.
 
-Messages persist in TermPocket's database until their conversation is deleted. Each model request receives bounded recent history and the current pending draft. There are no conversation summaries, durable fact memory, financial planning, spending-analysis tools or voice input in this release. Manual recording, screenshot import, savings goals and external read-only MCP remain available.
+Messages persist in TermPocket's database until their conversation is deleted. Each model request receives bounded recent history and the current pending draft. Pocky can also help plan: it averages your past months, lists your savings goals, runs deterministic cash projections from the numbers you give it (it asks for cash on hand rather than guessing, and will not call something affordable without it), and proposes one goal creation or change at a time, which only the goal card's Confirm button applies. Projections are estimates from stated inputs, not advice, and nothing is stored except the pending goal proposal. There are no conversation summaries, durable fact memory or voice input in this release. Manual recording, screenshot import, savings goals and external read-only MCP remain available.
 
 **Data handling:** messages, relevant history, pending rows and the displayed date/currency/timezone context are sent to DeepSeek. TermPocket stores conversations, and authorized administrators may access them. This is not end-to-end encrypted storage. DeepSeek handles submitted data under its own terms; deleting local history does not promise deletion from provider systems. Do not include account passwords or credentials. Operational agent logs contain metadata and safe error codes, not conversation contents or raw provider errors.
 
@@ -192,7 +192,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/011_add_import_tracking
 
 `schema.sql` is the desired end state; a migration without a matching `schema.sql` edit means fresh setups and existing databases diverge.
 
-Conversation recording needs [`013_conversational_transactions.sql`](backend/db/migrations/013_conversational_transactions.sql) on an existing database, after earlier migrations. Apply and verify it manually on a disposable local database or staging first; this implementation does not migrate production. It audits existing transaction sources and aborts on incompatible values without rewriting financial rows. Fresh setups include the same tables in `schema.sql`. Leave `AGENT_ENABLED=false` until the migration is installed; production migration and enablement are separate operator actions.
+Conversation recording needs [`013_conversational_transactions.sql`](backend/db/migrations/013_conversational_transactions.sql) on an existing database, after earlier migrations. Apply and verify it manually on a disposable local database or staging first; this implementation does not migrate production. It audits existing transaction sources and aborts on incompatible values without rewriting financial rows. Fresh setups include the same tables in `schema.sql`. Leave `AGENT_ENABLED=false` until the migration is installed; production migration and enablement are separate operator actions. Planning adds [`015_agent_goal_proposals.sql`](backend/db/migrations/015_agent_goal_proposals.sql) (additive, idempotent, requires 013): applying it before deploying the planning backend is recommended. Without it, goal proposals are simply unavailable (Pocky says so and the goal buttons answer `agent_unavailable`) while everything else works, and the backend notices the table once it is applied, without a restart.
 
 ### Run
 
@@ -339,13 +339,14 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - the removed stock and AI-plan endpoints fall through to the ordinary 404, signed in or not, without touching the database
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
+- planning projections in integer cents (repeats, month-end clamping, leap years, window edges, conversion, reserve breaches, goal math) and goal-proposal validation
 - agent row validation, authenticated routes, unavailable-mode behavior, cancellation, runtime tool restrictions, token limits, safe failures and temporary-directory cleanup
 
 **Drift guards** (`sharedContracts.test.ts`, `demoData.test.ts`) pin what the backend and frontend both define: the seed's category list must match the picker's, and every category the picker offers must have a colour. The two projects are deliberately not npm workspaces, since workspaces move every lockfile to the repo root and break `npm ci` for both deploys (Render builds `backend`, Vercel `frontend`).
 
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
-**`api.test.ts`, `agentStore.test.ts`, `agentMigration.test.ts` and `dropWatchlistMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
+**`api.test.ts`, `agentStore.test.ts`, `agentGoalProposals.test.ts`, `agentMigration.test.ts`, `goalProposalMigration.test.ts` and `dropWatchlistMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
 
 ```bash
 TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
@@ -432,6 +433,10 @@ All endpoints require the login JWT and return `Cache-Control: no-store`. Errors
 | `PATCH, DELETE /conversations/:id/draft` | Save edits or discard a specific draft version |
 | `POST /conversations/:id/confirm` | Confirm a version and selected row IDs with a UUID request ID |
 | `POST /receipts/:id/undo` | Undo an unchanged saved batch within ten minutes |
+| `POST /conversations/:id/goal-proposal/confirm` | Apply the latest pending goal proposal: `{proposalId, requestId}` (UUIDs); an update applies only if the goal is unchanged since it was proposed (`agent_goal_conflict` otherwise); a new goal whose target date has passed answers `agent_goal_invalid` |
+| `DELETE /conversations/:id/goal-proposal` | Cancel the pending goal proposal: `{proposalId}` |
+
+Conversation state includes `goalProposal`: the conversation's most recent proposal, `{id, action: 'create'|'update', goal_id, before, after, status: 'pending'|'confirmed'|'cancelled'|'expired'|'conflict', expires_at, result_goal_id}`, where `before`/`after` are `{name, target_amount, current_amount, currency, target_date, description}` with two-decimal amount strings and `YYYY-MM-DD` dates. Proposals expire after 24 hours. New goals need a target date, as in the goal form. Without migration `015`, both goal-proposal endpoints answer 503 `agent_unavailable`.
 
 When `AGENT_ENABLED=false`, only status is available. When it is true but the provider key is missing, only new model turns are unavailable. Request IDs bind their original payload; reuse with a different payload conflicts. Amounts are two-place decimal strings, and dates are calendar days.
 
@@ -533,7 +538,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ---
 
@@ -551,7 +556,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 ## Database
 
-The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables.
+The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables. Migration `015` adds `agent_goal_proposals` (goal changes awaiting the Confirm button); until it is applied, goal proposals are unavailable and nothing else is affected.
 
 `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` accepts `manual`, `ocr`, `ocr_llm` and `agent`; only confirmation writes `agent` rows. `import_batches` records counts for confirmed screenshot imports.
 

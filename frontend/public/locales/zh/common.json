@@ -425,9 +425,10 @@
   "Email address validation when configured": "配置后用于验证电子邮箱地址",
   "agent": {
     "title": "和 Pocky 一起记账",
-    "subtitle": "记录收支，或询问已记录的收入和支出。保存前请逐笔核对。",
+    "subtitle": "记录收支、询问已记录的账目，或规划储蓄目标。保存前请逐项核对。",
     "example": "“今天午餐花了12.50加元，坐公交花了3.25加元。”",
     "exampleQuestion": "“这学期我在外出就餐上花了多少？”",
+    "examplePlan": "“如果从一月开始实习每月收入2,400加元，八月前能存下3,000加元吗？”",
     "open": "打开对话",
     "reviewHint": "发送消息不会保存账目，只有点击确认按钮才会保存。",
     "privacy": "对话由 TermPocket 存储，获授权的管理员可能访问。请勿输入密码或账户凭证。",
@@ -491,6 +492,34 @@
     "confirmAll": "全部确认",
     "recoverConfirm": "恢复确认结果",
     "dismissRecovery": "关闭",
+    "goal": {
+      "createTitle": "新的储蓄目标",
+      "updateTitle": "修改储蓄目标",
+      "hint": "确认之前不会做任何更改。请核对名称、金额、货币和日期。",
+      "confirmCreate": "创建目标",
+      "confirmUpdate": "应用修改",
+      "recoverConfirm": "恢复目标确认",
+      "discard": "放弃",
+      "created": "该目标已添加到你的储蓄目标。",
+      "updated": "你的储蓄目标已更新。",
+      "viewGoals": "查看目标",
+      "discarded": "已放弃，你的目标没有变化。",
+      "expired": "此建议在确认前已过期。如仍需要，请再问一次 Pocky。",
+      "conflict": "Pocky 提出建议后，这个目标已被修改。请基于当前目标再问一次 Pocky。",
+      "noDate": "无目标日期",
+      "noDescription": "无描述",
+      "noChanges": "没有字段变化。",
+      "from": "原为",
+      "to": "改为",
+      "errors": {
+        "agent_version_conflict": "此目标建议已被其他请求修改。请刷新并核对最新版本后再确认。",
+        "agent_expired": "此目标建议已过期。请让 Pocky 重新提出。",
+        "agent_goal_conflict": "Pocky 提出建议后，这个目标已被修改。请基于当前目标再问一次 Pocky。",
+        "agent_goal_invalid": "此目标的日期已过。请让 Pocky 用更晚的日期重新提出。",
+        "agent_busy": "另一个请求正在进行。请等待完成后再处理此目标。",
+        "agent_unavailable": "当前部署暂时无法使用目标建议。"
+      }
+    },
     "discard": "丢弃草稿",
     "saved": "已确认的账目现已保存到收支记录。",
     "receiptSaved": "已保存 {{count}} 笔账目",
@@ -522,7 +551,8 @@
       "agent_limit_exceeded": "本次回复超出处理限制。请缩短消息并减少账目数量。",
       "agent_invalid_proposal": "AI 返回的草稿无效，未保存任何账目。请补充清晰的信息后重试。",
       "agent_request_failed": "请求未能完成。请刷新检查状态后重试。",
-      "agent_conversation_limit": "已达到对话数量上限。请删除不再需要的对话后重试。已保存的账目会保留。"
+      "agent_conversation_limit": "已达到对话数量上限。请删除不再需要的对话后重试。已保存的账目会保留。",
+      "agent_goal_conflict": "Pocky 提出建议后，这个目标已被修改。请基于当前目标再问一次 Pocky。"
     },
     "messageStatus": {
       "failed": "未完成",

@@ -200,3 +200,33 @@ CREATE TABLE IF NOT EXISTS agent_admissions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_agent_admissions_user ON agent_admissions(user_id,created_at DESC);
+
+-- Planning: savings-goal changes Pocky proposes. Only the user's Confirm
+-- button applies one; goal_id has no foreign key because the goal may be
+-- deleted meanwhile, which confirmation reports as a conflict.
+CREATE TABLE IF NOT EXISTS agent_goal_proposals (
+    id UUID PRIMARY KEY,
+    conversation_id UUID NOT NULL,
+    user_id INTEGER NOT NULL,
+    run_id UUID,
+    action VARCHAR(8) NOT NULL CHECK (action IN ('create','update')),
+    goal_id INTEGER,
+    -- savings_goals.updated_at as PostgreSQL text when proposed, to the microsecond.
+    expected_updated_at TEXT CHECK (length(expected_updated_at) <= 64),
+    before JSONB CHECK (before IS NULL OR (jsonb_typeof(before)='object' AND octet_length(before::text) <= 4096)),
+    after JSONB NOT NULL CHECK (jsonb_typeof(after)='object' AND octet_length(after::text) <= 4096),
+    status VARCHAR(12) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','superseded','conflict','expired')),
+    request_id UUID,
+    request_hash CHAR(64),
+    result_goal_id INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (now()+interval '24 hours'),
+    decided_at TIMESTAMPTZ,
+    CHECK ((action='create' AND goal_id IS NULL AND expected_updated_at IS NULL AND before IS NULL)
+        OR (action='update' AND goal_id IS NOT NULL AND expected_updated_at IS NOT NULL AND before IS NOT NULL)),
+    CHECK ((request_id IS NULL) = (request_hash IS NULL)),
+    UNIQUE(user_id,request_id),
+    FOREIGN KEY(conversation_id,user_id) REFERENCES agent_conversations(id,user_id) ON DELETE CASCADE,
+    FOREIGN KEY(run_id,conversation_id,user_id) REFERENCES agent_runs(id,conversation_id,user_id) ON DELETE SET NULL (run_id)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_goal_proposals_conversation ON agent_goal_proposals(user_id,conversation_id,created_at DESC);

@@ -23,7 +23,7 @@ export default function AgentPanel() {
       <CardDescription>{t('agent.subtitle')}</CardDescription>
     </CardHeader>
     <CardContent className="space-y-4">
-      <div className="space-y-2 rounded-lg border bg-muted/40 p-4 text-sm"><p>{t('agent.example')}</p><p>{t('agent.exampleQuestion')}</p></div>
+      <div className="space-y-2 rounded-lg border bg-muted/40 p-4 text-sm"><p>{t('agent.example')}</p><p>{t('agent.exampleQuestion')}</p><p>{t('agent.examplePlan')}</p></div>
       <p className="text-sm text-muted-foreground">{t('agent.reviewHint')}</p>
       <Button asChild><Link href="/agent">{t('agent.open')}<ArrowRight className="h-4 w-4" /></Link></Button>
     </CardContent>

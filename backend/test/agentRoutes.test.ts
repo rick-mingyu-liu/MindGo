@@ -17,7 +17,7 @@ const token = jwt.sign({ userId: 77, email: 'fictional@example.invalid' }, secre
 const originalSecret = config.jwt.secret;
 let originalAgent: typeof config.agent;
 const body = { requestId, content: '昨天买菜三十八块五', currency: 'CAD', timezone: 'America/Toronto', language: 'auto' };
-const state = { conversation: {id:conversationId,currency:'CAD',timezone:'America/Toronto',language:'auto'}, messages:[], draft:null,receipts:[],run:{id:requestId,status:'complete',error_code:null} };
+const state = { conversation: {id:conversationId,currency:'CAD',timezone:'America/Toronto',language:'auto'}, messages:[], draft:null,receipts:[],run:{id:requestId,status:'complete',error_code:null},goalProposal:null };
 let financialWrites: number; let printed: unknown[][];
 beforeEach(() => {
   originalAgent = {...config.agent}; config.agent.enabled = true; config.agent.apiKey = 'fictional-not-used'; config.jwt.secret = secret;
@@ -130,4 +130,34 @@ test('record tools are bound to the login user, never to anything the request ca
   assert.deepEqual(bound,[]);
   assert.equal((await post()).status,200);
   assert.deepEqual(bound,[77,77]);
+});
+test('goal proposal confirm and cancel accept only their keys and bind the login user',async()=>{
+  const proposalId='00000000-0000-4000-8000-000000000003';
+  const seen:unknown[]=[];
+  mock.method(store,'confirmGoalProposal',async(userId:number,id:string,input:unknown)=>{seen.push(['confirm',userId,id,input]);return state;});
+  mock.method(store,'cancelGoalProposal',async(userId:number,id:string,proposal:string)=>{seen.push(['cancel',userId,id,proposal]);return state;});
+  const confirm=(payload:object)=>request(app).post(`/agent/conversations/${conversationId}/goal-proposal/confirm`).auth(token,{type:'bearer'}).send(payload);
+  const cancel=(payload:object)=>request(app).delete(`/agent/conversations/${conversationId}/goal-proposal`).auth(token,{type:'bearer'}).send(payload);
+  for(const bad of [{proposalId,requestId,userId:99},{proposalId,requestId,target_amount:'9999.00'},{proposalId},{requestId},{proposalId:'nope',requestId}]) assert.equal((await confirm(bad)).status,400);
+  for(const bad of [{proposalId,requestId},{},{proposalId:'nope'}]) assert.equal((await cancel(bad)).status,400);
+  assert.deepEqual(seen,[]);
+  assert.equal((await request(app).post(`/agent/conversations/${conversationId}/goal-proposal/confirm`).send({proposalId,requestId})).status,401);
+  assert.equal((await confirm({proposalId,requestId})).status,200);
+  assert.equal((await cancel({proposalId})).status,200);
+  assert.deepEqual(seen,[['confirm',77,conversationId,{proposalId,requestId}],['cancel',77,conversationId,proposalId]]);
+});
+test('goal proposal buttons work without a provider key but not without storage',async()=>{
+  const proposalId='00000000-0000-4000-8000-000000000003';
+  mock.method(store,'confirmGoalProposal',async()=>state);
+  config.agent.apiKey=undefined;
+  assert.equal((await request(app).post(`/agent/conversations/${conversationId}/goal-proposal/confirm`).auth(token,{type:'bearer'}).send({proposalId,requestId})).status,200);
+  config.agent.enabled=false;
+  mock.method(store,'confirmGoalProposal',async()=>assert.fail('storage touched while disabled'));
+  const off=await request(app).post(`/agent/conversations/${conversationId}/goal-proposal/confirm`).auth(token,{type:'bearer'}).send({proposalId,requestId});
+  assert.equal(off.status,503);assert.equal(off.body.code,'agent_unavailable');
+});
+test('goal conflicts surface as stable codes',async()=>{
+  mock.method(store,'confirmGoalProposal',async()=>{throw new AgentError('agent_goal_conflict',409);});
+  const res=await request(app).post(`/agent/conversations/${conversationId}/goal-proposal/confirm`).auth(token,{type:'bearer'}).send({proposalId:'00000000-0000-4000-8000-000000000003',requestId});
+  assert.equal(res.status,409);assert.deepEqual(res.body,{error:'agent_goal_conflict',code:'agent_goal_conflict'});
 });

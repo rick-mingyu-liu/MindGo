@@ -45,3 +45,23 @@ export function validateRows(value: unknown, allowEmpty = false): DraftRow[] {
   });
 }
 export const validateDraftRows = validateRows;
+/** The largest amount a DECIMAL(10,2) column holds, in cents. */
+export const MAX_AMOUNT_CENTS = 9_999_999_999;
+/**
+ * A decimal string with at most two places ('12', '12.5', '12.50') as integer
+ * cents, parsed from the digits, never through floating point.
+ */
+export function decimalCents(value: unknown, options: { min?: number; max?: number; negative?: boolean } = {}): number {
+  const { min = 0, max = MAX_AMOUNT_CENTS, negative = false } = options;
+  if (typeof value !== 'string' || !(negative ? /^-?\d{1,8}(\.\d{1,2})?$/ : /^\d{1,8}(\.\d{1,2})?$/).test(value)) invalid();
+  const text = value as string;
+  const [whole, fraction = ''] = text.replace('-', '').split('.');
+  const cents = (Number(whole) * 100 + Number(fraction.padEnd(2, '0'))) * (text.startsWith('-') ? -1 : 1);
+  if (cents < min || cents > max) invalid();
+  return cents === 0 ? 0 : cents;
+}
+/** Integer cents as a two-decimal string: -1234 -> '-12.34'. */
+export function formatCents(cents: number): string {
+  const abs = Math.abs(cents);
+  return `${cents < 0 ? '-' : ''}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+}

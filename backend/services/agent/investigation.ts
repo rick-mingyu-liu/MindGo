@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import { query } from '../../db/connection';
 import { groupedBetween, RateUnavailableError } from '../moneyFacts';
+import { getExchangeRate } from '../exchangeRateService';
 import { daysBetween } from '../../utils/terms';
-import type { TransactionRow, TransactionType } from '../../types/db';
-import { AgentError, type AgentRecords, type CompareInput, type DetailsInput, type RecordWindow, type SummaryInput } from './types';
-import { categories, currencies, validateDay } from './validation';
+import type { SavingsGoalRow, TransactionRow, TransactionType } from '../../types/db';
+import { AgentError, type AgentRecords, type BaselineInput, type CompareInput, type DetailsInput, type RecordWindow, type SummaryInput } from './types';
+import { categories, currencies, decimalCents, formatCents, validateDay } from './validation';
+import { calculateScenario } from './scenario';
+import { prepareGoalProposal, GOAL_VERSION_SQL } from './planning';
 
 /**
  * Pocky's read-only view of one user's own records: totals for a window, two
@@ -216,11 +219,100 @@ export async function transactionDetails(userId: number, input: DetailsInput) {
   };
 }
 
-/** The three views bound to one user, for the agent runtime. */
+export const MAX_BASELINE_MONTHS = 12;
+const DEFAULT_BASELINE_MONTHS = 3;
+export const MAX_GOALS = 20;
+
+/** The first day of an absolute month (year * 12 + month index), by integer arithmetic. */
+const monthStart = (absolute: number): string => `${Math.floor(absolute / 12)}-${String((absolute % 12) + 1).padStart(2, '0')}-01`;
+
+/**
+ * Average monthly income, spending and net, per category too, over the last N
+ * whole calendar months before the conversation's today (this month never
+ * counts: it is not over). Divided by the months that have any record, like
+ * moneyFacts' monthlyBaseline, so a new account is not averaged with months it
+ * did not exist; months_with_data says how many that was.
+ */
+export async function spendingBaseline(userId: number, input: BaselineInput) {
+  if (!input || typeof input !== 'object') invalid();
+  const months = input.months === undefined ? DEFAULT_BASELINE_MONTHS : input.months;
+  if (typeof months !== 'number' || !Number.isInteger(months) || months < 1 || months > MAX_BASELINE_MONTHS) invalid();
+  const currency = currencyOf(input.currency);
+  const today = validateDay(input.today);
+  const thisMonth = Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7)) - 1;
+  const window = windowOf({ start: monthStart(thisMonth - months), end_exclusive: monthStart(thisMonth) });
+  const totals = await centsIn(userId, window, currency);
+  const counted = await query<{ months: string }>(
+    `SELECT COUNT(DISTINCT date_trunc('month', date)) AS months
+     FROM transactions WHERE user_id = $1 AND date >= $2 AND date < $3`,
+    [userId, window.start, window.end_exclusive]
+  );
+  const withData = Number(counted.rows[0]?.months ?? 0);
+  const per = (cents: number): number | null => (withData > 0 ? Math.round(cents / withData) : null);
+  const income = per(totals.income);
+  const expenses = per(totals.expenses);
+  const money = (cents: number | null): string | null => (cents === null ? null : formatCents(cents));
+  return {
+    window,
+    months_requested: months,
+    months_with_data: withData,
+    currency,
+    monthly_income: money(income),
+    monthly_expenses: money(expenses),
+    // The difference of the two averages, so the three numbers always agree.
+    monthly_net: income === null || expenses === null ? null : formatCents(income - expenses),
+    by_category: totals.categories.map(c => ({ category: c.category, type: c.type, monthly_amount: money(per(c.cents)) })),
+    converted_from: totals.convertedFrom,
+    conversion_note: conversionNote(totals.convertedFrom, currency),
+    note: withData === 0
+      ? 'Nothing was recorded in these months, so there is no baseline.'
+      : `Averaged over the ${withData} month(s) with any record, not all ${months} if some were empty. Recorded flows only: this is not a bank balance.`,
+  };
+}
+
+/**
+ * The user's savings goals, soonest deadline first, at most 20. updated_at is
+ * PostgreSQL's exact text (microseconds), the version propose_goal must quote
+ * to change a goal. Goal progress is what the user typed in, not cash.
+ */
+export async function listGoals(userId: number) {
+  const result = await query<Pick<SavingsGoalRow, 'id' | 'name' | 'target_amount' | 'current_amount' | 'currency' | 'target_date' | 'description'> & { version: string | null }>(
+    `SELECT id, name, target_amount, current_amount, currency, target_date, description, ${GOAL_VERSION_SQL} AS version
+     FROM savings_goals WHERE user_id = $1
+     ORDER BY target_date NULLS LAST, id LIMIT $2`,
+    [userId, MAX_GOALS + 1]
+  );
+  // An amount that does not read as cents is an error, never a silent zero
+  // (it surfaces as agent_records_unavailable, not as a model input problem).
+  const cents = (value: string | null): number => {
+    try { return decimalCents(amountText(String(value ?? '0'))); } catch { throw new Error('goal_amount_unreadable'); }
+  };
+  return {
+    goals: result.rows.slice(0, MAX_GOALS).map(goal => {
+      const target = cents(goal.target_amount);
+      const saved = cents(goal.current_amount);
+      return {
+        id: goal.id, name: goal.name, target_amount: formatCents(target), current_amount: formatCents(saved), currency: goal.currency,
+        target_date: goal.target_date, description_untrusted: goal.description === null ? null : untrustedDescription(goal.description),
+        updated_at: goal.version,
+        remaining: formatCents(Math.max(0, target - saved)),
+        // Floored, so 99.6% never reads as 100 on a goal that is not reached.
+        percent: target > 0 ? Math.min(100, Math.floor((saved * 100) / target)) : null,
+      };
+    }),
+    truncated: result.rows.length > MAX_GOALS,
+  };
+}
+
+/** Every view bound to one user, for the agent runtime. */
 export function recordsFor(userId: number): AgentRecords {
   return {
     spendingSummary: input => spendingSummary(userId, input),
     compareSpending: input => compareSpending(userId, input),
     transactionDetails: input => transactionDetails(userId, input),
+    spendingBaseline: input => spendingBaseline(userId, input),
+    listGoals: () => listGoals(userId),
+    calculateScenario: (input, today) => calculateScenario(input, today, getExchangeRate),
+    prepareGoalProposal: (input, today) => prepareGoalProposal(userId, input, today),
   };
 }
