@@ -3,7 +3,7 @@
 **Your money, term by term.**
 
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-blue.svg)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
 
@@ -256,7 +256,7 @@ backend/                        Express + PostgreSQL API (TypeScript)
 ├── test/                       unit + opt-in database tests, node --test
 └── dist/                       tsc output (CommonJS) — gitignored; what production runs
 
-frontend/                       Next.js 14, Pages Router, TypeScript
+frontend/                       Next.js 15, Pages Router, TypeScript
 ├── pages/                      one file per screen (import.tsx, settings.tsx, …)
 ├── components/ui/              Radix primitives, shadcn-style
 ├── lib/
@@ -624,7 +624,7 @@ The order constraints: **frontend, then backend, then 014** (the previous fronte
 
 **Backend** — TypeScript, Express 4, PostgreSQL via `pg`, JWT auth with `bcryptjs`, `express-validator`, `helmet`, `express-rate-limit`, `morgan`, `node-cron`, `nodemailer`.
 
-**Frontend** — Next.js 14 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
+**Frontend** — Next.js 15 (Pages Router), React 18, TypeScript, Tailwind CSS, Radix UI, Recharts, React Hook Form, `next-i18next`, SweetAlert2, react-hot-toast, Lucide icons.
 
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
