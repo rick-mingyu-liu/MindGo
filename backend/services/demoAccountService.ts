@@ -16,7 +16,7 @@ import type { PoolClient } from 'pg';
  *
  * ## Why the flag, and not the email address
  *
- * This deletes every transaction, goal and watchlist row belonging to its
+ * This deletes every transaction and goal belonging to its
  * target before rewriting them. Resolving that target by
  * `email = 'john.doe@example.com'` makes it a guessable string: the address is
  * ordinary, registration does not reserve it, and a scheduled job pointed at
@@ -45,7 +45,7 @@ const DEMO_EMAIL = 'john.doe@example.com';
 const DEMO_PASSWORD = 'password123';
 const DEMO_PASSWORD_HASH = '$2a$10$Cz3uqiIWcKlJ1dCUqe2AkuYXGscpq9wwBNMDuTXqtCSbIzyPDMuQ.';
 
-const OWNED_TABLES = ['transactions', 'savings_goals', 'watchlist', 'ai_plans'];
+const OWNED_TABLES = ['transactions', 'savings_goals'];
 
 /**
  * `VALUES ($1,$2,$3),($4,$5,$6),...` for `rows.length` rows of `width` columns.
@@ -143,7 +143,6 @@ async function refreshDemoAccount({ create = false, now = new Date() }: RefreshO
       goalRows.flat()
     );
 
-    // Archived watchlist and AI plans are cleared above, never regenerated.
     await client.query('COMMIT');
 
     const inserted = txRows.length + goalRows.length;

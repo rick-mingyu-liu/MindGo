@@ -22,8 +22,6 @@ import authRoutes = require('./routes/auth');
 import transactionRoutes = require('./routes/transactions');
 import summaryRoutes = require('./routes/summary');
 import goalRoutes = require('./routes/goals');
-import investmentRoutes = require('./routes/investments');
-import aiRoutes = require('./routes/ai');
 import importRoutes = require('./routes/import');
 import mcpRoutes = require('./routes/mcp');
 import accessTokenRoutes = require('./routes/accessTokens');
@@ -78,8 +76,6 @@ app.use('/auth', authRoutes);
 app.use('/transactions', transactionRoutes);
 app.use('/summary', summaryRoutes);
 app.use('/goals', goalRoutes);
-app.use('/investments', investmentRoutes);
-app.use('/ai', aiRoutes);
 app.use('/import', importRoutes);
 // The signed-in user's tokens for /mcp, managed with the login JWT.
 app.use('/access-tokens', accessTokenRoutes);

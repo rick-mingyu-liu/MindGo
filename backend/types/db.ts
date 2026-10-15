@@ -75,22 +75,6 @@ export interface SavingsGoalRow {
   updated_at: Date | null;
 }
 
-export interface WatchlistRow {
-  id: number;
-  user_id: number | null;
-  symbol: string;
-  company_name: string | null;
-  added_at: Date | null;
-}
-
-export interface AiPlanRow {
-  id: number;
-  user_id: number | null;
-  prompt: string;
-  response: string;
-  created_at: Date | null;
-}
-
 // Conversational transaction storage (migration 013).
 import type { Conversation, Message, Draft, Receipt, Run } from '../services/agent/types';
 export interface AgentConversationRow extends Conversation { user_id: number; draft_version: number }

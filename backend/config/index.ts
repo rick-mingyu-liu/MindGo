@@ -158,16 +158,13 @@ const config = {
   },
 
   // How long rows live before the hourly maintenance sweep may delete them.
-  // An AI plan's lifetime is enforced at read time, so physical deletion only
-  // lags it (by up to one sweep while the process runs, longer if it was down
-  // or asleep). An unverified account becomes deletable once it is older than
+  // An unverified account becomes deletable once it is older than
   // unverifiedAccountMinutes *and* its verification link has expired, or once
   // it is older than unverifiedAccountMaxMinutes whatever its link says; at
   // that point registering the same address again replaces it on the spot,
   // without waiting for the sweep. These are minutes because they are
   // interpolated into a Postgres INTERVAL.
   dataRetention: {
-    aiPlanMinutes: 30,
     unverifiedAccountMinutes: 30,
     // A hard cap: without it, re-sending the link every half hour (resend is
     // unauthenticated and takes only an address) would keep someone else's

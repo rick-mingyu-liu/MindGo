@@ -347,38 +347,23 @@ describe('API integration', { skip: HAVE_DB ? false : 'set TEST_DATABASE_URL to 
     });
   });
 
+  describe('removed stock and AI plan storage (migration 014)', () => {
+    test('the dropped watchlist and ai_plans storage is gone, and so are its routes', async () => {
+      const tables = await db.query<{ t: string | null }>(
+        "SELECT to_regclass('watchlist')::text AS t UNION ALL SELECT to_regclass('ai_plans')::text"
+      );
+      assert.deepEqual(tables.rows.map((r) => r.t), [null, null]);
+      for (const path of ['/ai/plans', '/investments/watchlist']) {
+        assert.equal((await auth(request(app).get(path))).status, 404, path);
+      }
+    });
+  });
+
   describe('expiry is enforced on read, whatever the hourly sweep has done', () => {
     // The retention sweep runs hourly, so expired rows can still exist. These
     // run the real filters against Postgres: an expired row must behave as
     // gone while it is physically still there.
     const minutesAgo = (m: number): string => `NOW() - make_interval(mins => ${m})`;
-
-    async function insertPlan(userId: number, ageMinutes: number): Promise<number> {
-      const r = await db.query<{ id: number }>(
-        `INSERT INTO ai_plans (user_id, prompt, response, created_at) VALUES ($1, 'p', 'r', ${minutesAgo(ageMinutes)}) RETURNING id`,
-        [userId]
-      );
-      return r.rows[0]!.id;
-    }
-
-    test('an expired AI plan is hidden from the list and plan route; goal creation is retired', async () => {
-      const fresh = await insertPlan(alice.id, 1);
-      const stale = await insertPlan(alice.id, 31);
-
-      const list = await auth(request(app).get('/ai/plans'));
-      assert.equal(list.status, 200);
-      const ids = list.body.plans.map((p: { id: number }) => p.id);
-      assert.ok(ids.includes(fresh));
-      assert.ok(!ids.includes(stale), 'expired plan listed');
-
-      assert.equal((await auth(request(app).get(`/ai/plans/${stale}`))).status, 404);
-      assert.equal((await auth(request(app).get(`/ai/plans/${fresh}`))).status, 200);
-
-      const goal = await auth(request(app).post('/goals/from-ai-plan')).send({
-        aiPlanId: stale, name: 'From an expired plan', target_amount: 100, target_date: '2030-01-01',
-      });
-      assert.equal(goal.status, 410);
-    });
 
     test('an expired verification link is refused while the account still exists', async () => {
       const token = crypto.randomUUID().replace(/-/g, '');

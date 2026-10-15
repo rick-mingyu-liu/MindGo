@@ -118,9 +118,10 @@ These are minor and common in Express apps, but worth noting:
 
 - **Service imported controllers (inverted dependency).** `schedulerService.ts`
   used to `require` `authController` and `aiController` in order to call
-  `autoDeleteOldAIPlans` and `deleteUnverifiedAccounts`. Both now live in
+  `autoDeleteOldAIPlans` and `deleteUnverifiedAccounts`. Both moved to
   [services/cleanupService.ts](services/cleanupService.ts), and the scheduler
-  depends downward.
+  depends downward. (The AI-plan half has since been removed with the
+  feature; see below.)
 
   An earlier draft of this document said that cleanup logic was *"reused by
   both HTTP routes and the scheduler"*. That was wrong — no route ever mounted
@@ -148,14 +149,14 @@ These are minor and common in Express apps, but worth noting:
 - Main structural smell remaining: the absent model layer. The scheduler's
   upward dependency on controllers is fixed.
 
-## Legacy feature retirement
+## Removed features
 
-Stock provider services and one-shot AI generation have been removed. The authenticated investment router now reports 410 except for clearing the current user's archived watchlist through Settings. The AI router preserves only unexpired, owned plan history; generation and AI-plan-to-goal conversion report 410. Those retired endpoints make no new stock or model calls. The optional `/agent` recording flow separately calls DeepSeek. Both legacy tables remain; AI plans retain their 30-minute read-time expiry and hourly cleanup. MCP financial facts, imports, manual transactions and savings goals remain active.
+The stock watchlist and one-shot AI planning are removed entirely. Their routers (`/investments`, `/ai`), controllers, the `/goals/from-ai-plan` route, the AI-plan expiry filter and its hourly cleanup are gone, so those paths fall through to the global 404. Migration `014_drop_watchlist_ai_plans.sql` drops the `watchlist` and `ai_plans` tables; deploy the code before applying it. The optional `/agent` recording flow separately calls DeepSeek. MCP financial facts, imports, manual transactions and savings goals remain active.
 
 
 ## Conversation recording
 
-The first implemented slice proposes income/spending entries and corrects a pending batch in English, Chinese or mixed text. The frontend `/agent` page provides persistent conversations, visible currency/timezone/language, editable/selectable drafts, explicit confirmation, cancellation, recovery and batch undo. It contains no voice input, durable facts, conversation summaries, financial planning or spending-query tools. `/ai-planning` redirects to this page; its retired one-shot generation endpoints remain retired.
+The first implemented slice proposes income/spending entries and corrects a pending batch in English, Chinese or mixed text. The frontend `/agent` page provides persistent conversations, visible currency/timezone/language, editable/selectable drafts, explicit confirmation, cancellation, recovery and batch undo. It contains no voice input, durable facts, conversation summaries, financial planning or spending-query tools. `/ai-planning` redirects to this page; one-shot generation is removed, not restored.
 
 ```text
 JWT-authenticated POST /agent/conversations/:id/messages

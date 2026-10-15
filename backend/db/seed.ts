@@ -13,7 +13,7 @@ import { labelOf } from '../utils/terms';
  * Re-running is safe and is how the demo stays current: it replaces the demo
  * user's rows rather than adding to them. The previous version leaned on
  * `ON CONFLICT DO NOTHING` for that, which caught nothing, because
- * transactions, savings_goals and ai_plans have no unique constraint on their
+ * transactions and savings_goals have no unique constraint on their
  * data columns — a second run simply inserted all 46 transactions again.
  */
 async function seedDatabase(now: Date = new Date()): Promise<void> {

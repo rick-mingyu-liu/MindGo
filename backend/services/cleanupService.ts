@@ -4,7 +4,7 @@ import config = require('../config');
 /**
  * Scheduled deletions, owned by the service layer.
  *
- * These used to live on `aiController` and `authController`, and
+ * These used to live on the controllers, and
  * `schedulerService` reached *up* into the controller layer to call them. That
  * inversion is the reason this file exists: a service must not depend on the
  * layer above it. Despite what CLAUDE.md claimed, no
@@ -23,26 +23,6 @@ import config = require('../config');
  * the previous version logged every deleted account's email address, which put
  * user email addresses into the server logs on a timer.
  */
-
-/**
- * SQL condition for an AI plan still inside its lifetime: the complement of
- * what deleteOldAIPlans deletes. Every read of ai_plans must include it, with
- * `$<param>` bound to `config.dataRetention.aiPlanMinutes`, because deletion
- * runs only hourly: without it a plan stays readable, and usable to create a
- * goal, for up to an hour past its lifetime.
- */
-function aiPlanIsLive(param: number): string {
-  return `created_at >= NOW() - make_interval(mins => $${param})`;
-}
-
-/** Deletes AI plans past `config.dataRetention.aiPlanMinutes`. Returns the row count. */
-async function deleteOldAIPlans(): Promise<number | null> {
-  const result = await query(
-    'DELETE FROM ai_plans WHERE created_at < NOW() - make_interval(mins => $1)',
-    [config.dataRetention.aiPlanMinutes]
-  );
-  return result.rowCount;
-}
 
 /**
  * SQL condition for an unverified account that may be deleted, or replaced by
@@ -91,4 +71,4 @@ async function reclaimStaleUnverifiedAccount(email: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
-export { aiPlanIsLive, deleteOldAIPlans, deleteUnverifiedAccounts, reclaimStaleUnverifiedAccount, unverifiedAccountIsStale };
+export { deleteUnverifiedAccounts, reclaimStaleUnverifiedAccount, unverifiedAccountIsStale };

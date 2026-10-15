@@ -132,7 +132,6 @@ export default function Settings() {
       await Promise.all([
         api.delete('/transactions/clear-all'),
         api.delete('/goals/clear-all'),
-        api.delete('/investments/watchlist/clear-all'),
       ])
       setClearDialogOpen(false)
       await Swal.fire({

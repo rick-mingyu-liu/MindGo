@@ -18,7 +18,6 @@ const MAX_TIMER_DELAY = 2_147_483_647;
 
 /** What one maintenance run did with each cleanup. A failed one is `null`. */
 interface MaintenanceResult {
-  aiPlans: number | null;
   unverifiedAccounts: number | null;
   agentData?: number | null;
 }
@@ -131,17 +130,17 @@ class SchedulerService {
   }
 
   /**
-   * One maintenance sweep: both retention deletions, back to back.
+   * One maintenance sweep: the unverified-account deletion, then agent
+   * housekeeping when that feature is enabled.
    *
-   * Each is attempted whatever happened to the other, so a failing AI-plan
-   * cleanup never leaves expired accounts in place, or the reverse. A call made
-   * while a sweep is still running joins that sweep instead of starting a
+   * Each is attempted whatever happened to the other, so a failing account
+   * cleanup never leaves expired agent data in place, or the reverse. A call
+   * made while a sweep is still running joins that sweep instead of starting a
    * second one.
    */
   runMaintenance(): Promise<MaintenanceResult> {
     if (!this.maintenanceRun) {
       this.maintenanceRun = (async () => ({
-        aiPlans: await attempt('aiPlanCleanup', cleanupService.deleteOldAIPlans),
         unverifiedAccounts: await attempt('accountCleanup', cleanupService.deleteUnverifiedAccounts),
         // Agent tables are queried only after the feature/migration is enabled.
         // Share the existing hourly wake-up; never add a keep-alive interval.
@@ -222,7 +221,7 @@ class SchedulerService {
     // needed deleting" and "the jobs were never mounted". This one line at boot
     // separates the two.
     logger.audit(
-      `Retention jobs scheduled: maintenance (aiPlanCleanup, accountCleanup) every ${config.cron.maintenance}ms, ` +
+      `Retention jobs scheduled: maintenance (accountCleanup) every ${config.cron.maintenance}ms, ` +
       'first run one interval from now'
     );
   }
