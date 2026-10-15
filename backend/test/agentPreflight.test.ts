@@ -16,7 +16,7 @@ const FAKE_PASSWORD = 'pw-PREFLIGHT-FAKE-1b2c';
 const FAKE_HOST = 'ep-fictional-preflight-pooler.example.invalid';
 const FAKE_URL = `postgresql://owner:${FAKE_PASSWORD}@${FAKE_HOST}/mindgo?sslmode=require`;
 
-function settings(overrides: { enabled?: boolean; apiKey?: string; model?: string; nodeEnv?: string } = {}): PreflightSettings {
+function settings(overrides: { enabled?: boolean; apiKey?: string; model?: string; runtime?: 'sdk' | 'direct'; nodeEnv?: string } = {}): PreflightSettings {
   return {
     nodeEnv: overrides.nodeEnv ?? 'production',
     database: { url: FAKE_URL, password: '', schema: 'public' },
@@ -24,6 +24,7 @@ function settings(overrides: { enabled?: boolean; apiKey?: string; model?: strin
       enabled: overrides.enabled ?? false,
       apiKey: 'apiKey' in overrides ? overrides.apiKey : FAKE_KEY,
       model: overrides.model ?? 'deepseek-flash',
+      runtime: overrides.runtime ?? 'sdk',
       timeoutMs: 90_000, maxToolCalls: 8, maxRows: 12, maxOutputTokens: 4000, maxTotalTokens: 32_000,
     },
   };
@@ -119,6 +120,13 @@ describe('configuration', () => {
     const noKey = configChecks(settings({ enabled: true, apiKey: undefined }));
     assert.equal(find(noKey, 'config.deepseek_key').status, 'WARN');
     assert.equal(find(configChecks(settings({ apiKey: undefined })), 'config.deepseek_key').status, 'PASS');
+  });
+
+  test('the active runtime is reported', () => {
+    assert.match(find(configChecks(settings()), 'config.agent_runtime').detail, /^sdk \(/);
+    const direct = find(configChecks(settings({ runtime: 'direct' })), 'config.agent_runtime');
+    assert.equal(direct.status, 'PASS');
+    assert.match(direct.detail, /^direct \(in-process/);
   });
 
   test('NODE_ENV other than production warns', () => {
