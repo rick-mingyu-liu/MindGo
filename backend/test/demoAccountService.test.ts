@@ -6,6 +6,9 @@ import bcrypt from 'bcryptjs';
 import {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
+  refreshDemoAccountIfStale,
+  demoAccountFreshness,
+  resetAbsenceReport,
   DEMO_PASSWORD,
   DEMO_PASSWORD_HASH,
   OWNED_TABLES,
@@ -176,6 +179,86 @@ describe('what the scheduler logs', () => {
   });
 });
 
+describe('how stale the demo account is', () => {
+  // The hourly maintenance run asks this before refreshing. One aggregate
+  // SELECT through the pool; the refresh's client is used only when stale.
+  let checks: Query[];
+  let answer: Array<{ id: number; newest: string | null }>;
+
+  beforeEach(() => {
+    checks = [];
+    answer = [{ id: 42, newest: '2026-10-10' }];
+    resetAbsenceReport();
+    mock.method(db, 'query', async (text: string, params?: unknown[]) => {
+      checks.push({ text: text.replace(/\s+/g, ' ').trim(), params });
+      return { rows: answer, rowCount: answer.length };
+    });
+  });
+
+  test('is one SELECT resolved by is_demo, with today as the UTC day', async () => {
+    // 23:30 in Toronto is already the next day in UTC.
+    await demoAccountFreshness(new Date('2026-10-15T23:30:00-04:00'), 14);
+    assert.equal(checks.length, 1);
+    assert.match(checks[0]!.text, /^SELECT /);
+    assert.match(checks[0]!.text, /is_demo = TRUE/);
+    assert.doesNotMatch(checks[0]!.text, /email/i);
+    // Future-dated rows a visitor adds cannot keep it looking fresh.
+    assert.match(checks[0]!.text, /FILTER \(WHERE t\.date <= \$1::date\)/);
+    assert.deepEqual(checks[0]!.params, ['2026-10-16']);
+  });
+
+  test('is fresh up to the limit and stale one day past it', async () => {
+    const now = new Date('2026-10-15T12:00:00Z');
+    answer = [{ id: 42, newest: '2026-10-01' }];
+    assert.deepEqual(await demoAccountFreshness(now, 14),
+      { state: 'fresh', userId: 42, newest: '2026-10-01', ageDays: 14 });
+    answer = [{ id: 42, newest: '2026-09-30' }];
+    assert.equal((await demoAccountFreshness(now, 14)).state, 'stale');
+  });
+
+  test('no transactions is stale; no flagged user is absent', async () => {
+    answer = [{ id: 42, newest: null }];
+    assert.equal((await demoAccountFreshness(new Date(), 14)).state, 'stale');
+    answer = [];
+    assert.deepEqual(await demoAccountFreshness(new Date(), 14), { state: 'absent' });
+  });
+
+  test('refreshDemoAccountIfStale leaves fresh data alone', async () => {
+    answer = [{ id: 42, newest: toDayUtc(new Date()) }];
+    assert.equal(await refreshDemoAccountIfStale(), 0);
+    assert.deepEqual(queries, [], 'opened a refresh transaction for fresh data');
+  });
+
+  test('refreshDemoAccountIfStale refreshes stale data and returns the deleted count', async () => {
+    mock.method(logger, 'info', () => {});
+    answer = [{ id: 42, newest: '2020-01-01' }];
+    assert.equal(await refreshDemoAccountIfStale(), OWNED_TABLES.length * 7);
+    assert.ok(ran(/^COMMIT$/));
+  });
+
+  test('with no demo account it writes nothing and says so once', async () => {
+    answer = [];
+    const lines: string[] = [];
+    mock.method(logger, 'error', (msg: string) => lines.push(msg));
+    assert.equal(await refreshDemoAccountIfStale(), 0);
+    assert.equal(await refreshDemoAccountIfStale(), 0);
+    assert.deepEqual(queries, []);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0]!, /db:seed/);
+  });
+
+  test('a refresh failure propagates to the caller', async () => {
+    answer = [{ id: 42, newest: null }];
+    mock.method(logger, 'info', () => {});
+    client.query = async (text) => {
+      if (/INSERT INTO transactions/.test(text)) throw new Error('connection lost');
+      return { rows: /SELECT id FROM users/.test(text) ? [{ id: 42 }] : [], rowCount: 0 };
+    };
+    await assert.rejects(refreshDemoAccountIfStale(), /connection lost/);
+  });
+});
+
+const toDayUtc = (d: Date): string => d.toISOString().slice(0, 10);
 
 /**
  * The demo credential is the one piece of this file a user types by hand, and
