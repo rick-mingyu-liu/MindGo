@@ -282,7 +282,12 @@ function openTurn(input: AgentInput, onProgress?: (event: {toolCalls: number}) =
       else if (toolCalls >= config.agent.maxToolCalls) limit('tool_calls');
       return allowed;
     },
-    /** One model response's content and real usage; trips the token and character budgets. */
+    /**
+     * One model response's content and real usage; trips the token and character
+     * budgets. `id` keys the usage: the SDK path passes the message id, because
+     * its events can repeat one message's usage; the direct path passes one key
+     * per request, so a provider that repeats or omits ids cannot hide tokens.
+     */
     observe(id: string, content: Array<{type:string}>, tokens: {input_tokens?:number|null;output_tokens?:number|null;cache_read_input_tokens?:number|null;cache_creation_input_tokens?:number|null}) {
       observedChars += JSON.stringify(content).length;
       thinkingBlocks += content.filter(block => block.type === 'thinking' || block.type === 'redacted_thinking').length;
@@ -425,26 +430,36 @@ export interface MessagesClient {
   messages: { create(body: MessageCreateParamsNonStreaming, options: {signal: AbortSignal}): Promise<DirectResponse> };
 }
 
-let deepseek: Promise<MessagesClient> | undefined;
+/**
+ * Caches a successful load for the process, but forgets a failed one, so one
+ * failed import is retried on the next turn instead of failing every turn until
+ * a restart.
+ */
+export function cacheOnSuccess<T>(load: () => Promise<T>): () => Promise<T> {
+  let cached: Promise<T> | undefined;
+  return () => {
+    cached ??= load().catch((error: unknown) => { cached = undefined; throw error; });
+    return cached;
+  };
+}
+
 /**
  * One HTTP client per process, created on the first direct turn. Every setting
  * is explicit so nothing comes from the host's ANTHROPIC_* variables: the key is
  * DeepSeek's, no bearer token is sent, and the client never logs.
  */
-function deepseekClient(): Promise<MessagesClient> {
-  deepseek ??= import('@anthropic-ai/sdk').then(({default: Anthropic}) => new Anthropic({
-    apiKey:config.agent.apiKey ?? null, authToken:null, baseURL:providerUrl,
-    // As on the SDK path: a momentary provider error is retried (the request
-    // only; tools never re-run), always inside the run deadline.
-    maxRetries:2, timeout:config.agent.timeoutMs, logLevel:'off',
-  }));
-  return deepseek;
-}
+const deepseekClient: () => Promise<MessagesClient> = cacheOnSuccess(() => import('@anthropic-ai/sdk').then(({default: Anthropic}) => new Anthropic({
+  apiKey:config.agent.apiKey ?? null, authToken:null, baseURL:providerUrl,
+  // As on the SDK path: a momentary provider error is retried (the request
+  // only; tools never re-run), always inside the run deadline.
+  maxRetries:2, timeout:config.agent.timeoutMs, logLevel:'off',
+})));
 
 /** The model's content, echoed back as request params: only the fields the API defines, never extras. */
 function echo(content: ContentBlock[]): ContentBlockParam[] {
   return content.flatMap((block): ContentBlockParam[] => {
-    if (block.type === 'text') return [{type:'text',text:block.text}];
+    // The API rejects an empty text block, so one the model sent is not echoed.
+    if (block.type === 'text') return block.text ? [{type:'text',text:block.text}] : [];
     if (block.type === 'tool_use') return [{type:'tool_use',id:block.id,name:block.name,input:block.input}];
     if (block.type === 'thinking') return [{type:'thinking',thinking:block.thinking,signature:block.signature}];
     if (block.type === 'redacted_thinking') return [{type:'redacted_thinking',data:block.data}];
@@ -484,18 +499,23 @@ export function createDirectRuntime(loadClient: () => Promise<MessagesClient> = 
           // See the SDK path: DeepSeek reasons unless told explicitly not to.
           thinking:{type:'disabled'},
         }, {signal:turn.controller.signal}), turn.aborted]);
-        turn.observe(response.id, response.content, response.usage);
+        // Keyed per request: every response is a separate billed call, whatever id it carries.
+        turn.observe(`${step}:${response.id}`, response.content, response.usage);
         if (turn.terminalError) throw turn.terminalError;
+        // Cut off at max_tokens: the SDK's CLI asks for a continuation, which
+        // takes output past maxOutputTokens, so the turn ends there either way,
+        // and a tool call in a cut-off response never runs: its input may be truncated.
+        if (response.stop_reason === 'max_tokens' || response.stop_reason === 'model_context_window_exceeded') {
+          turn.limit('max_tokens');
+          throw turn.terminalError ?? new AgentError('agent_limit_exceeded',429,turn.usageSoFar());
+        }
         const uses = response.content.filter((block): block is ToolUseBlock => block.type === 'tool_use');
         if (uses.length === 0) {
           if (response.stop_reason === 'end_turn' || response.stop_reason === 'stop_sequence') {
             return turn.finish(response.content.flatMap(block => block.type === 'text' ? [block.text] : []).join(''), turn.used);
           }
-          // Cut off at max_tokens: the SDK's CLI asks for a continuation, which
-          // takes output past maxOutputTokens, so the turn ends there either way.
-          if (response.stop_reason === 'max_tokens' || response.stop_reason === 'model_context_window_exceeded') turn.limit('max_tokens');
           // The stop reason is an API enum, never content.
-          else logger.error('Agent runtime result was not success', {stopReason:response.stop_reason,...turn.counts()});
+          logger.error('Agent runtime result was not success', {stopReason:response.stop_reason,...turn.counts()});
           throw turn.terminalError ?? new AgentError('agent_provider_error',502);
         }
         // The SDK path ends with error_max_turns once maxTurns model turns have
