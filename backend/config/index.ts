@@ -76,6 +76,10 @@ const config = {
     enabled: process.env.AGENT_ENABLED === 'true',
     apiKey: process.env.DEEPSEEK_API_KEY,
     model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
+    // How a turn executes. 'sdk' (default) spawns the Claude Agent SDK's
+    // binary per turn (~240 MB); 'direct' runs the same tool loop in this
+    // process over HTTP. Anything other than 'direct' means 'sdk'.
+    runtime: (process.env.AGENT_RUNTIME === 'direct' ? 'direct' : 'sdk') as 'sdk' | 'direct',
     timeoutMs: 90_000,
     maxTurns: 10,
     maxToolCalls: 8,

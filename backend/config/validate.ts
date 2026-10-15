@@ -64,6 +64,12 @@ function validateConfig(): void {
   for (const [key, consequence] of OPTIONAL) {
     if (!process.env[key]) console.warn(`⚠️  ${key} is not set — ${consequence}.`);
   }
+
+  // config.agent.runtime treats anything but 'direct' as 'sdk'; say so rather than fall back silently.
+  const runtime = process.env.AGENT_RUNTIME;
+  if (runtime && runtime !== 'sdk' && runtime !== 'direct') {
+    console.warn(`⚠️  AGENT_RUNTIME is neither sdk nor direct — Pocky turns use ${config.agent.runtime}.`);
+  }
 }
 
 export = validateConfig;
