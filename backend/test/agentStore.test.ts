@@ -138,6 +138,32 @@ describe('agent storage safety', { skip: !enabled }, () => {
     const next=await store.createConversation(user,settings);
     await assert.rejects(store.beginTurn(user,next.id,{...settings,requestId:randomUUID(),content:'Twenty first'}),{code:'agent_rate_limited'});
   });
+  test('the daily budget counts a rolling 24 hours per user, past the hourly window',async()=>{
+    const user=(await db.query<{id:number}>("INSERT INTO users(email,password_hash,first_name,last_name) VALUES($1,'x','Daily','Test') RETURNING id",[`agent-${randomUUID()}@example.invalid`])).rows[0]!.id;users.push(user);
+    await db.query("INSERT INTO agent_admissions(id,user_id,created_at) SELECT gen_random_uuid(),$1,now()-interval '25 hours' FROM generate_series(1,60)",[user]);
+    const c=await store.createConversation(user,settings);
+    const first=randomUUID();await store.beginTurn(user,c.id,{...settings,requestId:first,content:'Older than a day does not count'});
+    await store.finishTurn(user,c.id,first,{text:'Noted.'});
+    await db.query("INSERT INTO agent_admissions(id,user_id,created_at) SELECT gen_random_uuid(),$1,now()-interval '2 hours' FROM generate_series(1,59)",[user]);
+    const refused=store.beginTurn(user,c.id,{...settings,requestId:randomUUID(),content:'Sixty first today'});
+    await assert.rejects(refused,{code:'agent_daily_limit',status:429});
+  });
+  test('the all-users daily budget admits exactly the remaining turns under concurrency',async()=>{
+    const config:typeof import('../config')=require('../config');
+    const saved=config.agent.maxTurnsPerDayAllUsers;
+    const everyone=Number((await db.query<{count:string}>("SELECT count(*) FROM agent_admissions WHERE created_at>now()-interval '24 hours'")).rows[0]!.count);
+    config.agent.maxTurnsPerDayAllUsers=everyone+1;
+    try {
+      const [a,b]=await Promise.all([store.createConversation(alice,settings),store.createConversation(bob,settings)]);
+      const turns=[{user:alice,id:a.id,requestId:randomUUID()},{user:bob,id:b.id,requestId:randomUUID()}];
+      const attempts=await Promise.allSettled(turns.map(t=>store.beginTurn(t.user,t.id,{...settings,requestId:t.requestId,content:'Fictional coffee'})));
+      assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);
+      const refused=attempts.find(r=>r.status==='rejected') as PromiseRejectedResult;
+      assert.equal(refused.reason.code,'agent_daily_capacity');assert.equal(refused.reason.status,429);
+      const admitted=turns[attempts.findIndex(r=>r.status==='fulfilled')]!;
+      await store.finishTurn(admitted.user,admitted.id,admitted.requestId,{text:'Noted.'});
+    } finally { config.agent.maxTurnsPerDayAllUsers=saved; }
+  });
   test('concurrent confirmations with different nonces on one version write exactly one batch',async()=>{
     const s=await proposal();const rowIds=s.draft!.rows.map(r=>r.id);
     const before=Number((await db.query<{count:string}>('SELECT count(*) FROM transactions WHERE user_id=$1',[alice])).rows[0]!.count);

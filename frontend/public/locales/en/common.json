@@ -545,6 +545,8 @@
       "agent_expired": "The draft or undo window has expired. Refresh to see the latest state.",
       "agent_busy": "Another turn is running. Wait for it to finish or cancel it before sending again.",
       "agent_rate_limited": "Too many requests. Please try again later.",
+      "agent_daily_limit": "You have reached Pocky's limit for the last 24 hours. Try again later, or add entries on the Transactions page.",
+      "agent_daily_capacity": "Pocky has reached its overall limit for the last 24 hours. Try again later, or add entries on the Transactions page.",
       "agent_cancelled": "This turn was cancelled. You can send a new message.",
       "agent_timeout": "The reply took too long. Refresh its status, then try a new message.",
       "agent_provider_error": "The AI provider could not finish this reply. Refresh its status before trying again.",
