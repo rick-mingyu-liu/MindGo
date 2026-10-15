@@ -35,8 +35,8 @@ On 2026-10-15 the Render service was checked with its CLI: it was on the Free pl
 
 | Item | State |
 | --- | --- |
-| Frontend (Vercel) and backend (Render) | Both deploy from `main`. Render's live deploy is `f772255` (the #79 merge), redeployed at 18:00 UTC when the instance and variables changed |
-| Render service | Starter (0.5 CPU, 512 MB), region Oregon, one instance, build `npm ci --include=dev`. The x64 SDK binary is installed and launches; one live turn took 3.8 s. Memory under concurrent turns is unmeasured |
+| Frontend (Vercel) and backend (Render) | Both deploy from `main`. Render's live deploy is `231d230` (the #89 merge) on `termpocket-api`; Vercel's production build calls `https://termpocket-api.onrender.com` (checked in the served JavaScript, 2026-10-15) |
+| Render service | `termpocket-api` (https://termpocket-api.onrender.com), Starter (0.5 CPU, 512 MB), region **Virginia** since 2026-10-15, next to Neon; one instance, build `npm ci --include=dev`. The Oregon service `mindgo.onrender.com` is suspended, kept for rollback. One SDK turn measured about 240 MB for its child process, so `AGENT_MAX_CONCURRENT_RUNS` defaults to 1 (#88); the direct runtime (#89, `AGENT_RUNTIME=direct`) measured about 105 MB for the whole process |
 | Neon PostgreSQL and source audit | PostgreSQL 17.11; 0 incompatible transaction source values; read-only preflight |
 | Migration 013 (conversations) | Applied 2026-10-15: 6/6 agent tables, source check allows `agent` |
 | Migration 014 (drop `watchlist`, `ai_plans`) | Applied 2026-10-15: 23 watchlist rows and 0 AI plans dropped, by the owner's decision |

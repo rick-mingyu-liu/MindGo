@@ -547,7 +547,7 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
 ## Deployment
 
-The backend runs on **Render** (Starter instance, Oregon), the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
+The backend runs on **Render** (`termpocket-api`, Starter instance, Virginia — next to the database), the frontend on **Vercel** (`NEXT_PUBLIC_API_URL=https://termpocket-api.onrender.com`), the database on **Neon** (AWS `us-east-1`).
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
