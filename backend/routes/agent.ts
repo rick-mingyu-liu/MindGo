@@ -120,6 +120,16 @@ router.post('/conversations/:id/confirm',route(async(req,res)=>{
   const rowIds=body.rowIds.map(validateUuid);if(new Set(rowIds).size!==rowIds.length)throw new AgentError('agent_invalid_input');
   res.json(await store.confirmDraft(req.user.userId,validateUuid(req.params.id),{version:version(body.version),rowIds,requestId:validateUuid(body.requestId)}));
 }));
+// Goal proposals: only these buttons create or change a savings goal. They need
+// storage (AGENT_ENABLED) but not the provider key, like draft confirmation.
+router.post('/conversations/:id/goal-proposal/confirm',route(async(req,res)=>{
+  const body=object(req.body,['proposalId','requestId']);
+  res.json(await store.confirmGoalProposal(req.user.userId,validateUuid(req.params.id),{proposalId:validateUuid(body.proposalId),requestId:validateUuid(body.requestId)}));
+}));
+router.delete('/conversations/:id/goal-proposal',route(async(req,res)=>{
+  const body=object(req.body,['proposalId']);
+  res.json(await store.cancelGoalProposal(req.user.userId,validateUuid(req.params.id),validateUuid(body.proposalId)));
+}));
 router.post('/receipts/:id/undo',route(async(req,res)=>{
   await store.undoReceipt(req.user.userId,validateUuid(req.params.id));res.json({undone:true});
 }));

@@ -76,7 +76,7 @@ export interface SavingsGoalRow {
 }
 
 // Conversational transaction storage (migration 013).
-import type { Conversation, Message, Draft, Receipt, Run } from '../services/agent/types';
+import type { Conversation, Message, Draft, Receipt, Run, GoalFields } from '../services/agent/types';
 export interface AgentConversationRow extends Conversation { user_id: number; draft_version: number }
 export interface AgentRunRow extends Run {
   conversation_id: string; user_id: number; request_hash: string;
@@ -92,3 +92,15 @@ export interface AgentReceiptRow extends Receipt {
 }
 
 export interface AgentAdmissionRow { id: string; user_id: number; created_at: Date }
+
+// Goal changes Pocky proposes for button confirmation (migration 015).
+export interface AgentGoalProposalRow {
+  id: string; conversation_id: string; user_id: number; run_id: string | null;
+  action: 'create' | 'update'; goal_id: number | null;
+  /** savings_goals.updated_at as PostgreSQL text when proposed; compared as text at confirmation. */
+  expected_updated_at: string | null;
+  before: GoalFields | null; after: GoalFields;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'superseded' | 'conflict' | 'expired';
+  request_id: string | null; request_hash: string | null; result_goal_id: number | null;
+  created_at: Date; expires_at: Date; decided_at: Date | null;
+}

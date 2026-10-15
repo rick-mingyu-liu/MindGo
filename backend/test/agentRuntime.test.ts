@@ -9,7 +9,7 @@ import { recordsFor } from '../services/agent/investigation';
 import db = require('../db/connection');
 
 const unused = async () => assert.fail('records read without a tool call');
-const records = { spendingSummary: unused, compareSpending: unused, transactionDetails: unused };
+const records = { spendingSummary: unused, compareSpending: unused, transactionDetails: unused, spendingBaseline: unused, listGoals: unused, calculateScenario: unused, prepareGoalProposal: unused };
 const input = { content: 'Coffee 5 CAD today', history: [], pendingRows: [], currency: 'CAD', timezone: 'America/Toronto', language: 'en' as const, today: '2026-10-14', signal: new AbortController().signal, records };
 const row = { amount: '5.00', description: 'Coffee', category: 'Dining Out', type: 'expense', date: '2026-10-14', currency: 'CAD' };
 const success = { type: 'result', subtype: 'success', is_error: false, result: 'Please review the draft.', usage: { input_tokens: 20, output_tokens: 10 }, modelUsage: { model: {inputTokens: 20,outputTokens:10,cacheReadInputTokens:7,cacheCreationInputTokens:3} } };
@@ -43,7 +43,7 @@ test('provider errors never leak raw details, including success subtype with is_
 
 test('tool replaces whole pending batch with validated rows and actual tokens, never USD estimates', async () => {
   const f = await fixture(async function* (_options, tools) {
-    assert.equal(tools.length, 4);
+    assert.equal(tools.length, 8);
     assert.equal(tools[0]!.name, 'propose_transactions');
     await tools[0]!.handler({rows:[row]}, {});
     await tools[0]!.handler({rows:[{...row,amount:'7.00'}]}, {});
@@ -171,8 +171,9 @@ const text = (result: { content: Array<{ type: string; text?: string }> }) => re
 
 function fakeRecords(answer: unknown = { ok: true }) {
   const calls: Array<{ fn: string; args: unknown }> = [];
-  const record = (fn: string) => async (args: unknown) => { calls.push({ fn, args }); return answer; };
-  return { calls, records: { spendingSummary: record('spendingSummary'), compareSpending: record('compareSpending'), transactionDetails: record('transactionDetails') } };
+  const record = (fn: string) => async (args?: unknown) => { calls.push({ fn, args }); return answer; };
+  return { calls, records: { spendingSummary: record('spendingSummary'), compareSpending: record('compareSpending'), transactionDetails: record('transactionDetails'),
+    spendingBaseline: record('spendingBaseline'), listGoals: record('listGoals'), calculateScenario: record('calculateScenario'), prepareGoalProposal: unused } };
 }
 
 test('read tools answer from the bound records, count as tool calls and never propose', async () => {
@@ -300,7 +301,8 @@ test('read tool errors answer with a code only and leave the turn usable', async
 });
 
 test('the full application tool set passes initialization; anything extra still fails closed', async () => {
-  const all = ['mcp__draft__propose_transactions', 'mcp__draft__spending_summary', 'mcp__draft__compare_spending', 'mcp__draft__transaction_details'];
+  const all = ['mcp__draft__propose_transactions', 'mcp__draft__spending_summary', 'mcp__draft__compare_spending', 'mcp__draft__transaction_details',
+    'mcp__draft__spending_baseline', 'mcp__draft__list_goals', 'mcp__draft__calculate_scenario', 'mcp__draft__propose_goal'];
   const ok = await fixture(async function* () { yield { type: 'system', subtype: 'init', tools: all }; yield success; });
   await ok.runtime(input);
   const extra = await fixture(async function* () { yield { type: 'system', subtype: 'init', tools: [...all, 'mcp__draft__delete_transactions'] }; yield success; });
@@ -308,13 +310,118 @@ test('the full application tool set passes initialization; anything extra still 
 });
 
 test('the tool hook allows each application tool and denies others', async () => {
-  const f = await fixture(async function* (options) {
-    const hook = options.hooks!.PreToolUse![0]!.hooks[0]!;
-    const decide = async (name: string) => ((await hook({ hook_event_name: 'PreToolUse', tool_name: name, tool_input: {}, tool_use_id: name } as never, name, { signal: new AbortController().signal })) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision;
-    for (const name of ['mcp__draft__spending_summary', 'mcp__draft__compare_spending', 'mcp__draft__transaction_details', 'mcp__draft__propose_transactions']) assert.equal(await decide(name), 'allow');
-    assert.equal(await decide('mcp__records__spending_summary'), 'deny');
-    assert.equal(await decide('Bash'), 'deny');
+  // Every decision counts as an attempt, so the eight-attempt budget is spread over turns.
+  const groups = [
+    { allow: ['mcp__draft__spending_summary', 'mcp__draft__compare_spending', 'mcp__draft__transaction_details', 'mcp__draft__propose_transactions'], deny: ['mcp__records__spending_summary', 'Bash'] },
+    { allow: ['mcp__draft__spending_baseline', 'mcp__draft__list_goals', 'mcp__draft__calculate_scenario', 'mcp__draft__propose_goal'], deny: ['mcp__draft__confirm_goal'] },
+  ];
+  for (const group of groups) {
+    const f = await fixture(async function* (options) {
+      const hook = options.hooks!.PreToolUse![0]!.hooks[0]!;
+      const decide = async (name: string) => ((await hook({ hook_event_name: 'PreToolUse', tool_name: name, tool_input: {}, tool_use_id: name } as never, name, { signal: new AbortController().signal })) as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision;
+      for (const name of group.allow) assert.equal(await decide(name), 'allow');
+      for (const name of group.deny) assert.equal(await decide(name), 'deny');
+      yield success;
+    });
+    await f.runtime(input);
+  }
+});
+
+const goalDraft = { action: 'create' as const, goal_id: null, expected_updated_at: null, before: null,
+  after: { name: 'Fictional laptop', target_amount: '1500.00', current_amount: '0.00', currency: 'CAD', target_date: '2027-04-30', description: null } };
+
+test('planning read tools pass the conversation day and currency, and never propose', async () => {
+  const fake = fakeRecords({ ok: 1 });
+  const f = await fixture(async function* (_options, tools) {
+    await tool(tools, 'spending_baseline').handler({ months: 6, user_id: 99 } as never, {});
+    await tool(tools, 'list_goals').handler({ user_id: 99 } as never, {});
+    const events = [{ label: 'Rent', kind: 'expense', amount: '900', date: '2026-11-01' }];
+    await tool(tools, 'calculate_scenario').handler({ currency: 'CAD', end_exclusive: '2027-01-01', events, user_id: 99 } as never, {});
     yield success;
   });
+  const result = await f.runtime({ ...input, records: fake.records });
+  assert.equal(result.toolCalls, 3);
+  assert.equal(result.proposedRows, undefined);
+  assert.equal(result.goalProposal, undefined);
+  assert.deepEqual(fake.calls, [
+    { fn: 'spendingBaseline', args: { months: 6, currency: 'CAD', today: '2026-10-14' } },
+    { fn: 'listGoals', args: undefined },
+    { fn: 'calculateScenario', args: { currency: 'CAD', end_exclusive: '2027-01-01', events: [{ label: 'Rent', kind: 'expense', amount: '900', date: '2026-11-01' }] } },
+  ]);
+});
+
+test('only a successful propose_goal returns a goal proposal, and it shares the budgets', async () => {
+  const seen: unknown[] = [];
+  const records = { ...fakeRecords().records, prepareGoalProposal: async (args: unknown, today: string) => { seen.push([args, today]); return goalDraft; } };
+  const f = await fixture(async function* (_options, tools) {
+    const out = await tool(tools, 'propose_goal').handler({ action: 'create', name: 'Fictional laptop', target_amount: '1500', currency: 'CAD', target_date: '2027-04-30', user_id: 99 } as never, {});
+    assert.equal(out.isError, undefined);
+    const parsed = JSON.parse(text(out)) as { status: string; note: string };
+    assert.equal(parsed.status, 'pending_confirmation');
+    assert.match(parsed.note, /Confirm button/);
+    yield success;
+  });
+  const result = await f.runtime({ ...input, records });
+  assert.deepEqual(result.goalProposal, goalDraft);
+  assert.equal(result.toolCalls, 1);
+  // The model's user_id never reaches the records.
+  assert.deepEqual(seen, [[{ action: 'create', name: 'Fictional laptop', target_amount: '1500', currency: 'CAD', target_date: '2027-04-30' }, '2026-10-14']]);
+});
+
+test('propose_goal failures answer with fixed hints, keep the turn and never leave a proposal', async () => {
+  const failures: unknown[] = [new AgentError('agent_invalid_input'), new AgentError('agent_goal_not_found', 404), new AgentError('agent_goal_conflict', 409), new AgentError('agent_unavailable', 503), new Error('secret Fictional goal row')];
+  const records = { ...fakeRecords().records, prepareGoalProposal: async () => { throw failures.shift(); } };
+  const logged: unknown[] = [];
+  const restore = mock.method(console, 'error', (...args: unknown[]) => { logged.push(args); });
+  try {
+    const f = await fixture(async function* (_options, tools) {
+      const codes = [];
+      for (let i = 0; i < 5; i++) {
+        const out = await tool(tools, 'propose_goal').handler({ action: 'update', goal_id: 3, expected_updated_at: '2026-10-01 10:00:00.123456', name: 'x', target_amount: '1', currency: 'CAD' } as never, {});
+        assert.equal(out.isError, true);
+        codes.push(text(out).split(':')[0]);
+      }
+      assert.deepEqual(codes, ['agent_invalid_input', 'agent_goal_not_found', 'agent_goal_conflict', 'agent_unavailable', 'agent_records_unavailable']);
+      yield success;
+    });
+    const result = await f.runtime({ ...input, records });
+    assert.equal(result.goalProposal, undefined);
+  } finally { restore.mock.restore(); }
+  assert.ok(!JSON.stringify(logged).includes('secret'));
+});
+
+test('goal proposals count toward the eight-call cap with every other tool', async () => {
+  let prepared = 0;
+  const records = { ...fakeRecords().records, prepareGoalProposal: async () => { prepared++; return goalDraft; } };
+  const f = await fixture(async function* (_options, tools) {
+    for (let i = 0; i < 4; i++) await tool(tools, 'list_goals').handler({} as never, {});
+    for (let i = 0; i < 4; i++) await tool(tools, 'propose_goal').handler({ action: 'create', name: 'n', target_amount: '1', currency: 'CAD' } as never, {});
+    const ninth = await tool(tools, 'propose_goal').handler({ action: 'create', name: 'n', target_amount: '1', currency: 'CAD' } as never, {});
+    assert.equal(text(ninth), 'agent_limit_exceeded');
+    yield success;
+  });
+  await assert.rejects(f.runtime({ ...input, records }), { code: 'agent_limit_exceeded' });
+  assert.equal(prepared, 4);
+});
+
+test('a revoked run cannot prepare a goal proposal', async () => {
+  const records = { ...fakeRecords().records, prepareGoalProposal: async () => assert.fail('prepared after revocation') };
+  const f = await fixture(async function* (_options, tools) {
+    await tool(tools, 'propose_goal').handler({ action: 'create', name: 'n', target_amount: '1', currency: 'CAD' } as never, {});
+    yield success;
+  });
+  await assert.rejects(f.runtime({ ...input, records, assertActive: async () => { throw new Error('revoked'); } }), { code: 'agent_cancelled' });
+});
+
+test('the system prompt keeps planning to tools and forbids affordability claims on incomplete scenarios', async () => {
+  const f = await fixture(async function* () { yield success; });
   await f.runtime(input);
+  const system = String(f.options().systemPrompt);
+  assert.match(system, /calculate_scenario/);
+  assert.match(system, /status incomplete, never say anything is affordable/);
+  assert.match(system, /not a bank balance/);
+  assert.match(system, /explicit id from list_goals/);
+  assert.match(system, /Do not recommend investments, stocks/);
+  assert.match(system, /whole calendar months, so monthly_needed is conservative/);
+  assert.match(system, /no Markdown/);
 });
