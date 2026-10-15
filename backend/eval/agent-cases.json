@@ -380,7 +380,7 @@
         "goalProposal": null,
         "reply": {
           "mustContainAny": [["现金", "余额", "存款"]],
-          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问)负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
+          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问|(?:不能|无法|没法|没办法)(?:说|告诉你|判断|确定|保证)你?)负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
         }
       }
     },
@@ -444,8 +444,9 @@
         "reply": {
           "mustContainAny": [["cash", "balance"]],
           "mustNotMatch": [
-            "(?<!\\b(?:whether|if)\\s)you(?:'ll| will) (?:definitely |easily |comfortably )?(?:reach|hit|make) (?:it|that|the|your|around|about|\\$?\\d)",
-            "(?<!\\b(?:whether|if)\\s)you(?:'re| are) on track",
+            "(?<!(?:\\b(?:whether|if)|(?:\\bcannot|\\bnot|n't) (?:say|confirm|tell|guarantee|promise)(?: that)?)\\s)you(?:'ll| will) (?:definitely |easily |comfortably )?(?:reach|hit) (?:it|that|the|your|around|about|\\$?\\d)",
+            "(?<!(?:\\b(?:whether|if)|(?:\\bcannot|\\bnot|n't) (?:say|confirm|tell|guarantee|promise)(?: that)?)\\s)you(?:'re| are) on track",
+            "you(?:'ll| will) make it\\b",
             "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"
           ]
         }

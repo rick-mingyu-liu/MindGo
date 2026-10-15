@@ -390,6 +390,7 @@ function callMismatch(call: ToolCall, m: CallMatcher): string | null {
     const value = call.args?.[name];
     if (value === undefined) { if (c.optional) continue; return `${m.tool} without ${name}`; }
     if (c.min !== undefined && !(typeof value === 'number' && value >= c.min)) return `${m.tool} ${name} ${JSON.stringify(value)}, at least ${c.min} expected`;
+    // A string comparison orders days correctly only because the day schema forces YYYY-MM-DD.
     if (c.notBefore !== undefined && !(typeof value === 'string' && value >= c.notBefore)) return `${m.tool} ${name} ${JSON.stringify(value)}, not before ${c.notBefore} expected`;
   }
   return null;

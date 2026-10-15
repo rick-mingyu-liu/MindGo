@@ -170,6 +170,20 @@ describe('evaluation scoring', () => {
       assert.ok(scoreRun(c, { result: result(text), calls: [] }).length > 0, text);
     }
   });
+  test('planning cases accept negated or conditional claims and reject real ones', () => {
+    const check = (id: string, allowed: string[], flagged: string[]) => {
+      const c = file.cases.find(c => c.id === id)!;
+      const replyOnly = { ...c, expect: { reply: { mustNotMatch: c.expect.reply!.mustNotMatch } } };
+      for (const text of allowed) assert.deepEqual(scoreRun(replyOnly, { result: result(text), calls: [] }), [], text);
+      for (const text of flagged) assert.ok(scoreRun(replyOnly, { result: result(text), calls: [] }).length > 0, text);
+    };
+    check('en-plan-coop-savings-habits',
+      ['You will make around 7,920 over the term.', 'I cannot say you will reach 4,200.', "I can't confirm you're on track.", "I can't confirm whether you'll reach 4,200."],
+      ['You will reach it.', "You'll hit your 4,200 goal.", "You're on track.", "You'll make it by December."]);
+    check('zh-plan-without-cash',
+      ['我不能说负担得起。', '我无法说你负担得起。', '我还不能告诉你负担得起。', '你能否负担得起取决于现金。'],
+      ['你负担得起这次旅行。', '这次旅行完全负担得起。', '你买得起。', '完全没问题。']);
+  });
   test('checks proposals, reply alternatives, forbidden phrases and multiline Markdown', () => {
     const c = evalCase({ goalProposal: { action: 'create' }, reply: { mustContain: ['CAD'], mustContainAny: [['review', 'confirm']], mustNotContain: ['saved'], mustNotMatch: ['^\\s*#{1,6}\\s'] }, maxToolCalls: 0 });
     assert.equal(scoreRun(c, { result: { ...result('Saved!\n# Done'), toolCalls: 1 }, calls: [] }).length, 6);
