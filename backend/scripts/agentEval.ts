@@ -42,8 +42,13 @@ const MAX_REPEAT = 20;
 // Case file
 
 export interface ExpectedRow { id?: string; type?: 'expense' | 'income'; amount?: string; currency?: string; category?: string | string[]; date?: string }
+/** One argument condition: min for numbers, notBefore for day strings; an absent argument fails unless optional. */
+export interface ArgCondition { min?: number; notBefore?: string; optional?: true }
+/** A tool call whose arguments (as the handler received them) meet every condition. */
+export interface CallMatcher { tool: ToolName; args?: Record<string, ArgCondition> }
 export interface Expectations {
-  tools?: { include?: ToolName[]; exclude?: ToolName[] };
+  /** anyOf: at least one successful call matches one matcher. everyCall: every call to a named tool meets its matcher. */
+  tools?: { include?: ToolName[]; exclude?: ToolName[]; anyOf?: CallMatcher[]; everyCall?: CallMatcher[] };
   maxToolCalls?: number;
   /** The pending batch after the turn: proposedRows when the model proposed, otherwise the pendingRows it started with. */
   draft?: { count?: number; newRows?: number; unchanged?: boolean; rows?: ExpectedRow[] };
@@ -67,6 +72,16 @@ export interface CaseFile { defaults: { today: string; timezone: string; currenc
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every(s => typeof s === 'string' && s.length > 0);
 const unknownKeys = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).filter(k => !keys.includes(k));
+function validCondition(c: unknown): boolean {
+  if (!isObject(c) || unknownKeys(c, ['min', 'notBefore', 'optional']).length || (c.min === undefined && c.notBefore === undefined)) return false;
+  if (c.min !== undefined && (typeof c.min !== 'number' || !Number.isFinite(c.min))) return false;
+  if (c.notBefore !== undefined) { try { if (typeof c.notBefore !== 'string') return false; validateDay(c.notBefore); } catch { return false; } }
+  return c.optional === undefined || c.optional === true;
+}
+function validMatcher(m: unknown): boolean {
+  if (!isObject(m) || unknownKeys(m, ['tool', 'args']).length || !(TOOL_NAMES as readonly unknown[]).includes(m.tool)) return false;
+  return m.args === undefined || (isObject(m.args) && Object.values(m.args).every(validCondition));
+}
 
 function checkRow(row: unknown, where: string, problems: string[]): void {
   if (!isObject(row)) { problems.push(`${where}: not an object`); return; }
@@ -109,7 +124,11 @@ export function validateCaseFile(raw: unknown): CaseFile {
     if (e.tools !== undefined) {
       if (!isObject(e.tools)) problems.push(`${at}: tools`);
       else {
-        for (const k of unknownKeys(e.tools, ['include', 'exclude'])) problems.push(`${at}: tools.${k}`);
+        for (const k of unknownKeys(e.tools, ['include', 'exclude', 'anyOf', 'everyCall'])) problems.push(`${at}: tools.${k}`);
+        for (const k of ['anyOf', 'everyCall'] as const) {
+          const list = e.tools[k];
+          if (list !== undefined && (!Array.isArray(list) || list.length === 0 || !list.every(validMatcher))) problems.push(`${at}: tools.${k}`);
+        }
         const excluded = e.tools.exclude;
         if (isStringArray(e.tools.include) && isStringArray(excluded) && e.tools.include.some(t => excluded.includes(t))) problems.push(`${at}: tools include and exclude overlap`);
         for (const list of [e.tools.include, e.tools.exclude]) {
@@ -278,7 +297,7 @@ export function installFixture(f: Fixture): () => void {
   return () => { Object.assign(db, { query: saved.query, getPool: saved.getPool }); Object.assign(exchangeRateService, { getExchangeRate: saved.rate }); };
 }
 
-export interface ToolCall { tool: ToolName; ok: boolean; fixtureError?: boolean }
+export interface ToolCall { tool: ToolName; ok: boolean; fixtureError?: boolean; args?: Record<string, unknown> }
 const RECORD_TOOLS: Record<keyof AgentRecords, ToolName> = {
   spendingSummary: 'spending_summary', compareSpending: 'compare_spending', transactionDetails: 'transaction_details',
   spendingBaseline: 'spending_baseline', listGoals: 'list_goals', calculateScenario: 'calculate_scenario', prepareGoalProposal: 'propose_goal',
@@ -290,7 +309,7 @@ export function trackRecords(records: AgentRecords, calls: ToolCall[]): AgentRec
   for (const key of Object.keys(RECORD_TOOLS) as Array<keyof AgentRecords>) {
     const fn = records[key] as (...args: unknown[]) => Promise<unknown>;
     tracked[key] = async (...args: unknown[]) => {
-      const call: ToolCall = { tool: RECORD_TOOLS[key], ok: false };
+      const call: ToolCall = { tool: RECORD_TOOLS[key], ok: false, ...(isObject(args[0]) ? { args: args[0] } : {}) };
       calls.push(call);
       try {
         const value = await fn(...args);
@@ -364,6 +383,18 @@ const sameRows = (a: DraftRow[], b: DraftRow[]) => {
   return a.length === b.length && a.map(key).sort().join('\n') === b.map(key).sort().join('\n');
 };
 
+/** The first condition the call fails, as a reason, or null when it matches. */
+function callMismatch(call: ToolCall, m: CallMatcher): string | null {
+  if (call.tool !== m.tool) return `not ${m.tool}`;
+  for (const [name, c] of Object.entries(m.args ?? {})) {
+    const value = call.args?.[name];
+    if (value === undefined) { if (c.optional) continue; return `${m.tool} without ${name}`; }
+    if (c.min !== undefined && !(typeof value === 'number' && value >= c.min)) return `${m.tool} ${name} ${JSON.stringify(value)}, at least ${c.min} expected`;
+    if (c.notBefore !== undefined && !(typeof value === 'string' && value >= c.notBefore)) return `${m.tool} ${name} ${JSON.stringify(value)}, not before ${c.notBefore} expected`;
+  }
+  return null;
+}
+
 /** Every expectation the run failed, as a reason; empty means PASS. */
 export function scoreRun(c: EvalCase, outcome: RunOutcome): string[] {
   if (outcome.errorCode || !outcome.result) return [`run failed: ${outcome.errorCode ?? 'no result'}`];
@@ -379,6 +410,14 @@ export function scoreRun(c: EvalCase, outcome: RunOutcome): string[] {
   const calledList = [...called].join(', ') || 'none';
   for (const tool of e.tools?.include ?? []) if (!successful.has(tool)) failures.push(`tool ${tool} did not succeed (called: ${calledList})`);
   for (const tool of e.tools?.exclude ?? []) if (called.has(tool)) failures.push(`tool ${tool} was called`);
+  const anyOf = e.tools?.anyOf;
+  if (anyOf && !outcome.calls.some(call => call.ok && anyOf.some(m => callMismatch(call, m) === null))) {
+    const reasons = outcome.calls.flatMap(call => anyOf.filter(m => m.tool === call.tool).map(m => callMismatch(call, m) ?? (call.ok ? '' : `${m.tool} failed`))).filter(Boolean);
+    failures.push(`no successful call matches any of ${anyOf.map(m => m.tool).join(', ')} (called: ${calledList}${reasons.length ? `; ${reasons.join('; ')}` : ''})`);
+  }
+  for (const m of e.tools?.everyCall ?? []) {
+    for (const call of outcome.calls) { const why = call.tool === m.tool ? callMismatch(call, m) : null; if (why) failures.push(`call ${why}`); }
+  }
   if (e.maxToolCalls !== undefined && result.toolCalls > e.maxToolCalls) failures.push(`${result.toolCalls} tool calls, at most ${e.maxToolCalls} expected (called: ${calledList})`);
 
   if (e.draft) {

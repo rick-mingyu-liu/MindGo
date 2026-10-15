@@ -412,6 +412,46 @@
       }
     },
     {
+      "id": "en-habits-whole-year",
+      "language": "en",
+      "message": "Analyze my spending habits.",
+      "note": "Habits need a long enough window: a 3-month baseline mixes a study term with a work term. Pocky must average 12 months or compare whole terms.",
+      "expect": {
+        "tools": {
+          "exclude": ["propose_transactions", "propose_goal"],
+          "anyOf": [{ "tool": "spending_baseline", "args": { "months": { "min": 12 } } }, { "tool": "compare_spending" }]
+        },
+        "maxToolCalls": 5,
+        "draft": { "count": 0 },
+        "goalProposal": null
+      }
+    },
+    {
+      "id": "en-plan-coop-savings-habits",
+      "language": "en",
+      "today": "2026-10-15",
+      "message": "My co-op pays 1,980 every two weeks; the work term runs from September to the end of December. Estimate whether my savings can get to around 4,200 by the end of December, and analyze my past spending habits.",
+      "note": "Mirrors a production reply (2026-10-15) with different figures: it read only a 3-month baseline and offered a projection starting September 1. Habits need 12 months or a term comparison; any projection starts today (start omitted or not in the past); without cash on hand it must ask rather than call the goal reachable.",
+      "expect": {
+        "tools": {
+          "exclude": ["propose_transactions", "propose_goal"],
+          "anyOf": [{ "tool": "spending_baseline", "args": { "months": { "min": 12 } } }, { "tool": "compare_spending" }],
+          "everyCall": [{ "tool": "calculate_scenario", "args": { "start": { "notBefore": "2026-10-15", "optional": true } } }]
+        },
+        "maxToolCalls": 6,
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": {
+          "mustContainAny": [["cash", "balance"]],
+          "mustNotMatch": [
+            "(?<!\\b(?:whether|if)\\s)you(?:'ll| will) (?:definitely |easily |comfortably )?(?:reach|hit|make) (?:it|that|the|your|around|about|\\$?\\d)",
+            "(?<!\\b(?:whether|if)\\s)you(?:'re| are) on track",
+            "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"
+          ]
+        }
+      }
+    },
+    {
       "id": "en-goal-create",
       "language": "en",
       "message": "Create a savings goal called \"Reading Week Trip\" with a target of 800 CAD by 2027-02-14.",
