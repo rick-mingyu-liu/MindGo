@@ -17,6 +17,7 @@ npm start              # node dist/app.js (production — the compiled output, w
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)
 npm run db:seed        # (re)seed the demo account (john.doe@example.com / password123)
 backend/scripts/rehearse-linux.sh [--live]  # from the repo root, with docker-compose.test.yml up: Render's npm ci + build + preflight in a fresh node:<.node-version> Linux container
+npm run agent:eval     # opt-in paid Pocky evaluation: 36 fictional cases, real runtime/DeepSeek, in-memory records (no DB); README "Evaluating Pocky"
 npm run agent:preflight  # read-only Pocky deploy check (config, DB/migrations 013-015, SDK binary, DeepSeek reachability); `-- --live` adds one fictional model turn. Runbook: README "Deploying Pocky to production"
 npm run lint           # eslint . (eslint 9, flat config in eslint.config.mjs; TypeScript only, via typescript-eslint)
 npm test               # builds, then node --test 'dist/test/**/*.test.js' — unit tests always run; see below for the integration suite
@@ -56,6 +57,8 @@ npm test               # node --test — scorer unit tests
   **`sharedContracts.test.ts` checks that every category the frontend's picker offers has an explicit colour in `CATEGORY_COLORS`.** Like `demoData.test.ts`, it reads files outside `backend/`, so it fails on a checkout without `frontend/`. (It also pinned the copies in a React Native client, `mobile/`, until that client was removed.)
 
   `agentPreflight.test.ts` covers `scripts/agentPreflight.ts`'s pure parts: no secret (fake key, DB URL, password, host) survives formatting, the exit code follows FAIL alone, 013/014/015 PASS/WARN/FAIL from stubbed catalog facts, and that gathering facts issues only `SELECT`s.
+
+  `agentEval.test.ts` covers the fictional evaluation harness: scoring and numeric boundaries, strict fixture SQL/ownership/cursors/FX/goal versions, real-tool totals, CLI validation and pass thresholds, blocked pool access and restoration, bounded key-redacted output. `npm run agent:eval` is opt-in and paid; it never runs in CI and never opens a database. Cases, defaults and fixture data live under `backend/eval/`; keep them fictional. Required tools must succeed; excluded tools include failed handler calls. The harness cannot observe SDK schema-rejected tool names.
 
   One trap in `schedulerService.test.ts`: `mock.timers`' fake `Timeout` **ignores `unref()`** — `hasRef()` stays `true` however you call it — so the one test that checks the timer does not hold the event loop open has to run on a real timer, in its own `describe`.
 - **`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`; point it at a throwaway database instead:

@@ -14,6 +14,7 @@
     "db:setup": "node dist/db/setup.js",
     "db:seed": "node dist/db/seed.js",
     "access-token": "node dist/db/accessToken.js",
+    "agent:eval": "node dist/scripts/agentEval.js",
     "agent:preflight": "node dist/scripts/agentPreflight.js",
     "lint": "eslint .",
     "test": "npm run build && node --test 'dist/test/**/*.test.js'"
