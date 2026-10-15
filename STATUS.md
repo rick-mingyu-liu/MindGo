@@ -7,7 +7,7 @@ As of 2026-10-15. Update this file when a step below completes; git history keep
 Pocky, TermPocket's bilingual assistant, can now record, investigate and plan. It is live in production as of 2026-10-15: migrations 013 and 015 are applied, the agent is enabled on Render, and the Render Shell preflight passes with a live model turn.
 
 - **Built:** recording transactions by chat with button-only saving, read-only questions about your own spending, and planning (cash projections, savings-goal proposals). The stock watchlist and the old one-shot AI plans are removed.
-- **Production:** Render Starter instance with `AGENT_ENABLED=true` and the DeepSeek key; Neon has 013 (conversations) and 015 (goal proposals). Migration 014, which drops the legacy `watchlist` (23 rows) and `ai_plans` tables, is held for the owner's decision. The runbook is the README section "Deploying Pocky to production", and `npm run agent:preflight` checks each step.
+- **Production:** Render Starter instance with `AGENT_ENABLED=true` and the DeepSeek key; Neon has all three agent migrations: 013 (conversations), 014 (legacy `watchlist` and `ai_plans` dropped) and 015 (goal proposals). The runbook is the README section "Deploying Pocky to production", and `npm run agent:preflight` checks each step.
 - **Next:** a fictional smoke test in the app (draft, confirm, undo), then use Pocky for a week. Pocky memory follows, shaped by what real use shows.
 
 ## What is merged
@@ -31,7 +31,7 @@ The twelve original feature and deployment pull requests below landed between 20
 
 ## Production
 
-On 2026-10-15 the Render service was checked with its CLI: it was on the Free plan, which has no Shell, so the owner upgraded it to Starter and set `AGENT_ENABLED` and `DEEPSEEK_API_KEY`. Migrations 013 and 015 were then applied to Neon's `production` branch through the direct endpoint with `neonctl` (013's audit: 0 incompatible rows). The preflight in the Render Shell with `--live` passed: 17 PASS, 1 WARN (014), 0 FAIL.
+On 2026-10-15 the Render service was checked with its CLI: it was on the Free plan, which has no Shell, so the owner upgraded it to Starter and set `AGENT_ENABLED` and `DEEPSEEK_API_KEY`. Migrations 013 and 015 were then applied to Neon's `production` branch through the direct endpoint with `neonctl` (013's audit: 0 incompatible rows). The preflight in the Render Shell with `--live` passed: 17 PASS, 1 WARN (014), 0 FAIL. Migration 014 followed the same day, on the owner's decision that the stock watchlist and AI plans will never return: it dropped 23 `watchlist` rows and an empty `ai_plans` table. The production database was 8.7 MB afterwards.
 
 | Item | State |
 | --- | --- |
@@ -39,7 +39,7 @@ On 2026-10-15 the Render service was checked with its CLI: it was on the Free pl
 | Render service | Starter (0.5 CPU, 512 MB), region Oregon, one instance, build `npm ci --include=dev`. The x64 SDK binary is installed and launches; one live turn took 3.8 s. Memory under concurrent turns is unmeasured |
 | Neon PostgreSQL and source audit | PostgreSQL 17.11; 0 incompatible transaction source values; read-only preflight |
 | Migration 013 (conversations) | Applied 2026-10-15: 6/6 agent tables, source check allows `agent` |
-| Migration 014 (drop `watchlist`, `ai_plans`) | Required state absent: `watchlist` has 23 rows, `ai_plans` has 0; applying 014 deletes those watchlist rows. Run only after both new deployments are verified and the owner accepts that deletion |
+| Migration 014 (drop `watchlist`, `ai_plans`) | Applied 2026-10-15: 23 watchlist rows and 0 AI plans dropped, by the owner's decision |
 | Migration 015 (goal proposals) | Applied 2026-10-15: `agent_goal_proposals` present |
 | `AGENT_ENABLED`, `DEEPSEEK_API_KEY` on Render | Set 2026-10-15. The `--live` preflight turn (1 tool call, 1 drafted row, 8,109 in / 201 out tokens, 3.8 s) confirms the key works |
 | Render host checks | `/tmp` writable, linux-x64 glibc, Node 22.23.3, SDK binary launches, DeepSeek reachable (preflight in the Render Shell) |
@@ -97,7 +97,7 @@ Launch preparation and hardening can proceed in parallel. Verify both gates befo
 
 | Step | Work | Gate before the next step |
 | --- | --- | --- |
-| 1. Go live | Done except the in-app smoke test: Render on Starter, migrations 013 and 015 applied, agent enabled, `--live` preflight passes | A fictional lunch can be drafted, confirmed and undone in the app |
+| 1. Go live | Done except the in-app smoke test: Render on Starter, migrations 013–015 applied, agent enabled, `--live` preflight passes. A planning question hit `agent_limit_exceeded` in the first real use; a fix is in progress | A fictional lunch can be drafted, confirmed and undone in the app, and a planning question completes |
 | 2. Harden (alongside 1) | Evaluation set and dependency upgrades are merged; the remaining work is the frontend build-tool advisories (Tailwind 4 or upstream fixes) | One live evaluation run reviewed (done); no high-severity advisories (open: 7 high in the frontend toolchain) |
 | 3. Real use | Record real spending with Pocky for a week; note what it gets wrong | Real failures listed and added to the evaluation set |
 | 4. Memory | Remembered facts (rent, co-op pay, reserve) with Remember and Forget, saved plans, per-account currency, timezone and reply language | Deleting a fact removes it from everything Pocky sees, and the evaluation set still passes |
@@ -107,6 +107,6 @@ Decisions needed from the owner:
 
 - [x] Render instance type: upgraded from Free to Starter on 2026-10-15. Revisit Standard (2 GB) if the preflight or real use shows memory pressure.
 - [x] Migrations 013 and 015 applied on 2026-10-15.
-- [ ] Migration 014: explicitly accept removal of the 23 legacy watchlist rows, then apply it.
+- [x] Migration 014 applied on 2026-10-15 (the owner confirmed both features are gone for good).
 - [x] `AGENT_ENABLED=true` and the DeepSeek key are set on Render.
 - [ ] Decide whether DeepSeek usage needs a monthly spending cap beyond the built-in per-user limits.
