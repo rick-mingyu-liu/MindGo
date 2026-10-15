@@ -11,8 +11,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@napi-rs/canvas": "1.0.9",
+    "@napi-rs/canvas": "1.0.11",
     "onnxruntime-node": "1.30.0",
-    "ppu-paddle-ocr": "6.6.0"
+    "ppu-paddle-ocr": "6.6.1"
   }
 }
