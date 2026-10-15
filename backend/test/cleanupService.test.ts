@@ -2,13 +2,13 @@ import { test, describe, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import db = require('../db/connection');
 import config = require('../config');
-import { aiPlanIsLive, deleteOldAIPlans, deleteUnverifiedAccounts, reclaimStaleUnverifiedAccount } from '../services/cleanupService';
+import { deleteUnverifiedAccounts, reclaimStaleUnverifiedAccount } from '../services/cleanupService';
 
 /**
  * Unit tests for the scheduled deletions. No database: db.query is mocked.
  *
- * These two statements delete user accounts and AI plans on a timer, with
- * nobody watching. The properties worth pinning down are therefore less about
+ * These statements delete user accounts on a timer, or on a re-registration,
+ * with nobody watching. The properties worth pinning down are therefore less about
  * the happy path than about the shape of the SQL and what happens when it
  * fails.
  */
@@ -16,44 +16,6 @@ import { aiPlanIsLive, deleteOldAIPlans, deleteUnverifiedAccounts, reclaimStaleU
 function queryReturning(rowCount: number) {
   return mock.method(db, 'query', async (_text: string, _params?: unknown[]) => ({ rowCount, rows: [] }));
 }
-
-describe('deleteOldAIPlans', () => {
-  beforeEach(() => mock.restoreAll());
-
-  test('returns the number of rows deleted', async () => {
-    queryReturning(7);
-    assert.equal(await deleteOldAIPlans(), 7);
-  });
-
-  test('deletes from ai_plans, bounded by the configured retention', async () => {
-    const query = queryReturning(0);
-
-    await deleteOldAIPlans();
-
-    const [sql, params] = query.mock.calls[0]!.arguments;
-    assert.match(sql, /^DELETE FROM ai_plans\b/);
-    assert.match(sql, /created_at < NOW\(\) - make_interval\(mins => \$1\)/);
-    assert.deepEqual(params, [config.dataRetention.aiPlanMinutes]);
-  });
-
-  test('reads and deletes split plans at the same instant', () => {
-    // aiPlanIsLive is what every read filters on; the DELETE is its exact
-    // complement, so no plan is ever both unreadable and kept forever, or
-    // deleted while still readable.
-    assert.equal(aiPlanIsLive(3), 'created_at >= NOW() - make_interval(mins => $3)');
-  });
-
-  test('propagates a database error instead of swallowing it', async () => {
-    // The whole point of moving this out of the controller. The old version
-    // caught its own error and returned normally, so the scheduler logged
-    // "cleanup completed" for a cleanup that had not happened.
-    mock.method(db, 'query', async () => {
-      throw new Error('connection terminated');
-    });
-
-    await assert.rejects(() => deleteOldAIPlans(), /connection terminated/);
-  });
-});
 
 describe('deleteUnverifiedAccounts', () => {
   beforeEach(() => mock.restoreAll());

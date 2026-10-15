@@ -95,10 +95,10 @@ describe('what it identifies the demo account by', () => {
   });
 });
 
-test('refresh clears archived watchlist rows without creating new stock data', async () => {
-  await refreshDemoAccount({ create: false });
-  assert.ok(ran(/^DELETE FROM watchlist WHERE user_id = \$1$/));
-  assert.equal(ran(/^INSERT INTO watchlist/), false);
+test('refresh touches only the tables that still exist (watchlist and ai_plans were dropped by 014)', async () => {
+  await refreshDemoAccount({ create: true });
+  assert.deepEqual([...OWNED_TABLES], ['transactions', 'savings_goals']);
+  assert.equal(ran(/watchlist|ai_plans/), false);
 });
 
 describe('when no account is flagged', () => {

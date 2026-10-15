@@ -78,33 +78,12 @@ CREATE TABLE IF NOT EXISTS savings_goals (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Investment watchlist table
-CREATE TABLE IF NOT EXISTS watchlist (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    symbol VARCHAR(20) NOT NULL,
-    company_name VARCHAR(255),
-    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, symbol)
-);
-
--- AI plans table
-CREATE TABLE IF NOT EXISTS ai_plans (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    prompt TEXT NOT NULL,
-    response TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Indexes for better performance
 -- Every read of transactions filters on user_id and the main listing then sorts
 -- by date DESC, created_at DESC, so one composite index serves filter and sort.
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date DESC, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON savings_goals(user_id);
-CREATE INDEX IF NOT EXISTS idx_watchlist_user_id ON watchlist(user_id);
-CREATE INDEX IF NOT EXISTS idx_ai_plans_user_id ON ai_plans(user_id);
 CREATE INDEX IF NOT EXISTS idx_import_batches_user_id ON import_batches(user_id);
 CREATE INDEX IF NOT EXISTS idx_access_tokens_user_id ON access_tokens(user_id);
 

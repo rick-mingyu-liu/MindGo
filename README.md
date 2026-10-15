@@ -336,7 +336,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - the demo generator's evergreen properties at nine different "todays"
 - the startup config check, retention predicates, logger levels in production
 - the scheduler's timer plumbing, and the weekly report's next run **on a UTC clock**
-- retired stock and one-shot AI endpoints return authenticated retirement responses without database or provider calls; legacy history and archived-data deletion remain available
+- the removed stock and AI-plan endpoints fall through to the ordinary 404, signed in or not, without touching the database
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
 - agent row validation, authenticated routes, unavailable-mode behavior, cancellation, runtime tool restrictions, token limits, safe failures and temporary-directory cleanup
@@ -345,7 +345,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
-**`api.test.ts`, `agentStore.test.ts` and `agentMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
+**`api.test.ts`, `agentStore.test.ts`, `agentMigration.test.ts` and `dropWatchlistMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
 
 ```bash
 TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
@@ -412,17 +412,10 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `PUT /:id/progress` | update progress |
 | `GET /stats` | aggregates |
 | `DELETE /clear-all` | delete every goal |
-| `POST /from-ai-plan` | retired; returns `410 Gone` |
 
-### Retired stock and one-shot planning endpoints
+### Removed stock and one-shot planning features
 
-Stock/watchlist features and the old AI Planning interface are retired. `/investments` bookmarks redirect to the dashboard; `/ai-planning` bookmarks redirect to `/agent`, the optional conversation-recording flow. This does not restore one-shot plans or stock features.
-
-Authenticated stock operations under `/investments` return **`410 Gone`**. The one retained mutation is `DELETE /investments/watchlist/clear-all`: Settings uses it to delete the user's archived watchlist rows alongside transactions and goals. No stock quote, search, news or analysis provider is called.
-
-`POST /ai/plan`, `/ai/budget-recommendations`, `/ai/investment-advice` and `/goals/from-ai-plan` return **`410 Gone`**. `GET /ai/plans` and `GET /ai/plans/:id` remain authenticated, read-only legacy history endpoints. Existing plans expire 30 minutes after creation, enforced at read time and physically swept by the existing hourly maintenance job. No new one-shot plans can be created.
-
-The `watchlist` and `ai_plans` tables remain in the schema; this retirement needs no database migration and does not delete existing rows. Archived watchlist rows remain until the user clears them or the owning account is deleted. A future storage removal requires a separately reviewed data transition.
+The stock watchlist and the old one-shot AI Planning feature are gone, code and storage both. Nothing is mounted under `/investments` or `/ai` any more, and `POST /goals/from-ai-plan` no longer exists, so those paths get the ordinary `404`. Migration [`014_drop_watchlist_ai_plans.sql`](backend/db/migrations/014_drop_watchlist_ai_plans.sql) drops the `watchlist` and `ai_plans` tables. Old frontend bookmarks still redirect: `/investments` to the dashboard and `/ai-planning` to `/agent`, the optional conversation-recording flow (which is not one-shot planning).
 
 ### `/agent` — conversation recording
 
@@ -532,13 +525,15 @@ The backend runs on **Render**, the frontend on **Vercel**, the database on **Ne
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
-**Migration and enablement:** verify migration `013` on PostgreSQL 15+ locally or in staging before an operator applies it to production through the direct database endpoint. No production migration or deployment is performed by this implementation. `AGENT_ENABLED=false` permits the application to run without the new tables being queried by agent routes or maintenance. Enable it only after migration verification. Configure `DEEPSEEK_API_KEY` and, optionally, `DEEPSEEK_MODEL` (default `deepseek-flash`) for new model turns. Stock-provider credentials remain unused.
+**Migration 014 (drop `watchlist` and `ai_plans`):** Deploy order: the Vercel frontend first (the previous build's Settings clear-all calls `DELETE /investments/watchlist/clear-all`, which now 404s), then the Render backend, then apply 014. Deploy the backend that no longer reads those tables before you apply `014_drop_watchlist_ai_plans.sql` through the direct endpoint. The order matters: the previous release queries `ai_plans` in its hourly maintenance job and its `/ai/plans` routes, and would error against a database without it. The migration is idempotent and prints only row counts.
+
+**Migration and enablement:** verify migration `013` on PostgreSQL 15+ locally or in staging before an operator applies it to production through the direct database endpoint. No production migration or deployment is performed by this implementation. `AGENT_ENABLED=false` permits the application to run without the new tables being queried by agent routes or maintenance. Enable it only after migration verification. Configure `DEEPSEEK_API_KEY` and, optionally, `DEEPSEEK_MODEL` (default `deepseek-flash`) for new model turns.
 
 **Agent hosting requirements:** the backend needs a Node host that permits the Claude Agent SDK's platform-specific child process, writable temporary storage for isolated configuration/cwd, and outbound HTTPS to `https://api.deepseek.com/anthropic`. Retain the SDK's optional platform dependency during installation. Allow HTTP requests to run beyond the 90-second model deadline so terminal state and cleanup can finish; a short-lived edge handler is insufficient. Each run deletes its temporary directory and disables SDK session persistence. Local adapter tests exercised real DeepSeek calls, cancellation and failures; deployed Linux compatibility, memory capacity and provider throttling still need validation on the intended host. Four model requests per process is a process limit, not a fleet-wide cap. Set the email credentials separately when enabling reports.
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes expired AI plans and unverified accounts and, when agent storage is enabled, expires agent drafts and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ---
 
@@ -556,7 +551,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 ## Database
 
-The original tables are `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. `watchlist` and `ai_plans` remain legacy storage under the retirement policy above.
+The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables.
 
 `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` accepts `manual`, `ocr`, `ocr_llm` and `agent`; only confirmation writes `agent` rows. `import_batches` records counts for confirmed screenshot imports.
 

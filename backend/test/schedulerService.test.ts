@@ -6,6 +6,7 @@ import db = require('../db/connection');
 import config = require('../config');
 import type { ScheduledTask } from 'node-cron';
 import { spawnSync } from 'node:child_process';
+import * as agentStore from '../services/agent/store';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
@@ -393,13 +394,12 @@ describe('what the retention jobs report', () => {
     const savedEnabled = logger.enabled;
     logger.enabled = false;
     mock.method(console, 'log', (...a: unknown[]) => printed.push(a.map(String).join(' ')));
-    mock.method(db, 'query', async (text: string) => ({ rowCount: text.includes('ai_plans') ? 3 : 2, rows: [] }));
+    mock.method(db, 'query', async () => ({ rowCount: 2, rows: [] }));
 
     await scheduler.runMaintenance();
 
     logger.enabled = savedEnabled;
     const log = printed.join('\n');
-    assert.match(log, /\[AUDIT\].*aiPlanCleanup: deleted 3 row\(s\)/);
     assert.match(log, /\[AUDIT\].*accountCleanup: deleted 2 row\(s\)/);
   });
 
@@ -425,7 +425,7 @@ describe('what the retention jobs report', () => {
 
     assert.equal(audits.length, 1);
     assert.match(audits[0]!, /maintenance/);
-    assert.match(audits[0]!, /aiPlanCleanup/);
+    assert.doesNotMatch(audits[0]!, /aiPlan/);
     assert.match(audits[0]!, /accountCleanup/);
     assert.match(audits[0]!, new RegExp(`every ${config.cron.maintenance}ms`));
   });
@@ -433,7 +433,7 @@ describe('what the retention jobs report', () => {
 
 describe('hourly maintenance', () => {
   /**
-   * Both retention deletions share one hourly sweep. They used to run every 5
+   * The retention deletions share one hourly sweep. They used to run every 5
    * and 10 minutes, which left Neon (suspends after ~5 idle minutes) almost no
    * window to scale to zero. These pin what the sweep may and may not do to
    * the database: db.query is mocked, and every call to it is a query Neon
@@ -486,45 +486,58 @@ describe('hourly maintenance', () => {
     assert.deepEqual(sql, []);
   });
 
-  test('runs both cleanups in the same run, once an hour', async () => {
+  test('runs the account cleanup once an hour, and nothing else while the agent is off', async () => {
     answer(async () => ({ rowCount: 0, rows: [] }));
     scheduler.scheduleCleanupTasks();
     mock.timers.tick(hour);
     await drain();
-    assert.equal(sql.length, 2);
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(sql.length, 1);
     assert.equal(deletesFrom('users'), 1);
 
     mock.timers.tick(hour);
     await drain();
-    assert.equal(sql.length, 4);
+    assert.equal(sql.length, 2);
   });
 
   test('a failing cleanup does not stop the other one', async () => {
-    for (const failing of ['ai_plans', 'users']) {
-      sql = [];
-      errors = [];
-      answer(async (text) => {
-        if (text.startsWith(`DELETE FROM ${failing}`)) throw new Error('connection terminated');
-        return { rowCount: 1, rows: [] };
-      });
-      const result = await scheduler.runMaintenance();
-      assert.equal(deletesFrom('ai_plans'), 1, `ai_plans skipped when ${failing} failed`);
-      assert.equal(deletesFrom('users'), 1, `users skipped when ${failing} failed`);
-      assert.deepEqual(errors, [failing === 'ai_plans' ? 'aiPlanCleanup failed' : 'accountCleanup failed']);
-      assert.deepEqual(result, failing === 'ai_plans'
-        ? { aiPlans: null, unverifiedAccounts: 1 }
-        : { aiPlans: 1, unverifiedAccounts: null });
-      mock.restoreAll();
-      mock.method(logger, 'info', () => {});
-      mock.method(logger, 'audit', () => {});
-      mock.method(logger, 'error', (message: string) => errors.push(message));
+    // Agent housekeeping is the other cleanup in the sweep; it runs only
+    // while the feature is enabled, so enable it and stand in for its store.
+    const savedAgent = config.agent.enabled;
+    config.agent.enabled = true;
+    try {
+      for (const failing of ['agent', 'users']) {
+        sql = [];
+        errors = [];
+        let agentCalls = 0;
+        answer(async (text) => {
+          if (failing === 'users' && text.startsWith('DELETE FROM users')) throw new Error('connection terminated');
+          return { rowCount: 1, rows: [] };
+        });
+        mock.method(agentStore, 'cleanupAgentData', async () => {
+          agentCalls++;
+          if (failing === 'agent') throw new Error('connection terminated');
+          return 1;
+        });
+        const result = await scheduler.runMaintenance();
+        assert.equal(agentCalls, 1, `agent cleanup skipped when ${failing} failed`);
+        assert.equal(deletesFrom('users'), 1, `users skipped when ${failing} failed`);
+        assert.deepEqual(errors, [failing === 'agent' ? 'agentCleanup failed' : 'accountCleanup failed']);
+        assert.deepEqual(result, failing === 'agent'
+          ? { unverifiedAccounts: 1, agentData: null }
+          : { unverifiedAccounts: null, agentData: 1 });
+        mock.restoreAll();
+        mock.method(logger, 'info', () => {});
+        mock.method(logger, 'audit', () => {});
+        mock.method(logger, 'error', (message: string) => errors.push(message));
+      }
+    } finally {
+      config.agent.enabled = savedAgent;
     }
   });
 
   test('a slow run is never overlapped by the next', async () => {
     let release: () => void = () => {};
-    answer((text) => text.startsWith('DELETE FROM ai_plans')
+    answer((text) => text.startsWith('DELETE FROM users')
       ? new Promise((resolve) => { release = () => resolve({ rowCount: 0, rows: [] }); })
       : Promise.resolve({ rowCount: 0, rows: [] }));
     scheduler.scheduleCleanupTasks();
@@ -536,25 +549,24 @@ describe('hourly maintenance', () => {
       mock.timers.tick(hour);
       await drain();
     }
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
 
     // A direct call during the run joins it rather than starting another.
     const joined = scheduler.runMaintenance();
     await drain();
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
 
     release();
     await joined;
     await drain();
-    assert.equal(deletesFrom('users'), 1);
 
     // The next run is a full hour after this one finished.
     mock.timers.tick(hour - 1);
     await drain();
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
     mock.timers.tick(1);
     await drain();
-    assert.equal(deletesFrom('ai_plans'), 2);
+    assert.equal(deletesFrom('users'), 2);
 
     // Let that second run finish: the scheduler is a singleton, and a run left
     // hanging here would be joined by every later test's runMaintenance().
@@ -570,10 +582,10 @@ describe('hourly maintenance', () => {
     scheduler.scheduleCleanupTasks();
     mock.timers.tick(6 * hour);
     await drain();
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
     mock.timers.tick(hour - 1);
     await drain();
-    assert.equal(deletesFrom('ai_plans'), 1);
+    assert.equal(deletesFrom('users'), 1);
   });
 
   test('stop() cancels future runs', async () => {
@@ -581,12 +593,12 @@ describe('hourly maintenance', () => {
     scheduler.scheduleCleanupTasks();
     mock.timers.tick(hour);
     await drain();
-    assert.equal(sql.length, 2);
+    assert.equal(sql.length, 1);
 
     scheduler.stop();
     mock.timers.tick(10 * hour);
     await drain();
-    assert.equal(sql.length, 2);
+    assert.equal(sql.length, 1);
     assert.deepEqual(scheduler.getStatus(), {});
   });
 
@@ -596,7 +608,7 @@ describe('hourly maintenance', () => {
     scheduler.scheduleCleanupTasks();
     mock.timers.tick(hour);
     await drain();
-    assert.equal(sql.length, 2);
+    assert.equal(sql.length, 1);
   });
 
   test('reports no next run while one is in flight', async () => {
@@ -607,9 +619,7 @@ describe('hourly maintenance', () => {
     await drain();
     assert.equal(scheduler.getStatus().maintenance!.nextRun, null);
 
-    // Drain both cleanups; then the next run is an hour from now.
-    release();
-    await drain();
+    // Drain the cleanup; then the next run is an hour from now.
     release();
     await drain();
     await drain();

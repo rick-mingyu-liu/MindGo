@@ -87,7 +87,7 @@ describe('startup configuration check', () => {
   test('warns for each missing optional key, naming what it breaks', () => {
     const { code, output } = runWith({ JWT_SECRET: GOOD_SECRET, DATABASE_URL: 'postgres://x/y' });
     assert.equal(code, 0);
-    assert.doesNotMatch(output, /DEEPSEEK|FINNHUB|ALPHA_VANTAGE/);
+    assert.doesNotMatch(output, /DEEPSEEK/);
     assert.match(output, /MAILBOXLAYER_API_KEY is not set/);
     // The consequence matters more than the name. This one was wrong until
     // round 10: it said registration 500s, which was true and is no longer.
