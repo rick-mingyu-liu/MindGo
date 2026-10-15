@@ -1,0 +1,42 @@
+# A throwaway PostgreSQL for backend tests and migration checks, matching CI's
+# postgres:17 service. Never production: it listens on this machine only,
+# trusts local connections (no password to leak) and keeps its data in memory,
+# so every `up` starts empty.
+#
+#   docker compose -f docker-compose.test.yml up -d --wait
+#   cd backend
+#   export TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/termpocket_test
+#   npm run build && DATABASE_URL=$TEST_DATABASE_URL npm run db:setup
+#   npm test
+#   docker compose -f docker-compose.test.yml down
+#
+# backend/scripts/rehearse-linux.sh joins this network to rehearse a Render
+# deploy against the same database.
+name: termpocket-test
+
+services:
+  postgres:
+    image: postgres:17
+    # SSL with the image's self-signed certificate: under NODE_ENV=production
+    # the backend always connects with SSL, as Neon requires. Plain
+    # connections, which local tests use, are still accepted.
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+      - -c
+      - ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+    environment:
+      POSTGRES_DB: termpocket_test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d termpocket_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

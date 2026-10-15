@@ -16,6 +16,8 @@ npm run dev            # tsx watch app.ts (plain node cannot require the .ts mod
 npm start              # node dist/app.js (production — the compiled output, which is .js)
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)
 npm run db:seed        # (re)seed the demo account (john.doe@example.com / password123)
+backend/scripts/rehearse-linux.sh [--live]  # from the repo root, with docker-compose.test.yml up: Render's npm ci + build + preflight in a fresh node:<.node-version> Linux container
+npm run agent:preflight  # read-only Pocky deploy check (config, DB/migrations 013-015, SDK binary, DeepSeek reachability); `-- --live` adds one fictional model turn. Runbook: README "Deploying Pocky to production"
 npm run lint           # eslint . (eslint 9, flat config in eslint.config.mjs; TypeScript only, via typescript-eslint)
 npm test               # builds, then node --test 'dist/test/**/*.test.js' — unit tests always run; see below for the integration suite
 ```
@@ -53,12 +55,18 @@ npm test               # node --test — scorer unit tests
 
   **`sharedContracts.test.ts` checks that every category the frontend's picker offers has an explicit colour in `CATEGORY_COLORS`.** Like `demoData.test.ts`, it reads files outside `backend/`, so it fails on a checkout without `frontend/`. (It also pinned the copies in a React Native client, `mobile/`, until that client was removed.)
 
+  `agentPreflight.test.ts` covers `scripts/agentPreflight.ts`'s pure parts: no secret (fake key, DB URL, password, host) survives formatting, the exit code follows FAIL alone, 013/014/015 PASS/WARN/FAIL from stubbed catalog facts, and that gathering facts issues only `SELECT`s.
+
   One trap in `schedulerService.test.ts`: `mock.timers`' fake `Timeout` **ignores `unref()`** — `hasRef()` stays `true` however you call it — so the one test that checks the timer does not hold the event loop open has to run on a real timer, in its own `describe`.
 - **`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`; point it at a throwaway database instead:
 
   ```bash
-  TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
+  docker compose -f docker-compose.test.yml up -d --wait   # PostgreSQL 17 like CI, in memory, local only, no password
+  export TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/termpocket_test
+  npm run build && DATABASE_URL=$TEST_DATABASE_URL npm run db:setup && npm test
   ```
+
+  Any PostgreSQL 15+ works (migration 013 needs 15; Homebrew's default may be older). The compose server has SSL on with a self-signed certificate, because under `NODE_ENV=production` the backend always connects with SSL.
 
   The database must already have the schema (`npm run db:setup`). `db:setup` never drops tables, so a test database created before migration 014 also needs 014 applied, or `api.test.ts`'s removed-table check fails. The suite creates and deletes users, which is why opting in is deliberate — never point it at production.
 

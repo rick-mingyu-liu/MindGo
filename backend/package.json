@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Backend API for Personal Finance Web App",
   "main": "dist/app.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc",
     "prepare": "npm run build",
@@ -11,6 +14,7 @@
     "db:setup": "node dist/db/setup.js",
     "db:seed": "node dist/db/seed.js",
     "access-token": "node dist/db/accessToken.js",
+    "agent:preflight": "node dist/scripts/agentPreflight.js",
     "lint": "eslint .",
     "test": "npm run build && node --test 'dist/test/**/*.test.js'"
   },
