@@ -79,7 +79,10 @@ const config = {
     timeoutMs: 90_000,
     maxTurns: 10,
     maxToolCalls: 8,
-    maxConcurrentRuns: 4,
+    // Each turn spawns the Agent SDK's binary (~240 MB measured), so on a
+    // 512 MB instance a second simultaneous turn risks an out-of-memory restart.
+    // Extra turns are refused with agent_busy. Raise only with the memory to match.
+    maxConcurrentRuns: intFromEnv('AGENT_MAX_CONCURRENT_RUNS', 1),
     maxTurnsPerHour: 20,
     maxInputChars: 4000,
     maxOutputChars: 8000,

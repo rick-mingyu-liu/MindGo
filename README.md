@@ -166,6 +166,7 @@ EMAIL_PASS=
 AGENT_ENABLED=false
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-flash
+AGENT_MAX_CONCURRENT_RUNS=1   # turns at once; each takes ~240 MB
 ```
 
 The app **refuses to boot** without database configuration and `JWT_SECRET`, and warns about missing email and address-validation credentials. Conversation recording reports its availability through `/agent/status`; a missing DeepSeek key does not stop the rest of the application.
