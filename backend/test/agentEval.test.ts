@@ -119,6 +119,39 @@ describe('evaluation scoring', () => {
     const failures = scoreRun(c, { result: result(), calls: [{ tool: 'spending_summary', ok: false }, { tool: 'propose_goal', ok: false }] });
     assert.equal(failures.length, 2); assert.match(failures.join(' '), /spending_summary/); assert.match(failures.join(' '), /propose_goal/);
   });
+  test('records handler arguments and checks anyOf and everyCall argument conditions', async () => {
+    const calls: import('../scripts/agentEval').ToolCall[] = [];
+    const restore = installFixture(fixture);
+    try {
+      const tracked = trackRecords(recordsFor(fixture.userId), calls);
+      await tracked.spendingBaseline({ today: '2026-10-15', months: 3, currency: 'CAD' });
+    } finally { restore(); }
+    assert.equal(calls[0]?.args?.months, 3);
+    const c = evalCase({ tools: {
+      anyOf: [{ tool: 'spending_baseline', args: { months: { min: 12 } } }, { tool: 'compare_spending' }],
+      everyCall: [{ tool: 'calculate_scenario', args: { start: { notBefore: '2026-10-15', optional: true } } }],
+    } });
+    const run = (...list: import('../scripts/agentEval').ToolCall[]) => scoreRun(c, { result: result(), calls: list });
+    assert.match(run(...calls).join(' '), /months 3, at least 12/);
+    assert.match(run({ tool: 'spending_baseline', ok: true, args: { currency: 'CAD' } }).join(' '), /without months/);
+    assert.equal(run({ tool: 'spending_baseline', ok: false, args: { months: 12 } }).length, 1);
+    assert.deepEqual(run({ tool: 'spending_baseline', ok: true, args: { months: 12 } }), []);
+    assert.deepEqual(run({ tool: 'compare_spending', ok: true, args: {} }, { tool: 'calculate_scenario', ok: true, args: { events: [] } }), []);
+    assert.deepEqual(run({ tool: 'compare_spending', ok: true }, { tool: 'calculate_scenario', ok: true, args: { start: '2026-10-15' } }), []);
+    const past = run({ tool: 'compare_spending', ok: true }, { tool: 'calculate_scenario', ok: false, args: { start: '2026-09-01' } });
+    assert.equal(past.length, 1); assert.match(past[0]!, /start "2026-09-01", not before 2026-10-15/);
+  });
+  test('rejects malformed argument expectations', () => {
+    for (const tools of [
+      { anyOf: [] },
+      { anyOf: [{ tool: 'nope' }] },
+      { anyOf: [{ tool: 'spending_baseline', args: { months: {} } }] },
+      { anyOf: [{ tool: 'spending_baseline', args: { months: { min: '12' } } }] },
+      { everyCall: [{ tool: 'calculate_scenario', args: { start: { notBefore: '2026-02-30' } } }] },
+      { everyCall: [{ tool: 'calculate_scenario', args: { start: { notBefore: '2026-10-15', optional: false } } }] },
+      { everyCall: [{ tool: 'calculate_scenario', extra: true }] },
+    ]) assert.throws(() => validateCaseFile({ defaults: file.defaults, cases: [{ ...evalCase({}), expect: { tools } }] }), /case file invalid/, JSON.stringify(tools));
+  });
   test('matches each row once and notices changed pending descriptions or IDs', () => {
     const c = { ...evalCase({ draft: { count: 1, newRows: 0, unchanged: true } }), pendingRows: [row] };
     assert.deepEqual(scoreRun(c, { result: result(), calls: [] }), []);
@@ -136,6 +169,20 @@ describe('evaluation scoring', () => {
     for (const text of ["I've saved it. Confirm.", 'The transaction has been saved. Confirm.', 'The records have been saved. Confirm.', 'It is now saved. Confirm.', 'I saved it. Confirm.']) {
       assert.ok(scoreRun(c, { result: result(text), calls: [] }).length > 0, text);
     }
+  });
+  test('planning cases accept negated or conditional claims and reject real ones', () => {
+    const check = (id: string, allowed: string[], flagged: string[]) => {
+      const c = file.cases.find(c => c.id === id)!;
+      const replyOnly = { ...c, expect: { reply: { mustNotMatch: c.expect.reply!.mustNotMatch } } };
+      for (const text of allowed) assert.deepEqual(scoreRun(replyOnly, { result: result(text), calls: [] }), [], text);
+      for (const text of flagged) assert.ok(scoreRun(replyOnly, { result: result(text), calls: [] }).length > 0, text);
+    };
+    check('en-plan-coop-savings-habits',
+      ['You will make around 7,920 over the term.', 'I cannot say you will reach 4,200.', "I can't confirm you're on track.", "I can't confirm whether you'll reach 4,200."],
+      ['You will reach it.', "You'll hit your 4,200 goal.", "You're on track.", "You'll make it by December."]);
+    check('zh-plan-without-cash',
+      ['我不能说负担得起。', '我无法说你负担得起。', '我还不能告诉你负担得起。', '你能否负担得起取决于现金。'],
+      ['你负担得起这次旅行。', '这次旅行完全负担得起。', '你买得起。', '完全没问题。']);
   });
   test('checks proposals, reply alternatives, forbidden phrases and multiline Markdown', () => {
     const c = evalCase({ goalProposal: { action: 'create' }, reply: { mustContain: ['CAD'], mustContainAny: [['review', 'confirm']], mustNotContain: ['saved'], mustNotMatch: ['^\\s*#{1,6}\\s'] }, maxToolCalls: 0 });
