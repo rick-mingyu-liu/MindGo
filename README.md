@@ -6,6 +6,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-lightgrey.svg)](LICENSE.md)
 
 TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
 
@@ -30,6 +31,7 @@ The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not slee
 - [API](#api)
 - [Deployment](#deployment)
 - [Stack](#stack) · [Database](#database) · [Known gaps](#known-gaps)
+- [License](#license) · [Contributing](#contributing)
 
 ---
 
@@ -664,6 +666,22 @@ The improvement backlog is retired; the reasoning for anything already fixed liv
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.
 - **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else.
 
+## License
+
+TermPocket is **source-available** under the [Functional Source License, Version 1.1, MIT Future License](LICENSE.md) (FSL-1.1-MIT).
+
+- **You may** read, run, modify and self-host it for your own use, for non-commercial education or research, or to build something that is not a competing product.
+- **You may not** offer it, or a modified version, as a commercial product or service that competes with TermPocket.
+- **Each version becomes MIT** on the second anniversary of its release, with no restrictions.
+
+The hosted app at [mind-go.vercel.app](https://mind-go.vercel.app/) is free to use.
+
+The license covers every version that includes `LICENSE.md`, starting October 2026. Earlier commits were published without a license; ask the maintainer if you need to use one of them.
+
+The TermPocket name and Pocky are not licensed for use as your own product's name or branding.
+
 ## Contributing
 
-Private project. For collaboration, contact the maintainer directly.
+Issues and pull requests are welcome. By submitting a contribution, you agree that it is licensed under the same terms as the project and that the maintainer may relicense it, including under a commercial license, as part of TermPocket.
+
+For larger changes, open an issue first so we can agree on the approach.
