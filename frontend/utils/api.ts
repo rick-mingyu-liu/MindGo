@@ -63,6 +63,13 @@ api.interceptors.response.use(
       && response?.status >= 400 && response?.status < 500 && response?.status !== 401
     if (ownsClientErrors) return Promise.reject(error)
 
+    // The edit page reads one transaction and says "not found" itself, so a
+    // missing, foreign or malformed id must not also raise the generic dialog.
+    const ownsTransactionLookup = error.config?.method === 'get'
+      && /^\/transactions\/[^/?]+$/.test(error.config?.url ?? '')
+      && (response?.status === 400 || response?.status === 404)
+    if (ownsTransactionLookup) return Promise.reject(error)
+
     if (response?.status === 401) {
       // Unauthorized - redirect to login
       logout()

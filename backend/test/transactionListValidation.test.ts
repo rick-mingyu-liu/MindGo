@@ -91,13 +91,13 @@ describe('GET /transactions paging', () => {
       assert.equal(res.status, 200);
       const { text, params } = queries[0]!;
       assert.match(text, /LIMIT \$\d+ OFFSET \$\d+$/);
-      assert.deepEqual(params.slice(-2), [200, 400]);
+      assert.deepEqual(params.slice(-2), [201, 400]);
     });
 
     test('no parameters means page 1 of 50', async () => {
       const res = await get('');
       assert.equal(res.status, 200);
-      assert.deepEqual(queries[0]!.params.slice(-2), [50, 0]);
+      assert.deepEqual(queries[0]!.params.slice(-2), [51, 0]);
     });
 
     test('limit 1 is allowed', async () => {
@@ -108,11 +108,11 @@ describe('GET /transactions paging', () => {
       for (const qs of ['?limit=05', '?limit=%2B5']) {
         queries = [];
         assert.equal((await get(qs)).status, 200, qs);
-        assert.equal(queries[0]!.params.at(-2), 5, qs);
+        assert.equal(queries[0]!.params.at(-2), 6, qs);
       }
       queries = [];
       assert.equal((await get('?page=%2B2&limit=10')).status, 200);
-      assert.deepEqual(queries[0]!.params.slice(-2), [10, 10]);
+      assert.deepEqual(queries[0]!.params.slice(-2), [11, 10]);
     });
   });
 
@@ -144,7 +144,7 @@ describe('GET /transactions ordering and keyset paging', () => {
     assert.equal(res.status, 200);
     const { text, params } = queries[0]!;
     assert.match(text, /AND \(date, id\) < \(\$2::date, \$3\)/);
-    assert.deepEqual(params, [7, '2026-08-01', 42, 10, 0]);
+    assert.deepEqual(params, [7, '2026-08-01', 42, 11, 0]);
   });
 
   test('no cursor, no keyset predicate', async () => {
@@ -174,16 +174,43 @@ describe('GET /transactions ordering and keyset paging', () => {
     }
   });
 
-  test('a full page returns nextCursor for its last row; a short one returns null', async () => {
+  test('nextCursor exists only when a row beyond the page does; the extra row is dropped', async () => {
     rows = [
       { id: 9, date: '2026-08-03', amount: '1.00', currency: 'CAD' },
       { id: 4, date: '2026-08-02', amount: '2.00', currency: 'CAD' },
+      { id: 2, date: '2026-08-01', amount: '3.00', currency: 'CAD' },
     ];
-    const full = await (await get('?limit=2')).json() as { nextCursor: string | null };
-    assert.equal(full.nextCursor, cursor('2026-08-02', 4));
+    const more = await (await get('?limit=2')).json() as { nextCursor: string | null; transactions: unknown[] };
+    assert.equal(more.nextCursor, cursor('2026-08-02', 4));
+    assert.equal(more.transactions.length, 2);
 
-    const short = await (await get('?limit=3')).json() as { nextCursor: string | null };
-    assert.equal(short.nextCursor, null);
+    // Exactly a full last page: no extra row, so no cursor to an empty page.
+    const exact = await (await get('?limit=3')).json() as { nextCursor: string | null; transactions: unknown[] };
+    assert.equal(exact.nextCursor, null);
+    assert.equal(exact.transactions.length, 3);
+  });
+
+  test('pagination.page is reported without a cursor and omitted with one', async () => {
+    const plain = await (await get('?page=2&limit=5')).json() as { pagination: Record<string, unknown> };
+    assert.equal(plain.pagination.page, 2);
+    const keyed = await (await get(`?before=${cursor('2026-08-01', 3)}&limit=5`)).json() as { pagination: Record<string, unknown> };
+    assert.equal('page' in keyed.pagination, false);
+  });
+});
+
+describe('PUT and DELETE /transactions/:id', () => {
+  test('a malformed id is a 400 before db.query', async () => {
+    for (const id of ['abc', '0', '-1']) {
+      const del = await fetch(`${baseUrl}/transactions/${id}`, { method: 'DELETE' });
+      assert.equal(del.status, 400, `DELETE ${id}`);
+      const put = await fetch(`${baseUrl}/transactions/${id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ amount: 1, description: 'd', category: 'c', type: 'expense', date: '2026-08-01', currency: 'CAD' }),
+      });
+      assert.equal(put.status, 400, `PUT ${id}`);
+    }
+    assert.equal(queries.length, 0);
   });
 });
 

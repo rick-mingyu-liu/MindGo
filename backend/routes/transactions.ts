@@ -93,8 +93,8 @@ router.delete('/auto-delete', autoDeleteValidation, transactionController.autoDe
 router.get('/retention-settings', transactionController.getDataRetentionSettings);
 router.get('/:id', idValidation, transactionController.getTransaction);
 router.put('/retention-settings', transactionController.updateDataRetentionSettings);
-router.put('/:id', transactionValidation, transactionController.updateTransaction);
-router.delete('/:id', transactionController.deleteTransaction);
+router.put('/:id', idValidation, transactionValidation, transactionController.updateTransaction);
+router.delete('/:id', idValidation, transactionController.deleteTransaction);
 
 
 export = router;

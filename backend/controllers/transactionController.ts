@@ -90,7 +90,8 @@ const transactionController = {
 
       // Add ordering and pagination
       sql += ` ORDER BY date DESC, id DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-      params.push(parseInt(limit), offset);
+      // One row beyond the page tells whether another page exists.
+      params.push(parseInt(limit) + 1, offset);
 
       const transactions = await query<TransactionRow>(sql, params);
 
@@ -141,7 +142,9 @@ const transactionController = {
         rateCache[key] = rate;
         return rate;
       }
-      const convertedTransactions: TransactionWithConversion[] = await Promise.all(transactions.rows.map(async (tx): Promise<TransactionWithConversion> => {
+      const hasMore = transactions.rows.length > parseInt(limit);
+      const pageRows = hasMore ? transactions.rows.slice(0, parseInt(limit)) : transactions.rows;
+      const convertedTransactions: TransactionWithConversion[] = await Promise.all(pageRows.map(async (tx): Promise<TransactionWithConversion> => {
         let convertedAmount = parseFloat(tx.amount);
         let convertedCurrency = tx.currency || displayCurrency;
         if (tx.currency && tx.currency !== displayCurrency) {
@@ -162,18 +165,17 @@ const transactionController = {
         };
       }));
 
-      // Keyset paging: a full page may have more behind it, a short one never does.
-      const last = transactions.rows[transactions.rows.length - 1];
+      // A row beyond the page means another page exists.
+      const last = pageRows[pageRows.length - 1];
       const lastDay = last ? toDay(last.date) : null;
-      const nextCursor = last && lastDay && transactions.rows.length === parseInt(limit)
-        ? encodeCursor(lastDay, last.id)
-        : null;
+      const nextCursor = hasMore && last && lastDay ? encodeCursor(lastDay, last.id) : null;
 
       res.json({
         transactions: convertedTransactions,
         nextCursor,
+        // With a cursor the position is not a page number, so none is reported.
         pagination: {
-          page: parseInt(page),
+          ...(cursor ? {} : { page: parseInt(page) }),
           limit: parseInt(limit),
           total: totalCount,
           pages: Math.ceil(totalCount / Number(limit))
@@ -339,6 +341,11 @@ const transactionController = {
   // Delete transaction
   async deleteTransaction(req: Request, res: Response) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const { id } = req.params;
 
       // Check if transaction belongs to user
