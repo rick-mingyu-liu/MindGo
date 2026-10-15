@@ -17,7 +17,7 @@ npm start              # node dist/app.js (production — the compiled output, w
 npm run db:setup       # create schema from db/schema.sql (idempotent, CREATE IF NOT EXISTS)
 npm run db:seed        # (re)seed the demo account (john.doe@example.com / password123)
 backend/scripts/rehearse-linux.sh [--live]  # from the repo root, with docker-compose.test.yml up: Render's npm ci + build + preflight in a fresh node:<.node-version> Linux container
-npm run agent:eval     # opt-in paid Pocky evaluation: 37 fictional cases, real runtime/DeepSeek, in-memory records (no DB); README "Evaluating Pocky"
+npm run agent:eval     # opt-in paid Pocky evaluation: 45 fictional cases, real runtime/DeepSeek, in-memory records (no DB); README "Evaluating Pocky"
 npm run agent:preflight  # read-only Pocky deploy check (config, DB/migrations 013-015, SDK binary, DeepSeek reachability); `-- --live` adds one fictional model turn. Runbook: README "Deploying Pocky to production"
 npm run lint           # eslint . (eslint 9, flat config in eslint.config.mjs; TypeScript only, via typescript-eslint)
 npm test               # builds, then node --test 'dist/test/**/*.test.js' — unit tests always run; see below for the integration suite
