@@ -75,6 +75,21 @@ The two hardening branches have been recovered from the interrupted session. Pro
 
 Ongoing dependency maintenance is configured in [`.github/dependabot.yml`](.github/dependabot.yml): weekly checks for the three npm projects and GitHub Actions, grouped minor/patch updates, separate major version PRs and separate security-update groups. Updates still require review and CI; no auto-merge is configured.
 
+The first Dependabot round was resolved on 2026-10-15, and CI passed on `main` after each merge:
+
+| PR | Update |
+| --- | --- |
+| #70 | `eval/` minor/patch group (2 packages) |
+| #72, #73 | `actions/setup-node` and `actions/checkout` 4 → 7 |
+| #74 | Backend minor/patch group (8 packages) |
+| #75 | `helmet` 7 → 8.3.0 (merged after resolving a conflict with #74) |
+| #76 | `express-rate-limit` 7 → 8.7.1 |
+| #77 | Frontend minor/patch group (13 packages), with coordinated Radix patch versions |
+| #78 | `lucide-react` 0.292 → 1.55.0 |
+| #71 | Closed without merging: removing the vulnerable `postcss-selector-parser` pulled in Tailwind 4 without migrating the PostCSS configuration, and CI failed (see [`frontend/DEPENDENCIES.md`](frontend/DEPENDENCIES.md)) |
+
+After that round, `npm audit` reports 0 findings for the backend and `eval/`. The frontend still has 7 high and 2 moderate findings, all in the build and lint toolchain (Tailwind 3's `chokidar`/`fast-glob`/`braces` chain and `eslint-config-next`).
+
 ## Plan
 
 Launch preparation and hardening can proceed in parallel. Verify both gates before the week of real use, then build memory from the observed failures.
@@ -82,7 +97,7 @@ Launch preparation and hardening can proceed in parallel. Verify both gates befo
 | Step | Work | Gate before the next step |
 | --- | --- | --- |
 | 1. Go live | Runbook: Render plan check, deploy, preflight, migrations 013–015, enable, `--live` preflight, smoke test | The preflight passes with `--live`, and a fictional lunch can be drafted, confirmed and undone in the app |
-| 2. Harden (alongside 1) | Merge the evaluation set and the dependency upgrades | One live evaluation run reviewed; no high-severity advisories |
+| 2. Harden (alongside 1) | Evaluation set and dependency upgrades are merged; the remaining work is the frontend build-tool advisories (Tailwind 4 or upstream fixes) | One live evaluation run reviewed (done); no high-severity advisories (open: 7 high in the frontend toolchain) |
 | 3. Real use | Record real spending with Pocky for a week; note what it gets wrong | Real failures listed and added to the evaluation set |
 | 4. Memory | Remembered facts (rent, co-op pay, reserve) with Remember and Forget, saved plans, per-account currency, timezone and reply language | Deleting a fact removes it from everything Pocky sees, and the evaluation set still passes |
 | 5. Later | Dashboard summaries computed in SQL (unblocks an All time view), a frontend test runner, renaming leftover MindGo infrastructure | — |
