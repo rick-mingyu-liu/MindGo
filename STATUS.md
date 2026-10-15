@@ -31,17 +31,18 @@ The twelve original feature and deployment pull requests below landed between 20
 
 ## Production
 
-The local read-only preflight on 2026-10-15 verified the Neon database configured in `backend/.env`. Render's CLI token is expired, so its deployed commit, environment, instance type and runtime still require a separate check. Local environment and host checks do not establish Render's configuration.
+The local read-only preflight on 2026-10-15 verified the Neon database configured in `backend/.env`. The Render service was checked with its CLI on the same day: it was on the Free plan, which has no Shell, so the owner upgraded it to Starter. The owner has also set `AGENT_ENABLED` and `DEEPSEEK_API_KEY`, ahead of migration 013 (see below).
 
 | Item | State |
 | --- | --- |
-| Frontend (Vercel) and backend (Render) | Configured to deploy from `main` according to the runbook; current production deployment not independently verified |
+| Frontend (Vercel) and backend (Render) | Both deploy from `main`. Render's live deploy is `f772255` (the #79 merge), redeployed at 18:00 UTC when the instance and variables changed |
+| Render service | Starter (0.5 CPU, 512 MB), region Oregon, one instance, build `npm ci --include=dev`. Shell is now available. Whether 512 MB holds the SDK process next to Express is unmeasured; the Render Shell preflight's `host.sdk_launch` is the first check |
 | Neon PostgreSQL and source audit | PostgreSQL 17.11; 0 incompatible transaction source values; read-only preflight |
 | Migration 013 (conversations) | Required state absent: 0/6 agent tables, source constraint does not allow `agent` |
 | Migration 014 (drop `watchlist`, `ai_plans`) | Required state absent: `watchlist` has 23 rows, `ai_plans` has 0; applying 014 deletes those watchlist rows. Run only after both new deployments are verified and the owner accepts that deletion |
 | Migration 015 (goal proposals) | Goal-proposal table absent; optional, but proposals are unavailable without it |
-| `AGENT_ENABLED`, `DEEPSEEK_API_KEY` on Render | Unconfirmed; the local environment is not evidence of Render's values |
-| Render plan (child processes, `/tmp`, memory, request time over 90 s, Shell) | Not yet confirmed |
+| `AGENT_ENABLED`, `DEEPSEEK_API_KEY` on Render | Set by the owner on 2026-10-15, **before 013**: the runbook's order is 013 first. Until 013 is applied, conversation requests under `/agent` fail (`/agent/status` still answers) and the hourly sweep logs an agent housekeeping error; no data is changed |
+| Render plan (child processes, `/tmp`, memory, request time over 90 s) | Starter has Shell; the rest is checked by the preflight in that Shell |
 
 Turning Pocky on is the runbook in the README. In short: deploy, run the preflight in the Render Shell, apply 013, 014 and 015 through Neon's direct endpoint, set the two variables, run the preflight with `--live`, then smoke-test in the app with fictional input.
 
@@ -104,7 +105,7 @@ Launch preparation and hardening can proceed in parallel. Verify both gates befo
 
 Decisions needed from the owner:
 
-- [ ] Confirm the Render instance type allows child processes and long requests, or choose to upgrade it.
+- [x] Render instance type: upgraded from Free to Starter on 2026-10-15. Revisit Standard (2 GB) if the preflight or real use shows memory pressure.
 - [ ] Run the three Neon migrations after deployment verification; explicitly accept removal of the 23 legacy watchlist rows before 014.
-- [ ] Approve `AGENT_ENABLED=true` and the DeepSeek key on Render.
+- [x] `AGENT_ENABLED=true` and the DeepSeek key are set on Render (before 013, so apply 013 next or turn the flag off until then).
 - [ ] Decide whether DeepSeek usage needs a monthly spending cap beyond the built-in per-user limits.
