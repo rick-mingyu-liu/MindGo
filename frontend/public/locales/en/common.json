@@ -424,9 +424,10 @@
   "Email address validation when configured": "Email address validation when configured",
   "agent": {
     "title": "Record with Pocky",
-    "subtitle": "Record income and spending, or ask about what you have recorded. Review every entry before saving.",
+    "subtitle": "Record income and spending, ask about what you have recorded, or plan a savings goal. Review every entry and goal before saving.",
     "example": "“I spent $12.50 on lunch and $3.25 on the bus today.”",
     "exampleQuestion": "“How much did I spend on dining out this term?”",
+    "examplePlan": "“If co-op pays $2,400 a month from January, can I save $3,000 by August?”",
     "open": "Open conversation",
     "reviewHint": "Messages never save transactions. Only the confirmation buttons do.",
     "privacy": "Conversations are stored by TermPocket and may be accessed by authorized administrators. Avoid including passwords or account credentials.",
@@ -490,6 +491,34 @@
     "confirmAll": "Confirm all",
     "recoverConfirm": "Recover confirmation",
     "dismissRecovery": "Dismiss",
+    "goal": {
+      "createTitle": "New savings goal",
+      "updateTitle": "Change to savings goal",
+      "hint": "Nothing changes until you confirm. Check the name, amounts, currency and date.",
+      "confirmCreate": "Create goal",
+      "confirmUpdate": "Apply change",
+      "recoverConfirm": "Recover goal confirmation",
+      "discard": "Discard",
+      "created": "The goal is now in your savings goals.",
+      "updated": "Your savings goal has been updated.",
+      "viewGoals": "View goals",
+      "discarded": "Discarded. Your goals were not changed.",
+      "expired": "This proposal expired before it was confirmed. Ask Pocky again if you still want it.",
+      "conflict": "This goal changed since Pocky proposed it. Ask Pocky again with the current goal.",
+      "noDate": "No target date",
+      "noDescription": "No description",
+      "noChanges": "No fields change.",
+      "from": "from",
+      "to": "to",
+      "errors": {
+        "agent_version_conflict": "This goal proposal changed in another request. Refresh and review the latest version before confirming.",
+        "agent_expired": "This goal proposal has expired. Ask Pocky to propose it again.",
+        "agent_goal_conflict": "This goal changed since Pocky proposed it. Ask Pocky again with the current goal.",
+        "agent_goal_invalid": "This goal's target date has passed. Ask Pocky to propose it again with a later date.",
+        "agent_busy": "Another request is running. Wait for it to finish, then try the goal again.",
+        "agent_unavailable": "Goal proposals are not available on this deployment right now."
+      }
+    },
     "discard": "Discard draft",
     "saved": "Confirmed entries are now saved in your transactions.",
     "receiptSaved_one": "{{count}} entry saved",
@@ -523,7 +552,8 @@
       "agent_limit_exceeded": "This reply exceeded its processing limit. Try a shorter message with fewer entries.",
       "agent_invalid_proposal": "The AI returned an invalid draft. No entries were saved. Please try again with clearer details.",
       "agent_request_failed": "The request could not finish. Refresh to check its status before trying again.",
-      "agent_conversation_limit": "You have reached the conversation limit. Delete a conversation you no longer need, then try again. Saved transactions will remain."
+      "agent_conversation_limit": "You have reached the conversation limit. Delete a conversation you no longer need, then try again. Saved transactions will remain.",
+      "agent_goal_conflict": "This goal changed since Pocky proposed it. Ask Pocky again with the current goal."
     },
     "messageStatus": {
       "failed": "Not completed",
