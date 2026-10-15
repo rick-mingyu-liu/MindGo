@@ -109,7 +109,9 @@ export function createAgentRuntime(loadSdk: () => Promise<Sdk> = () => import('@
     // Running totals, hoisted so a failed run can still report what it used.
     let used = {inputTokens:0,outputTokens:0};
     let observedChars = 0;
-    const counts = () => ({toolCalls,toolAttempts,toolOutputChars,observedChars,...used});
+    // Thinking is disabled; a nonzero count here means hidden reasoning came back. It still counts against every budget.
+    let thinkingBlocks = 0;
+    const counts = () => ({toolCalls,toolAttempts,toolOutputChars,observedChars,thinkingBlocks,...used});
     // For the run row: a refused call is counted above but never executed, so executions stop at the cap.
     const usageSoFar = (): RunUsage => ({inputTokens:used.inputTokens,outputTokens:used.outputTokens,toolCalls:Math.min(toolCalls,config.agent.maxToolCalls)});
     const stop = (code: string) => {
@@ -316,6 +318,7 @@ export function createAgentRuntime(loadSdk: () => Promise<Sdk> = () => import('@
         }
         if (event.type === 'assistant') {
           observedChars += JSON.stringify(event.message.content).length;
+          thinkingBlocks += event.message.content.filter(block => block.type === 'thinking' || block.type === 'redacted_thinking').length;
           const tokens = event.message.usage;
           // Multiple content blocks may repeat one API message's usage.
           observedUsage.set(event.message.id, {inputTokens:count(tokens.input_tokens)+count(tokens.cache_read_input_tokens)+count(tokens.cache_creation_input_tokens),outputTokens:count(tokens.output_tokens)});

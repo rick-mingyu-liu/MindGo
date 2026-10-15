@@ -101,7 +101,8 @@ test('a tripped limit logs which one with counts only, and the error carries the
     const limits = logged.filter(args => args[0] === 'Agent run hit a limit');
     assert.equal(limits.length, 1);
     assert.equal((limits[0]![1] as {reason:string}).reason, 'total_tokens');
-    assert.deepEqual(Object.keys(limits[0]![1] as object).sort(), ['inputTokens','observedChars','outputTokens','reason','toolAttempts','toolCalls','toolOutputChars']);
+    assert.deepEqual(Object.keys(limits[0]![1] as object).sort(), ['inputTokens','observedChars','outputTokens','reason','thinkingBlocks','toolAttempts','toolCalls','toolOutputChars']);
+    assert.equal((limits[0]![1] as {thinkingBlocks:number}).thinkingBlocks, 3);
     assert.ok(!JSON.stringify(logged).includes(secret));
   } finally { spy.mock.restore(); }
 });
