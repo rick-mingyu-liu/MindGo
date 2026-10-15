@@ -1,6 +1,6 @@
 import { query } from '../db/connection';
 import { getExchangeRate } from './exchangeRateService';
-import { boundsOf, labelOf, currentTerm, previousTerm } from '../utils/terms';
+import { boundsOf, labelOf, currentTerm, previousTerm, daysBetween, sameElapsedWindows, type DayWindow } from '../utils/terms';
 import { toDay } from '../utils/dates';
 import type { SavingsGoalRow, TransactionType } from '../types/db';
 
@@ -15,7 +15,6 @@ import type { SavingsGoalRow, TransactionType } from '../types/db';
 export const REPORT_CURRENCY = 'CAD';
 const TOP_CATEGORIES = 8;
 const BASELINE_MONTHS = 12;
-const DAY_MS = 86_400_000;
 
 interface TotalRow {
   currency: string | null;
@@ -31,38 +30,82 @@ interface Totals {
 }
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
-const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
-/** `'2026-05-01'` plus 27 days. A day string parses as UTC midnight and is printed in UTC, so no timezone enters. */
-const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
 
 /** `(2026, 0)` -> `'2026-01-01'`, by arithmetic: never `new Date(y, m, d).toISOString()`. */
 const monthStart = (absoluteMonth: number): string =>
   `${Math.floor(absoluteMonth / 12)}-${String((absoluteMonth % 12) + 1).padStart(2, '0')}-01`;
 
-/** Income and spending in [start, end), converted to CAD, with spending by category. */
-async function totalsBetween(userId: number, start: string, end: string): Promise<Totals> {
-  const rows = await query<TotalRow>(
-    `SELECT currency, type, category, SUM(amount) AS total
+interface GroupRow extends TotalRow {
+  count: string;
+}
+
+/** One (currency, type, category) group in [start, end), converted to the report currency. */
+export interface ConvertedGroup {
+  /** The currency the rows were recorded in. */
+  currency: string;
+  type: TransactionType;
+  category: string;
+  /** SUM(amount) times the current rate (1 when already in the report currency). */
+  amount: number;
+  count: number;
+}
+
+/** Thrown when a needed exchange rate cannot be had: a total without it would be silently wrong. */
+export class RateUnavailableError extends Error {
+  /** The cause's code only (ECONNABORTED, ENOTFOUND, ...), so errorSummary can log why without its message. */
+  readonly code: string | undefined;
+  constructor(cause: unknown) {
+    super('rate_unavailable');
+    this.name = 'RateUnavailableError';
+    this.code = typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string' ? cause.code : undefined;
+  }
+}
+
+/**
+ * Every (currency, type, category) total in [start, end), converted to
+ * `reportCurrency` at current rates. Aggregated in SQL; reads no description.
+ * Shared by the MCP tools and the agent's investigation tools.
+ */
+export async function groupedBetween(userId: number, start: string, end: string, reportCurrency: string = REPORT_CURRENCY): Promise<ConvertedGroup[]> {
+  const rows = await query<GroupRow>(
+    `SELECT currency, type, category, SUM(amount) AS total, COUNT(*) AS count
      FROM transactions
      WHERE user_id = $1 AND date >= $2 AND date < $3
      GROUP BY currency, type, category`,
     [userId, start, end]
   );
-  const totals: Totals = { income: 0, expenses: 0, byCategory: new Map() };
   const rates = new Map<string, number>();
+  const groups: ConvertedGroup[] = [];
   for (const row of rows.rows) {
-    const currency = row.currency || REPORT_CURRENCY;
+    // The column defaults to CAD; a legacy NULL means what the default means.
+    const currency = row.currency || 'CAD';
     let rate = 1;
-    if (currency !== REPORT_CURRENCY) {
-      rate = rates.get(currency) ?? (await getExchangeRate(currency, REPORT_CURRENCY));
-      rates.set(currency, rate);
+    if (currency !== reportCurrency) {
+      let known = rates.get(currency);
+      if (known === undefined) {
+        try {
+          known = await getExchangeRate(currency, reportCurrency);
+        } catch (error) {
+          throw new RateUnavailableError(error);
+        }
+        rates.set(currency, known);
+      }
+      rate = known;
     }
-    const amount = Number(row.total) * rate;
-    if (row.type === 'income') {
-      totals.income += amount;
+    groups.push({ currency, type: row.type, category: row.category, amount: Number(row.total) * rate, count: Number(row.count) });
+  }
+  return groups;
+}
+
+/** Income and spending in [start, end), converted to CAD, with spending by category. */
+async function totalsBetween(userId: number, start: string, end: string): Promise<Totals> {
+  const totals: Totals = { income: 0, expenses: 0, byCategory: new Map() };
+  for (const group of await groupedBetween(userId, start, end, REPORT_CURRENCY)) {
+    if (group.type === 'income') {
+      totals.income += group.amount;
     } else {
-      totals.expenses += amount;
-      totals.byCategory.set(row.category, (totals.byCategory.get(row.category) ?? 0) + amount);
+      totals.expenses += group.amount;
+      totals.byCategory.set(group.category, (totals.byCategory.get(group.category) ?? 0) + group.amount);
     }
   }
   return totals;
@@ -80,14 +123,6 @@ export const CONVERSION_NOTE = 'Non-CAD amounts are converted to CAD at current 
 const PACE_CAVEAT =
   'Compares recorded spending only. Adjacent terms often differ in kind — a study term and a co-op work term, or tuition paid in one and not the other — so a ratio above or below 1 is a difference, not a judgement.';
 
-/** A run of days, half-open: `start` is in it, `end_exclusive` is not. */
-interface Window {
-  start: string;
-  end_exclusive: string;
-  /** Days in [start, end_exclusive). */
-  days: number;
-}
-
 /** termSummary's `pace`, for the current term only. Amounts are CAD. */
 interface Pace {
   /** The term compared with, e.g. 'Winter 2026': always the term just before, never the same term a year ago. */
@@ -99,9 +134,9 @@ interface Pace {
   /** What this term has spent within `current_window`; rows dated after today are not counted. */
   current_spending: number;
   /** This term from its first day through today. */
-  current_window: Window;
+  current_window: DayWindow;
   /** The previous term's first `current_window.days` days, or all of it when shorter (`clamped: true`). */
-  comparison_window: Window & { clamped: boolean };
+  comparison_window: DayWindow & { clamped: boolean };
   /** Present when the ratio is missing or the window was clamped. */
   note?: string;
   /** That adjacent terms can differ in kind, so the ratio compares spending and judges nothing. */
@@ -122,19 +157,11 @@ interface Pace {
  * process's local day, as everywhere else — depends on the timezone.
  */
 async function paceOf(userId: number, currentId: string, today: string): Promise<Pace> {
-  const current = boundsOf(currentId);
-  const previousId = previousTerm(currentId);
-  const previous = boundsOf(previousId);
-  const tomorrow = addDays(today, 1);
-  const currentEnd = tomorrow < current.end ? tomorrow : current.end;
-  const elapsed = daysBetween(current.start, currentEnd);
-  const cutoff = addDays(previous.start, elapsed);
-  const clamped = cutoff > previous.end;
-  const comparisonEnd = clamped ? previous.end : cutoff;
-
-  const spent = (await totalsBetween(userId, current.start, currentEnd)).expenses;
-  const before = (await totalsBetween(userId, previous.start, comparisonEnd)).expenses;
+  const { previousId, current, comparison } = sameElapsedWindows(currentId, today);
+  const spent = (await totalsBetween(userId, current.start, current.end_exclusive)).expenses;
+  const before = (await totalsBetween(userId, comparison.start, comparison.end_exclusive)).expenses;
   const label = labelOf(previousId);
+  const clamped = comparison.clamped;
 
   let note: string | undefined;
   if (before === 0) {
@@ -151,8 +178,8 @@ async function paceOf(userId: number, currentId: string, today: string): Promise
     last_term_same_point: round2(before),
     ratio: before > 0 ? round2(spent / before) : null,
     current_spending: round2(spent),
-    current_window: { start: current.start, end_exclusive: currentEnd, days: elapsed },
-    comparison_window: { start: previous.start, end_exclusive: comparisonEnd, days: daysBetween(previous.start, comparisonEnd), clamped },
+    current_window: current,
+    comparison_window: comparison,
     ...(note ? { note } : {}),
     caveat: PACE_CAVEAT,
   };

@@ -8,6 +8,7 @@ import store = require('../services/agent/store');
 import runtime = require('../services/agent/runtime');
 import { AgentError } from '../services/agent/types';
 import agentRoutes = require('../routes/agent');
+import db = require('../db/connection');
 const app = express(); app.use(express.json()); app.use('/agent', agentRoutes);
 const conversationId = '00000000-0000-4000-8000-000000000001';
 const requestId = '00000000-0000-4000-8000-000000000002';
@@ -115,4 +116,18 @@ test('process concurrency limit releases its slot after cancellation',async()=>{
   const pending=post().then(res=>res);await entered;assert.equal((await post()).status,429);
   await request(app).post(`/agent/conversations/${conversationId}/runs/${requestId}/cancel`).auth(token,{type:'bearer'});await pending;
   mock.method(runtime,'runAgent',async()=>({text:'Ready',usage:{inputTokens:1,outputTokens:1},toolCalls:0}));assert.equal((await post()).status,200);
+});
+test('record tools are bound to the login user, never to anything the request carries',async()=>{
+  const bound:unknown[]=[];
+  mock.method(db,'query',async(_text:string,params:unknown[])=>{bound.push(params[0]);return {rowCount:0,rows:[]};});
+  mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>{
+    await input.records.spendingSummary({start:'2026-09-01',end_exclusive:'2026-10-15',currency:'CAD'});
+    await input.records.transactionDetails({start:'2026-09-01',end_exclusive:'2026-10-15'});
+    return {text:'Ready',usage:{inputTokens:1,outputTokens:1},toolCalls:2};
+  });
+  // A forged identity in the body is refused by the allowlist before anything runs.
+  assert.equal((await post({...body,userId:99})).status,400);
+  assert.deepEqual(bound,[]);
+  assert.equal((await post()).status,200);
+  assert.deepEqual(bound,[77,77]);
 });

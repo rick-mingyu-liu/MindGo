@@ -10,6 +10,12 @@ export function validateUuid(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) invalid();
   return value.toLowerCase();
 }
+/** A real calendar day 'YYYY-MM-DD' between 1900 and 2100; 2026-02-30 is not one. */
+export function validateDay(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value < '1900-01-01' || value > '2100-12-31') invalid();
+  const day = new Date(`${value}T00:00:00.000Z`); if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== value) invalid();
+  return value;
+}
 export function validateSettings(value: unknown): ConversationSettings {
   if (!value || typeof value !== 'object') invalid();
   const { currency, timezone, language } = value as Record<string, unknown>;
@@ -33,10 +39,9 @@ export function validateRows(value: unknown, allowEmpty = false): DraftRow[] {
     if (typeof amount !== 'string' || !/^(0|[1-9]\d{0,7})\.\d{2}$/.test(amount) || amount === '0.00') invalid();
     if (typeof description !== 'string' || !description.trim() || description.length > 255 || description.includes('\0')) invalid();
     if ((type !== 'expense' && type !== 'income') || typeof category !== 'string' || !categories[type].includes(category)) invalid();
-    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date < '1900-01-01' || date > '2100-12-31') invalid();
-    const day = new Date(`${date}T00:00:00.000Z`); if (!Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== date) invalid();
+    const day = validateDay(date);
     if (typeof currency !== 'string' || !currencies.includes(currency)) invalid();
-    return { id, amount, description: description.trim(), category, type, date, currency };
+    return { id, amount, description: description.trim(), category, type, date: day, currency };
   });
 }
 export const validateDraftRows = validateRows;

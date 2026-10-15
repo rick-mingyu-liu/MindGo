@@ -5,6 +5,7 @@ import logger = require('../utils/logger');
 import { errorSummary } from '../utils/errorSummary';
 import store = require('../services/agent/store');
 import runtime = require('../services/agent/runtime');
+import { recordsFor } from '../services/agent/investigation';
 import { AgentError } from '../services/agent/types';
 import { validateUuid, validateSettings, validateMessage } from '../services/agent/validation';
 
@@ -77,6 +78,8 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
       currency:input.currency,timezone:input.timezone,language:input.language,
       today:dayInZone(input.timezone),signal:controller.signal,
       assertActive:()=>store.assertRunActive(userId,conversationId,input.requestId),
+      // Bound to the authenticated user here; no tool argument can name another.
+      records:recordsFor(userId),
     });
     if(controller.signal.aborted) throw new AgentError(timedOut?'agent_timeout':'agent_cancelled',409);
     // finishTurn locks and rechecks the run; late output after a remote
