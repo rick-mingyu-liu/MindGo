@@ -91,7 +91,7 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
     if(started) {
       try {
         if(failure.code==='agent_cancelled') await store.cancelRun(userId,conversationId,input.requestId);
-        else await store.failTurn(userId,conversationId,input.requestId,failure.code);
+        else await store.failTurn(userId,conversationId,input.requestId,failure.code,failure.usage);
       } catch(persistError) {
         if(!(persistError instanceof AgentError && persistError.code==='agent_not_found')) logger.error('Agent terminal state failed',{userId,...errorSummary(persistError)});
       }

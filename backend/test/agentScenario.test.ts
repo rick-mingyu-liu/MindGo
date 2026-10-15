@@ -104,6 +104,23 @@ describe('projection', () => {
     assert.deepEqual(out.ignored, [{ label: 'Pay', before_start: 1, after_end: 36 }, { label: 'Too late', before_start: 0, after_end: 1 }]);
   });
 
+  test('two_weeks repeats every 14 days from the anchor: biweekly pay, not twice a month and not weekly', async () => {
+    const pay = (every: string) => event({ label: 'Co-op pay', kind: 'income', amount: '2400', date: '2026-09-04', repeat: { every, until_exclusive: '2027-01-01' } });
+    const out = await run({ ...base, events: [pay('two_weeks')] });
+    // Sep 4, 18 and Oct 2 fall before the window; Oct 16, 30, Nov 13, 27, Dec 11, 25 inside; Jan 8 is past until_exclusive.
+    assert.equal(out.occurrences, 6);
+    assert.equal(out.totals.income, '14400.00');
+    assert.deepEqual(out.by_month.map(m => [m.month, m.income]), [['2026-10', '4800.00'], ['2026-11', '4800.00'], ['2026-12', '4800.00']]);
+    assert.deepEqual(out.ignored, [{ label: 'Co-op pay', before_start: 3, after_end: 0 }]);
+    // The same pay repeated weekly would nearly double it: the mistake two_weeks exists to prevent.
+    assert.equal((await run({ ...base, events: [pay('week')] })).occurrences, 11);
+    // Across a leap day the step stays 14 calendar days.
+    const leap = await run({ currency: 'CAD', start: '2028-02-01', end_exclusive: '2028-03-15', events: [event({ date: '2028-02-15', repeat: { every: 'two_weeks', until_exclusive: '2028-03-15' } })], starting_cash: { amount: '5000', as_of: '2028-02-01' } });
+    assert.equal(leap.occurrences, 3);
+    assert.deepEqual(leap.lowest, { balance: '2300.00', date: '2028-03-14' });
+    await rejects({ ...base, events: [event({ repeat: { every: 'two_weeks', until_exclusive: '2026-11-01' } })] });
+  });
+
   test('month-end repeats clamp through February in a leap year', async () => {
     const out = await run({ currency: 'CAD', start: '2028-01-01', end_exclusive: '2028-05-01', events: [event({ date: '2028-01-31', amount: '10', repeat: { every: 'month', until_exclusive: '2028-05-01' } })], starting_cash: { amount: '100', as_of: '2028-01-01' } });
     assert.deepEqual(out.by_month.map(m => m.expenses), ['10.00', '10.00', '10.00', '10.00']);

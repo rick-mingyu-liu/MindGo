@@ -7,6 +7,7 @@ import config = require('../config');
 import { AgentError } from '../services/agent/types';
 import { recordsFor } from '../services/agent/investigation';
 import db = require('../db/connection');
+import logger = require('../utils/logger');
 
 const unused = async () => assert.fail('records read without a tool call');
 const records = { spendingSummary: unused, compareSpending: unused, transactionDetails: unused, spendingBaseline: unused, listGoals: unused, calculateScenario: unused, prepareGoalProposal: unused };
@@ -73,9 +74,36 @@ test('unknown tools denied, built-ins/settings disabled, config isolated and ses
     assert.equal(options.env?.ANTHROPIC_API_KEY, 'fictional-test-key');
     assert.ok(options.env?.CLAUDE_CONFIG_DIR?.startsWith(options.cwd!));
     assert.equal(options.env?.HOME, options.cwd);
+    // The CLI omits a disabled thinking field and DeepSeek then reasons by
+    // default, so the request body must say so explicitly.
+    assert.deepEqual(options.thinking, {type:'disabled'});
+    assert.deepEqual(JSON.parse(options.env?.CLAUDE_CODE_EXTRA_BODY ?? 'null'), {thinking:{type:'disabled'}});
     yield success;
   });
   await f.runtime(input);
+});
+
+test('a tripped limit logs which one with counts only, and the error carries the usage so far', async () => {
+  const logged: unknown[][] = [];
+  const spy = mock.method(logger, 'error', (...args: unknown[]) => { logged.push(args); });
+  try {
+    const secret = 'fictional private reasoning about rent';
+    const assistant = (id: string, input_tokens: number, output_tokens: number) => ({type:'assistant',message:{id,content:[{type:'thinking',thinking:secret}],usage:{input_tokens,output_tokens,cache_read_input_tokens:6000}}});
+    const f = await fixture(async function* () {
+      yield assistant('m1', 4000, 100);
+      yield assistant('m2', 4000, 100);
+      yield assistant('m3', 9000, 100);
+      yield success;
+    });
+    const error = await f.runtime(input).then(() => assert.fail('expected a limit'), (e: unknown) => e as AgentError);
+    assert.equal(error.code, 'agent_limit_exceeded');
+    assert.deepEqual(error.usage, {inputTokens:35000,outputTokens:300,toolCalls:0});
+    const limits = logged.filter(args => args[0] === 'Agent run hit a limit');
+    assert.equal(limits.length, 1);
+    assert.equal((limits[0]![1] as {reason:string}).reason, 'total_tokens');
+    assert.deepEqual(Object.keys(limits[0]![1] as object).sort(), ['inputTokens','observedChars','outputTokens','reason','toolAttempts','toolCalls','toolOutputChars']);
+    assert.ok(!JSON.stringify(logged).includes(secret));
+  } finally { spy.mock.restore(); }
 });
 
 test('tool budget rejects a ninth call and discards all proposals', async () => {
@@ -83,7 +111,8 @@ test('tool budget rejects a ninth call and discards all proposals', async () => 
     for(let i=0;i<9;i++) await tools[0]!.handler({rows:[row]}, {});
     yield success;
   });
-  await assert.rejects(f.runtime(input), {code:'agent_limit_exceeded'});
+  // The refused ninth call is not an execution: the run row's 0-8 check must hold.
+  await assert.rejects(f.runtime(input), {code:'agent_limit_exceeded',usage:{inputTokens:0,outputTokens:0,toolCalls:8}});
 });
 
 test('invalid dates cannot become a proposal and model can repair after safe tool error', async () => {
