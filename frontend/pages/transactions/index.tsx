@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2, ScanText } from 'lucide-react'
@@ -35,51 +35,59 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const { t, i18n } = useTranslation('common');
 
-  // Get user's default currency from localStorage (preferences)
-  let defaultCurrency = 'CAD';
-  if (typeof window !== 'undefined') {
-    const prefs = localStorage.getItem('userPreferences');
-    if (prefs) {
-      try {
-        defaultCurrency = JSON.parse(prefs).currency || 'CAD';
-      } catch {}
-    }
-  }
-
-  const currentCurrency = () => {
+  // The currency the user chose in Settings, read from localStorage each time
+  // it is needed. The page re-reads it on mount and on every refresh (initial
+  // load, deletion); a change made in Settings applies when this page is next
+  // opened, since the two are never on screen together.
+  const currentCurrency = (): string => {
     try {
-      return JSON.parse(localStorage.getItem('userPreferences') ?? '{}').currency || 'CAD';
+      return JSON.parse(localStorage.getItem('userPreferences') ?? '{}').currency || 'CAD'
     } catch {
-      return 'CAD';
+      return 'CAD'
     }
   }
+  const defaultCurrency = typeof window !== 'undefined' ? currentCurrency() : 'CAD'
 
-  // Page 1 replaces the list (first load, deletion, currency change); later
-  // pages append, skipping ids already shown in case rows shifted between pages.
-  const fetchTransactions = async (nextPage = 1) => {
+  // Bumped by every reset/refresh. A response from an older generation (a slow
+  // first load overtaken by a refresh after a deletion, or a Load more that
+  // was in flight during one) is dropped rather than applied.
+  const generation = useRef(0)
+
+  // Without `before` this replaces the list (first load, deletion); with the
+  // previous response's nextCursor it appends. The de-dupe on append is only a
+  // belt: keyset paging already keeps pages from overlapping.
+  const fetchTransactions = async (before: string | null = null) => {
+    const append = before !== null
+    if (!append) generation.current += 1
+    const mine = generation.current
     try {
-      if (nextPage === 1) setLoading(true)
-      else setLoadingMore(true)
+      if (append) {
+        setLoadingMore(true)
+      } else {
+        setLoading(true)
+        setLoadingMore(false)
+      }
+      const cursorParam = append ? `&before=${encodeURIComponent(before)}` : ''
       const response = await api.get(
-        `/transactions?limit=${PAGE_SIZE}&page=${nextPage}&targetCurrency=${currentCurrency()}`
+        `/transactions?limit=${PAGE_SIZE}${cursorParam}&targetCurrency=${currentCurrency()}`
       )
+      if (mine !== generation.current) return
       const rows: Transaction[] = response.data.transactions
       setTransactions(prev => {
-        if (nextPage === 1) return rows
+        if (!append) return rows
         const seen = new Set(prev.map(tx => tx.id))
         return [...prev, ...rows.filter(tx => !seen.has(tx.id))]
       })
-      setPage(nextPage)
-      setHasMore(rows.length === PAGE_SIZE)
+      setNextCursor(response.data.nextCursor ?? null)
     } catch (error) {
+      if (mine !== generation.current) return
       console.error('Error fetching transactions:', error)
       Swal.fire({
         icon: 'error',
@@ -87,8 +95,11 @@ export default function Transactions() {
         text: t('There was an error fetching transactions. Please try again later.')
       })
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      // Each request clears only the flag it set, and only if still current.
+      if (mine === generation.current) {
+        if (append) setLoadingMore(false)
+        else setLoading(false)
+      }
     }
   }
 
@@ -349,7 +360,7 @@ export default function Transactions() {
                   </Button>
                 </div>
               )}
-              {hasMore && (
+              {nextCursor && (
                 <div className="mt-6 flex flex-col items-center gap-2">
                   {filtersActive && (
                     <p className="text-sm text-muted-foreground text-center">
@@ -358,7 +369,7 @@ export default function Transactions() {
                   )}
                   <Button
                     variant="outline"
-                    onClick={() => fetchTransactions(page + 1)}
+                    onClick={() => fetchTransactions(nextCursor)}
                     disabled={loadingMore}
                   >
                     {loadingMore ? t('Loading...') : t('Load more')}

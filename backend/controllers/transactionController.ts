@@ -3,6 +3,8 @@ import { validationResult, FieldValidationError } from 'express-validator';
 import { query } from '../db/connection';
 import { getExchangeRate } from '../services/exchangeRateService';
 import type { TransactionRow } from '../types/db';
+import { decodeCursor, encodeCursor } from '../utils/transactionCursor';
+import { toDay } from '../utils/dates';
 import { errorSummary } from '../utils/errorSummary';
 
 /** A transactions row, plus its amount converted to the caller's requested currency. */
@@ -46,11 +48,20 @@ const transactionController = {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const targetCurrency = req.query.targetCurrency as string | undefined;
-      const offset = (Number(page) - 1) * Number(limit);
+      const cursor = req.query.before === undefined ? null : decodeCursor(req.query.before);
+      // With a cursor the position comes from it, never from page.
+      const offset = cursor ? 0 : (Number(page) - 1) * Number(limit);
 
       let sql = 'SELECT * FROM transactions WHERE user_id = $1';
       const params: unknown[] = [req.user.userId];
       let paramCount = 1;
+
+      // Rows strictly below the cursor in (date DESC, id DESC) order.
+      if (cursor) {
+        params.push(cursor.date, cursor.id);
+        paramCount += 2;
+        sql += ` AND (date, id) < ($${paramCount - 1}::date, $${paramCount})`;
+      }
 
       // Add filters
       if (type) {
@@ -78,7 +89,7 @@ const transactionController = {
       }
 
       // Add ordering and pagination
-      sql += ` ORDER BY date DESC, created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+      sql += ` ORDER BY date DESC, id DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
       params.push(parseInt(limit), offset);
 
       const transactions = await query<TransactionRow>(sql, params);
@@ -151,8 +162,16 @@ const transactionController = {
         };
       }));
 
+      // Keyset paging: a full page may have more behind it, a short one never does.
+      const last = transactions.rows[transactions.rows.length - 1];
+      const lastDay = last ? toDay(last.date) : null;
+      const nextCursor = last && lastDay && transactions.rows.length === parseInt(limit)
+        ? encodeCursor(lastDay, last.id)
+        : null;
+
       res.json({
         transactions: convertedTransactions,
+        nextCursor,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -290,6 +309,29 @@ const transactionController = {
 
     } catch (error) {
       console.error('Update transaction error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  // One transaction, owned by the caller. Another user's id is a plain 404.
+  async getTransaction(req: Request, res: Response) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const result = await query<TransactionRow>(
+        'SELECT * FROM transactions WHERE id = $1 AND user_id = $2',
+        [req.params.id, req.user.userId]
+      );
+      const transaction = result.rows[0];
+      if (!transaction) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      res.json({ transaction });
+    } catch (error) {
+      console.error('Get transaction error:', errorSummary(error));
       res.status(500).json({ error: 'Server error' });
     }
   },
