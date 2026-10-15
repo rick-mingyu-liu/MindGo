@@ -553,6 +553,28 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
+### Evaluating Pocky with fictional conversations
+
+From `backend/`, build once with `npm run build`, then opt in to paid DeepSeek turns:
+
+```bash
+AGENT_ENABLED=true npm run agent:eval
+AGENT_ENABLED=true npm run agent:eval -- --case en-record-single,zh-record-single-no-currency --repeat 3
+AGENT_ENABLED=true npm run agent:eval -- --json --min-pass 0.9
+```
+
+`DEEPSEEK_API_KEY` is read through the usual backend configuration (`.env` or environment); `DEEPSEEK_MODEL` defaults to `deepseek-flash`. Enabling the flag for this command only does not enable the deployed app. No database or migrations are needed. The runner replaces database queries and exchange rates with [`backend/eval/agent-fixture.json`](backend/eval/agent-fixture.json), blocks pool access, and rejects SQL it does not recognize. It executes the real runtime, tool validation, investigation and planning code. Its only external service is DeepSeek; it never confirms a transaction or goal, writes financial data, or reads your accounts.
+
+The 36 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, corrections, missing information, chat confirmation boundaries, record totals and comparisons, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios, goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
+
+Each run reports successful/failed assertions, tool names, token usage and elapsed time. Failed reply assertions include a bounded excerpt; the key and raw provider errors are never printed. `--json` returns one report (use `npm run --silent agent:eval -- --json` to omit npm's banner). Exit status is 0 when every run passes, 1 for evaluation failures, and 2 for invalid arguments, fixture/case files or missing configuration. `--min-pass` deliberately relaxes the aggregate threshold; it does not hide individual failures. `--repeat` accepts 1–20; repeated `--case` flags and comma-separated IDs select cases.
+
+Assertions require included record tools to succeed, forbid excluded handler calls, check draft counts/IDs/fields and goal proposals, and inspect reply text. Numbers ignore thousands separators and trailing decimal zeros; numeric expectations must match the sign as well. Regex assertions use multiline, case-insensitive matching. Tool names cover calls that reached application handlers (transaction proposals are inferred from the resulting draft), not schema-rejected SDK attempts. The runtime's total call count supplies the maximum-call assertion. Usage is reported for completed turns only; failed turns may still incur provider charges.
+
+The [October 15 acceptance record](backend/eval/reports/2026-10-15.md) includes captured fictional results, review findings and an offline replay command.
+
+This is an opt-in behavioral evaluation, not a CI model-quality guarantee: replies are nondeterministic and text assertions cannot prove every sentence correct. Review failures against their prompt, fixture and expectation before changing either the agent or a case. The offline `agentEval.test.ts` suite runs under `npm test`, exercising the scorer, CLI exit codes and redaction, fixture isolation, and the real tools' fixture totals, pagination and goal versions without provider or database access.
+
 ### Deploying Pocky to production
 
 `npm run agent:preflight` ([`backend/scripts/agentPreflight.ts`](backend/scripts/agentPreflight.ts)) checks a host and its database before and after each step below. It prints one `PASS|FAIL|WARN|SKIP` line per check and exits non-zero only on a FAIL. It prints booleans, counts and versions only: never a key, a connection string, a hostname or a row. Every database statement is a catalog read or a count inside a rolled-back `READ ONLY` transaction with a 5-second `statement_timeout`. A missing 013 is a FAIL only once `AGENT_ENABLED=true`, and host or network problems are FAILs only once both the flag and the key are set. Before that they are WARNs.
