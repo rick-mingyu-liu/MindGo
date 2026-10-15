@@ -196,12 +196,12 @@
       "id": "voice-en-cut-off",
       "language": "en",
       "message": "um so i spent uh on the",
-      "note": "A recording that stopped mid-sentence (the 15-second cap, or the button released early): no amount, so no row, and a question back.",
+      "note": "A recording that stopped mid-sentence (the 15-second cap, or the button released early): no amount, so no row, and a question back (asked with or without a question mark).",
       "expect": {
         "tools": { "exclude": ["propose_transactions", "propose_goal"] },
         "draft": { "count": 0 },
         "goalProposal": null,
-        "reply": { "mustContainAny": [["?"]] }
+        "reply": { "mustContainAny": [["?", "could you", "can you", "please tell", "tell me"]] }
       }
     },
     {
