@@ -70,7 +70,6 @@ Work: before launch, add a usage panel (database size and agent turns per day) t
 ### G. Later
 
 - Clear the frontend's remaining 7 high advisories, which come only from build tooling, by migrating to Tailwind 4. See [`frontend/DEPENDENCIES.md`](../frontend/DEPENDENCIES.md).
-- Put Render (Oregon) and Neon (us-east-1) in the same region.
 - Rename the leftover MindGo infrastructure.
 
 ## Order
