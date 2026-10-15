@@ -21,5 +21,7 @@ Thumbs.db
 # Dependencies (also covered by subproject .gitignore files)
 node_modules/
 
-# Documentation — kept locally, not in the repo
-/docs/
+# Documentation — kept locally, not in the repo, except the plans listed here
+/docs/*
+!/docs/PHASE-2.md
+!/docs/VOICE.md
