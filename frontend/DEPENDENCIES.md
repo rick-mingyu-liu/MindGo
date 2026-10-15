@@ -44,6 +44,20 @@ Patched parser 7.1.6 is outside both consumers' version-6 ranges. Await compatib
 upstream updates or separately review a Tailwind migration; do not force a
 major parser override or suppress these advisories.
 
+Dependabot [PR #71](https://github.com/rick-mingyu-liu/TermPocket/pull/71)
+was not adopted: its proposed removal of the vulnerable parser upgrades
+Tailwind 3 to 4.3.3 without migrating the PostCSS configuration or styles.
+CI fails because Tailwind 4 no longer provides the configured PostCSS plugin.
+That migration needs separate review; the advisories remain open, with no
+ignore rule or audit suppression added. The 2026-10-15 audit after the
+compatible frontend updates still reports 7 high and 2 moderate findings.
+
+The grouped frontend update's Radix Select 2.4.0 has an upstream callback-type
+regression that rejects the transaction type selector's existing handler.
+Select 2.4.1 fixes it without application changes. Dialog 1.3.1 and Dropdown
+Menu 2.2.1 keep their focus-scope and dismissable-layer versions aligned with
+Select, so nested controls share the same focus and layer state.
+
 These dependencies process repository-controlled source patterns and CSS during
 builds/linting in this application. They are not imported by application pages
 and were absent from generated `.next/server/**/*.nft.json` page traces. This
