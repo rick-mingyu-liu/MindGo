@@ -2,7 +2,7 @@ import { test, describe, before, after, beforeEach, afterEach, mock } from 'node
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import express from 'express';
-import { types } from 'pg';
+import pg, { types } from 'pg';
 import db = require('../db/connection');
 import { toDay, monthOf, formatDay, monthSpan } from '../utils/dates';
 
@@ -42,6 +42,32 @@ describe('the DATE type parser', () => {
     // Before the parser this set held three different strings, one of which
     // ('2026-08-27T16:00:00.000Z') names the wrong day outright.
     assert.deepEqual([...seen], ['2026-08-28']);
+  });
+});
+
+describe('the TIMESTAMP type parser', () => {
+  test('reads a zone-less timestamp as UTC, whatever timezone the server runs in', () => {
+    const parse = types.getTypeParser(types.builtins.TIMESTAMP);
+    const saved = process.env.TZ;
+    const seen = new Set<string>();
+    for (const tz of ['UTC', 'America/Toronto', 'Asia/Shanghai', 'Pacific/Kiritimati']) {
+      process.env.TZ = tz;
+      seen.add((parse('2026-10-15 15:13:34.123456') as Date).toISOString());
+      seen.add((parse('2026-10-15 15:13:34') as Date).toISOString().replace('.000', '.123'));
+    }
+    process.env.TZ = saved;
+    // Before the parser, Toronto read this four hours later: an expired
+    // verification link was still accepted.
+    assert.deepEqual([...seen], ['2026-10-15T15:13:34.123Z']);
+  });
+
+  test('leaves what it cannot read as text instead of inventing an instant', () => {
+    const parse = types.getTypeParser(types.builtins.TIMESTAMP);
+    assert.equal(parse('infinity'), 'infinity');
+  });
+
+  test('Date parameters are written in UTC, matching the session', () => {
+    assert.equal(pg.defaults.parseInputDatesAsUTC, true);
   });
 });
 

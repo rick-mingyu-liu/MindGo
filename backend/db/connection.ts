@@ -1,4 +1,4 @@
-import { Pool, types, type QueryResult, type QueryResultRow, type PoolConfig } from 'pg';
+import pg, { Pool, types, type QueryResult, type QueryResultRow, type PoolConfig } from 'pg';
 import config = require('../config');
 
 // A DATE column is a calendar day: no time, no zone. node-pg turns it into a
@@ -20,6 +20,22 @@ import config = require('../config');
 // Handing back the raw 'YYYY-MM-DD' makes the wire format identical on every
 // host, and leaves the value the only thing it ever was: a day.
 types.setTypeParser(types.builtins.DATE, (value: string) => value);
+
+// A TIMESTAMP column (no zone: users, transactions, goals, tokens) holds a
+// UTC wall-clock time, because every session runs in UTC (see createPool).
+// node-pg reads such a value as the *process's* local time and writes a Date
+// parameter in local time with an offset that PostgreSQL then drops, so both
+// directions were right only while the server process also ran in UTC. Under
+// Toronto time an email verification link expired four hours late. Read and
+// write it as UTC, so the host's timezone never enters. TIMESTAMPTZ already
+// carries its offset and is unaffected.
+const TIMESTAMP_TEXT = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/;
+types.setTypeParser(types.builtins.TIMESTAMP, (value: string) => {
+  const match = TIMESTAMP_TEXT.exec(value);
+  // 'infinity', BC years and the like: hand back the text rather than a wrong instant.
+  return match ? new Date(`${match[1]}T${match[2]}Z`) : value;
+});
+pg.defaults.parseInputDatesAsUTC = true;
 
 const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 let pool: Pool | null = null;
@@ -66,8 +82,11 @@ function createPool(): Pool {
     // Queued before the client is handed out, so it runs ahead of any real
     // query on this connection. It cannot go in the pool's `options` instead:
     // Neon's pooler rejects search_path as a startup parameter.
-    client.query(`SET search_path TO ${SEARCH_PATH}`).catch((err) => {
-      console.error('❌ Failed to set search_path', err);
+    // UTC session: now() and CURRENT_TIMESTAMP write UTC into TIMESTAMP
+    // columns, matching the parser above. Render and Neon default to UTC
+    // already; a developer machine or another host may not.
+    client.query(`SET search_path TO ${SEARCH_PATH}; SET TIME ZONE 'UTC'`).catch((err) => {
+      console.error('❌ Failed to set search_path or time zone', err);
     });
     console.log('✅ Connected to PostgreSQL database');
   });
