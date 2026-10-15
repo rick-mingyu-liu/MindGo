@@ -106,4 +106,21 @@ describe('getExchangeRate', () => {
     assert.equal(await getExchangeRate('USD', 'CAD'), 1.37);
     assert.equal(get.mock.callCount(), 2);
   });
+
+  test('rejects a zero, negative or non-finite rate instead of converting with it', async () => {
+    for (const bad of [0, -1.37, Infinity, NaN]) {
+      respondWith({ CAD: bad });
+      const { getExchangeRate } = freshService();
+      await assert.rejects(() => getExchangeRate('USD', 'CAD'), /Failed to fetch exchange rate/);
+      mock.restoreAll();
+    }
+  });
+
+  test('bounds the request with a timeout', async () => {
+    const get = mock.method(axios, 'get', async (_url: string, _options?: { timeout?: number }) => ({ data: { rates: { CAD: 1.37 } } }));
+    const { getExchangeRate } = freshService();
+    await getExchangeRate('USD', 'CAD');
+    const timeout = get.mock.calls[0]!.arguments[1]?.timeout;
+    assert.ok(typeof timeout === 'number' && timeout > 0 && timeout <= 10_000);
+  });
 });

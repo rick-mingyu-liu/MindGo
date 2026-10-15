@@ -230,6 +230,50 @@ function shiftYear(yearId: unknown, by: number): string {
 
 const previousYear = (yearId: unknown): string => shiftYear(yearId, -1);
 
+const DAY_MS = 86_400_000;
+/** Days from one 'YYYY-MM-DD' to another. Both parse as UTC midnight, so no timezone enters. */
+const daysBetween = (from: string, to: string): number => Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS);
+/** `'2026-05-01'` plus 27 days, by UTC arithmetic. */
+const addDays = (day: string, days: number): string => new Date(Date.parse(day) + days * DAY_MS).toISOString().slice(0, 10);
+
+/** A run of days, half-open: `start` is in it, `end_exclusive` is not. */
+interface DayWindow {
+  start: string;
+  end_exclusive: string;
+  /** Days in [start, end_exclusive). */
+  days: number;
+}
+
+/**
+ * "This term so far" and "the previous term at the same point": the current
+ * term from its first day through `today`, and the previous term's first as
+ * many days (the term's first day is day 1). Terms differ in length — Winter
+ * 120 or 121 days, Spring 123, Fall 122 — so when that runs past the previous
+ * term's end the window is the whole previous term, and `clamped` says so.
+ * Both MCP's pace and the agent's prompt context use this, so they cannot
+ * disagree about what "the same point" means.
+ */
+function sameElapsedWindows(currentId: string, today: string): {
+  previousId: string;
+  current: DayWindow;
+  comparison: DayWindow & { clamped: boolean };
+} {
+  const current = boundsOf(currentId);
+  const previousId = previousTerm(currentId);
+  const previous = boundsOf(previousId);
+  const tomorrow = addDays(today, 1);
+  const currentEnd = tomorrow < current.end ? tomorrow : current.end;
+  const elapsed = daysBetween(current.start, currentEnd);
+  const cutoff = addDays(previous.start, elapsed);
+  const clamped = cutoff > previous.end;
+  const comparisonEnd = clamped ? previous.end : cutoff;
+  return {
+    previousId,
+    current: { start: current.start, end_exclusive: currentEnd, days: elapsed },
+    comparison: { start: previous.start, end_exclusive: comparisonEnd, days: daysBetween(previous.start, comparisonEnd), clamped },
+  };
+}
+
 export {
   TERMS,
   MONTHS_PER_TERM,
@@ -248,4 +292,8 @@ export {
   termsOfYear,
   currentYear,
   previousYear,
+  daysBetween,
+  addDays,
+  sameElapsedWindows,
 };
+export type { DayWindow };

@@ -12,3 +12,13 @@ export interface ConversationState { conversation: Conversation; messages: Messa
 export interface TurnInput extends ConversationSettings { requestId: string; content: string }
 export interface TurnResult { text: string; proposedRows?: unknown[]; usage?: { inputTokens: number; outputTokens: number }; toolCalls?: number }
 export interface BeginTurnResult { started: boolean; state: ConversationState; history: Message[]; pendingRows: DraftRow[] }
+export interface RecordWindow { start: string; end_exclusive: string }
+export interface SummaryInput extends RecordWindow { currency: string }
+export interface CompareInput { a: RecordWindow; b: RecordWindow; currency: string }
+export interface DetailsInput extends RecordWindow { category?: string; type?: string; cursor?: string; limit?: number }
+/** Read-only views of one user's records, bound to that user by the route; the model never supplies a user id. */
+export interface AgentRecords {
+  spendingSummary(input: SummaryInput): Promise<unknown>;
+  compareSpending(input: CompareInput): Promise<unknown>;
+  transactionDetails(input: DetailsInput): Promise<unknown>;
+}
