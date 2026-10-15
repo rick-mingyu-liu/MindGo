@@ -64,14 +64,16 @@ Limitations:
 - There are no saved plans or remembered facts yet, so planning inputs must be repeated in each conversation.
 - The on-screen privacy notice does not name DeepSeek, by the owner's decision. DeepSeek is named in Open Source Acknowledgements.
 
-## In progress
+## Hardening
 
 The two hardening branches have been recovered from the interrupted session. Production migrations and agent enablement remain separate operator actions.
 
 | Branch | What it adds | Done when |
 | --- | --- | --- |
-| `feat/agent-eval` — [PR #67](https://github.com/rick-mingyu-liu/TermPocket/pull/67) | 36 fictional prompts in English, Chinese and mixed, with expected tools, rows, goal proposals and reply checks. `npm run agent:eval` runs them against real DeepSeek. | Harness, full backend tests, independent review and live acceptance complete. The linked PR tracks CI and merge state. |
-| `chore/dependency-upgrades` — [PR #66](https://github.com/rick-mingyu-liu/TermPocket/pull/66) | Backend audit clean; Next.js 15.5.28 retains React 18 and the Pages Router. Backend 783/783 tests, frontend build/lint/locales and HTTP route checks pass; independent review and all PR CI checks pass. | **Zero-high gate remains open:** frontend has 7 high and 2 moderate package findings from build-tool dependencies (`braces`, `postcss-selector-parser`). The PR remains open pending an explicit decision to merge the verified fixes with those findings tracked, or wait for full remediation. Details are in the PR's `frontend/DEPENDENCIES.md`. |
+| `feat/agent-eval` — [PR #67](https://github.com/rick-mingyu-liu/TermPocket/pull/67) | 36 fictional prompts in English, Chinese and mixed, with expected tools, rows, goal proposals and reply checks. `npm run agent:eval` runs them against real DeepSeek. | Merged after independent review and all CI checks passed; harness, full backend tests and live acceptance complete. |
+| `chore/dependency-upgrades` — [PR #66](https://github.com/rick-mingyu-liu/TermPocket/pull/66) | Backend audit clean; Next.js 15.5.28 retains React 18 and the Pages Router. Backend 783/783 tests, frontend build/lint/locales and HTTP route checks pass; independent review and all PR CI checks pass. | Merged with the owner's explicit approval to ship verified fixes while tracking the remaining findings. **Zero-high objective remains open:** frontend has 7 high and 2 moderate package findings from build-tool dependencies (`braces`, `postcss-selector-parser`). Details: [`frontend/DEPENDENCIES.md`](frontend/DEPENDENCIES.md). |
+
+Ongoing dependency maintenance is configured in [`.github/dependabot.yml`](.github/dependabot.yml): weekly checks for the three npm projects and GitHub Actions, grouped minor/patch updates, separate major version PRs and separate security-update groups. Updates still require review and CI; no auto-merge is configured.
 
 ## Plan
 
