@@ -54,9 +54,16 @@ export default function EditTransaction() {
   const fetchTransaction = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/transactions`)
-      const transactions = response.data.transactions
-      const targetTransaction = transactions.find((t: Transaction) => t.id === parseInt(id as string))
+      // There is no single-transaction endpoint, so walk the pages (newest
+      // first) until the row turns up or a page comes back short.
+      const pageSize = 200
+      let targetTransaction: Transaction | undefined
+      for (let page = 1; !targetTransaction; page++) {
+        const response = await api.get(`/transactions?limit=${pageSize}&page=${page}`)
+        const transactions: Transaction[] = response.data.transactions
+        targetTransaction = transactions.find((t) => t.id === parseInt(id as string))
+        if (transactions.length < pageSize) break
+      }
       
       if (!targetTransaction) {
         Swal.fire({

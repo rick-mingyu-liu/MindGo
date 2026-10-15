@@ -62,8 +62,18 @@ const autoDeleteValidation = [
     .withMessage('months must be a whole number between 1 and 60'),
 ];
 
+// Listing is paged: the largest page is 200 rows, and the default stays 50.
+// These used to be read unvalidated, so ?limit=1000000 asked the database for
+// everything and ?page=0 produced a negative OFFSET (a 500).
+const listValidation = [
+  query('page').optional().isInt({ min: 1 })
+    .withMessage('page must be a whole number of at least 1'),
+  query('limit').optional().isInt({ min: 1, max: 200 })
+    .withMessage('limit must be a whole number between 1 and 200'),
+];
+
 // Routes
-router.get('/', transactionController.getTransactions);
+router.get('/', listValidation, transactionController.getTransactions);
 router.post('/', transactionValidation, transactionController.createTransaction);
 router.post('/import', importValidation, transactionController.importTransactions);
 router.get('/categories', transactionController.getCategories);

@@ -32,15 +32,13 @@ const transactionController = {
   // Get all transactions for user
   async getTransactions(req: Request, res: Response) {
     try {
-      // No express-validator chain runs on this route, so these are read
-      // exactly as the original code read them off req.query: untyped
-      // strings when present, with page/limit defaulting only on undefined,
-      // matching a destructuring default's own behaviour. page/limit stay
-      // the raw strings (parsed only at the specific sites below that
-      // originally parsed them) -- '-' and '*' already coerce with ToNumber,
-      // which is what Number() does and parseInt() does not: parsing here
-      // would silently floor a fractional page/limit before offset is
-      // computed, turning '?page=5.7&limit=3' from OFFSET 14.1 into OFFSET 12.
+      // listValidation (routes/transactions.ts) vets page and limit; the rest
+      // are read as untyped strings off req.query.
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
       const page = (req.query.page as string | undefined) ?? '1';
       const limit = (req.query.limit as string | undefined) ?? '50';
       const type = req.query.type as string | undefined;

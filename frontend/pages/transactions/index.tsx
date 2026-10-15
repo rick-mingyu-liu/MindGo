@@ -28,10 +28,15 @@ interface Transaction {
   convertedCurrency?: string
 }
 
+const PAGE_SIZE = 200
+
 export default function Transactions() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
@@ -49,18 +54,31 @@ export default function Transactions() {
     }
   }
 
-  const fetchTransactions = async () => {
+  const currentCurrency = () => {
     try {
-      setLoading(true)
-      const prefs = localStorage.getItem('userPreferences');
-      let currency = 'CAD';
-      if (prefs) {
-        try {
-          currency = JSON.parse(prefs).currency || 'CAD';
-        } catch {}
-      }
-      const response = await api.get(`/transactions?targetCurrency=${currency}`)
-      setTransactions(response.data.transactions)
+      return JSON.parse(localStorage.getItem('userPreferences') ?? '{}').currency || 'CAD';
+    } catch {
+      return 'CAD';
+    }
+  }
+
+  // Page 1 replaces the list (first load, deletion, currency change); later
+  // pages append, skipping ids already shown in case rows shifted between pages.
+  const fetchTransactions = async (nextPage = 1) => {
+    try {
+      if (nextPage === 1) setLoading(true)
+      else setLoadingMore(true)
+      const response = await api.get(
+        `/transactions?limit=${PAGE_SIZE}&page=${nextPage}&targetCurrency=${currentCurrency()}`
+      )
+      const rows: Transaction[] = response.data.transactions
+      setTransactions(prev => {
+        if (nextPage === 1) return rows
+        const seen = new Set(prev.map(tx => tx.id))
+        return [...prev, ...rows.filter(tx => !seen.has(tx.id))]
+      })
+      setPage(nextPage)
+      setHasMore(rows.length === PAGE_SIZE)
     } catch (error) {
       console.error('Error fetching transactions:', error)
       Swal.fire({
@@ -70,6 +88,7 @@ export default function Transactions() {
       })
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -98,6 +117,8 @@ export default function Transactions() {
     return matchesSearch && matchesType && matchesCategory
   })
 
+  const filtersActive = searchTerm !== '' || typeFilter !== 'all' || categoryFilter !== 'all'
+
   const categories = [...new Set(transactions.map(t => t.category))]
 
   const handleDelete = async (id: number) => {
@@ -122,7 +143,7 @@ export default function Transactions() {
         title: t('Transaction deleted successfully'),
         text: t('The transaction has been deleted successfully.')
       })
-      fetchTransactions() // Refresh the list
+      fetchTransactions() // Back to page 1
     } catch (error) {
       console.error('Error deleting transaction:', error)
       Swal.fire({
@@ -325,6 +346,22 @@ export default function Transactions() {
                   <Button onClick={() => router.push('/transactions/new')}>
                     <Plus className="w-4 h-4 mr-2" />
                     {t('Add Transaction')}
+                  </Button>
+                </div>
+              )}
+              {hasMore && (
+                <div className="mt-6 flex flex-col items-center gap-2">
+                  {filtersActive && (
+                    <p className="text-sm text-muted-foreground text-center">
+                      {t('Search and filters apply only to the transactions loaded so far.')}
+                    </p>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchTransactions(page + 1)}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? t('Loading...') : t('Load more')}
                   </Button>
                 </div>
               )}
