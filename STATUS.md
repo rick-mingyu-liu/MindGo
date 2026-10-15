@@ -93,6 +93,8 @@ After that round, `npm audit` reports 0 findings for the backend and `eval/`. Th
 
 ## Plan
 
+The next phase, from launch readiness to voice input, is in [`docs/PHASE-2.md`](docs/PHASE-2.md).
+
 Launch preparation and hardening can proceed in parallel. Verify both gates before the week of real use, then build memory from the observed failures.
 
 | Step | Work | Gate before the next step |
