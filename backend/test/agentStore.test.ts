@@ -148,21 +148,24 @@ describe('agent storage safety', { skip: !enabled }, () => {
     const refused=store.beginTurn(user,c.id,{...settings,requestId:randomUUID(),content:'Sixty first today'});
     await assert.rejects(refused,{code:'agent_daily_limit',status:429});
   });
-  test('the all-users daily budget admits exactly the remaining turns under concurrency',async()=>{
+  test('the all-users daily budget never admits two turns for one remaining slot',async()=>{
+    // Other test files run in parallel against the same database and may take
+    // the slot first, so zero admitted is a pass; two would be the overshoot.
     const config:typeof import('../config')=require('../config');
     const saved=config.agent.maxTurnsPerDayAllUsers;
     const everyone=Number((await db.query<{count:string}>("SELECT count(*) FROM agent_admissions WHERE created_at>now()-interval '24 hours'")).rows[0]!.count);
+    const [a,b]=await Promise.all([store.createConversation(alice,settings),store.createConversation(bob,settings)]);
+    const turns=[{user:alice,id:a.id,requestId:randomUUID()},{user:bob,id:b.id,requestId:randomUUID()}];
     config.agent.maxTurnsPerDayAllUsers=everyone+1;
+    let attempts:PromiseSettledResult<unknown>[]=[];
     try {
-      const [a,b]=await Promise.all([store.createConversation(alice,settings),store.createConversation(bob,settings)]);
-      const turns=[{user:alice,id:a.id,requestId:randomUUID()},{user:bob,id:b.id,requestId:randomUUID()}];
-      const attempts=await Promise.allSettled(turns.map(t=>store.beginTurn(t.user,t.id,{...settings,requestId:t.requestId,content:'Fictional coffee'})));
-      assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);
-      const refused=attempts.find(r=>r.status==='rejected') as PromiseRejectedResult;
-      assert.equal(refused.reason.code,'agent_daily_capacity');assert.equal(refused.reason.status,429);
-      const admitted=turns[attempts.findIndex(r=>r.status==='fulfilled')]!;
-      await store.finishTurn(admitted.user,admitted.id,admitted.requestId,{text:'Noted.'});
+      attempts=await Promise.allSettled(turns.map(t=>store.beginTurn(t.user,t.id,{...settings,requestId:t.requestId,content:'Fictional coffee'})));
     } finally { config.agent.maxTurnsPerDayAllUsers=saved; }
+    // Finish any admitted turn before asserting, so a failure cannot leave a
+    // running run that makes every later test in this file answer agent_busy.
+    for (const [i,r] of attempts.entries()) if (r.status==='fulfilled') await store.finishTurn(turns[i]!.user,turns[i]!.id,turns[i]!.requestId,{text:'Noted.'});
+    assert.ok(attempts.filter(r=>r.status==='fulfilled').length<=1,'two turns admitted for one slot');
+    for (const r of attempts) if (r.status==='rejected') { assert.equal(r.reason.code,'agent_daily_capacity'); assert.equal(r.reason.status,429); }
   });
   test('concurrent confirmations with different nonces on one version write exactly one batch',async()=>{
     const s=await proposal();const rowIds=s.draft!.rows.map(r=>r.id);
