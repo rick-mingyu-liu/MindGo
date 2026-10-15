@@ -27,15 +27,15 @@
     "@types/react-dom": "^18.2.0",
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.0",
-    "axios": "^1.6.0",
+    "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "i18next": "^25.3.2",
     "lucide-react": "^0.292.0",
-    "next": "^14.0.0",
+    "next": "^15.5.28",
     "next-i18next": "^15.4.2",
     "onnxruntime-web": "1.30.0",
-    "postcss": "^8.4.0",
+    "postcss": "^8.5.29",
     "ppu-paddle-ocr": "6.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -44,7 +44,7 @@
     "react-i18next": "^15.6.0",
     "react-markdown": "^10.1.0",
     "recharts": "^2.8.0",
-    "sweetalert2": "^11.22.2",
+    "sweetalert2": "^11.26.25",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "eslint": "^8.0.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^15.5.28"
   },
   "keywords": [
     "finance",
@@ -62,5 +62,10 @@
     "dashboard"
   ],
   "author": "Personal Finance App",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "next": {
+      "postcss": "$postcss"
+    }
+  }
 }
