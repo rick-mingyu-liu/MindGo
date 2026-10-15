@@ -1,6 +1,6 @@
 # Voice dictation — design and handoff
 
-Status: **not started** (draft PR, 2026-10-15). This file is written so that another session can pick the work up cold. Read [`CLAUDE.md`](../CLAUDE.md) (Conversation recording, On-device OCR) and [`PHASE-2.md`](PHASE-2.md) section C first.
+Status: **spike run on a laptop, 2026-10-15; result is no-go on accuracy as measured, phone and iOS pending** (see [Spike results](#spike-results-2026-10-15)). Draft PR #86. This file is written so that another session can pick the work up cold. Read [`CLAUDE.md`](../CLAUDE.md) (Conversation recording, On-device OCR) and [`PHASE-2.md`](PHASE-2.md) section C first.
 
 ## What we are building
 
@@ -43,6 +43,90 @@ Record the answers in this file (a "Spike results" section) and in the PR.
 
 Go/no-go: proceed if a 10-second clip transcribes in under 5 s on the laptop with amounts right in at least 18 of 20 phrases, and the phone time is tolerable (record it either way).
 
+## Spike results (2026-10-15)
+
+Measured on an Apple-silicon MacBook in Chrome 155. The harness was the spike page `/voice-spike` (`frontend/pages/voice-spike.tsx` and `public/voice-spike/worker.js`: unlinked, noindex, to be deleted before the build) plus scripts kept outside the repo.
+
+**Verdict: no-go for the mic button as specified.** Laptop latency passes easily. Amount accuracy misses the 18/20 bar on every configuration: the best is 17/20. The phone and iOS Safari are not measured yet. Two caveats cut in opposite directions: the phrases were spoken by macOS text-to-speech voices, not the owner, and a real voice may do better or worse; and some failures are systematic (below), which no voice fixes.
+
+### 1. Runtime: a separate copy works, and OCR is untouched
+
+- The worker is a module worker served as a static file (`/voice-spike/worker.js`), so webpack never sees it. It imports Transformers.js 4.3.1's self-contained build `dist/transformers.min.js`, which bundles its own ONNX Runtime **1.31.0-dev**. That build fetches its runtime file from the same CDN: `ort-wasm-simd-threaded.asyncify.wasm`, 5.5 MB. OCR keeps 1.30.0 from `/ort/`, and `next.config.js`, `lib/ocr/` and the frontend's dependencies are unchanged.
+- **OCR import still works.** In one Chrome session I loaded the voice model, then imported `eval/synthetic/bank-balance-01.png` on the real `/import` page against a local backend on the compose database. It read in 1.3 s, with all 5 rows and the 103.64 row correct.
+- `next build`, lint and `check:locales` pass.
+- whisper.cpp was not needed.
+- For the real build: self-host `transformers.min.js` and its `.wasm` under `public/voice/`, pinned and checksummed like `scripts/ocr-assets.js`, rather than importing from jsDelivr as the spike does.
+
+### 2. Accuracy: Whisper squashes dollars and cents
+
+There were 20 phrases, all fictional, each spoken by 3 voices (en-US Samantha, en-GB Daniel, en-AU Karen), so 60 clips. "Amount right" means the transcript keeps the amount usable: `23.40`, `23 40` or words, but not `2340`.
+
+| Model (8-bit unless noted) | Amount right | Per voice (of 20) |
+| --- | --- | --- |
+| `tiny.en` | 30/60 | 11, 10, 9 |
+| `base.en` | 42/60 | 15, 14, 13 |
+| `tiny.en`, amount prompt | 44/60 | 14, 15, 15 |
+| **`base.en`, amount prompt** | **49/60** | **17, 16, 16** |
+| `base.en` fp32 encoder + q4 decoder, amount prompt | 44/60 | 16, 15, 13 |
+
+- Dates ("yesterday", "today", "last night") were right in every clip.
+- Merchant words were right in 53/60 for `base.en`. The misses: "Launch" for lunch, "No Freel", "Best by", "Shop is drug mark".
+- **The main failure is systematic.** When dollars and cents are said without "dollars", Whisper writes them as one integer: "uber twenty three forty" → `Uber 2340`, "netflix sixteen ninety nine" → `Netflix 1699`, "nine fifty" → `950`. When the speaker says "dollars" ("fifteen dollars", "eighty four dollars and twenty cents"), the amount comes out right. Some outright errors also appeared: "eighty nine ninety nine" → `1899`, and "twenty five us dollars" → `$25.00`, which loses the currency.
+- **The amount prompt** puts example amounts written as `$18.25` before the transcript, so Whisper follows that format. It's worth +7 to +14 clips. Transformers.js 4.3.1 declares `generate({prompt_ids})` but ignores it, so the worker passes the prompt as `decoder_input_ids` instead (`<|startofprev|>` + prompt + `<|startoftranscript|><|notimestamps|>`). That works.
+- **Pocky does not reliably repair squashed amounts.** Live on the direct runtime, 2 runs each:
+
+  | Transcript | Pocky drafted |
+  | --- | --- |
+  | `Netflix 1699` | 16.99 |
+  | `Uber 2340.` | 23.40, or asked |
+  | `Spent 950 on bubble tea yesterday.` | **950.00** (both runs) |
+  | `Shoppers Drug Mart 1249 today.` / `Gas at Petro Canada 5130` | asked for the amount, or failed |
+
+  The only safeguards would be the editable transcript and the Confirm button.
+
+### 3. Latency on the laptop (10.1-second clip, from audio to text in the worker)
+
+| Model | Engine and files | 10 s clip (3 runs) | 3 s clip |
+| --- | --- | --- | --- |
+| `tiny.en` | WASM, 8-bit | 1.18–1.23 s | 1.0 s |
+| `base.en` | WASM, 8-bit | 2.41–2.54 s | 2.2 s |
+| `tiny.en` | WebGPU, fp32 + q4 | 0.30–0.80 s | 0.19 s |
+| `base.en` | WebGPU, fp32 + q4 | 0.39–0.59 s | 0.24 s |
+| `base.en` | WebGPU, 8-bit | 2.29–2.49 s | 1.8 s |
+
+- Everything is well under 5 s.
+- WASM ran single-threaded: the app isn't cross-origin isolated, the same constraint OCR has.
+- WebGPU is only faster with the large fp32 + q4 files; with 8-bit files it's no faster than WASM.
+- **Phone: not measured.**
+
+### 4. Download size and caching
+
+| Files | `tiny.en` | `base.en` |
+| --- | --- | --- |
+| 8-bit (WASM, or WebGPU with no speedup) | 40.8 MB | 76.9 MB |
+| fp32 encoder + q4 decoder (fast WebGPU) | 119.6 MB | 206.1 MB |
+
+- Add 5.5 MB for the runtime file. All of this is on top of OCR's ~45 MB.
+- First load is 2.6–4.6 s on this connection with 8-bit files, and 9.5–12.3 s with the large WebGPU files.
+- **A reload fetched 0 bytes of model** (Transformers.js keeps the files in Cache Storage), and loading from the cache took 0.5–0.8 s.
+
+### 5. iOS Safari: not measured
+
+This needs a real device. Open `/voice-spike` on the PR's Vercel preview on an iPhone, load `base.en` (WASM), record an entry, and note:
+
+- the reported `audio/mp4` type
+- whether decoding and resampling succeed
+- the "stop → text" time
+- the same time on one mid-range Android phone
+
+### What would change the verdict
+
+1. **Run it on the owner's voice** (the 20 phrases above, on `/voice-spike`). If amounts reach 18/20 with the prompt, the bar is met.
+2. **Speak amounts with "dollars"** ("nine dollars fifty"). It's reliable in every clip, but it puts the burden on the user.
+3. **Compare the phone keyboard's dictation** with the same phrases. If it formats `$9.50` correctly, the interim (no feature) may be the answer.
+
+Building the mic button anyway would mean relying on the user to catch `950` in the textarea and in the draft.
+
 ## Build (2–3 days), if the spike passes
 
 Follow the OCR code's shape; it solved the same problems.
@@ -67,6 +151,6 @@ Follow the OCR code's shape; it solved the same problems.
 
 ## Open questions for the owner
 
-- `tiny.en` (smaller, faster) or `base.en` (more accurate) if both pass — decided by the spike numbers.
-- Self-host the model or use the Hugging Face CDN.
+- `tiny.en` (smaller, faster) or `base.en` (more accurate) if both pass — decided by the spike numbers. *Spike: `base.en` 8-bit with the amount prompt is the most accurate (49/60), 2.5 s per 10 s clip on WASM; neither passes 18/20 on synthetic voices.*
+- Self-host the model or use the Hugging Face CDN. *Spike: the 8-bit files are 41 MB / 77 MB and cache after the first load; self-hosting stays the recommendation, for the same pinning reasons as OCR.*
 - Push-to-talk (hold) or tap to start / tap to stop. Tap is easier on phones; proposed default.
