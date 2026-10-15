@@ -148,7 +148,8 @@ function openTurn(input: AgentInput, onProgress?: (event: {toolCalls: number}) =
   // Shared admission for every tool: revocation, then the call budget.
   const admit = async (): Promise<string | undefined> => {
     if (controller.signal.aborted) return 'agent_cancelled';
-    try { await input.assertActive?.(); } catch {
+    // Raced so a hung revocation check cannot outlive the deadline or a cancel.
+    try { await Promise.race([input.assertActive?.(), aborted]); } catch {
       stop('agent_cancelled');
       return 'agent_cancelled';
     }
@@ -513,7 +514,10 @@ export function createDirectRuntime(loadClient: () => Promise<MessagesClient> = 
           } else {
             const parsed = entry!.schema.safeParse(use.input);
             // Like the SDK's schema check: a repairable error, and the turn goes on.
-            result = parsed.success ? await entry!.tool.handler(parsed.data) : {isError:true,content:[{type:'text',text:schemaError(use.name, parsed.error)}]};
+            // The handler is raced like the SDK path's iterator, so a slow query or
+            // rate lookup cannot hold the turn (and its process slot) past the
+            // deadline or a cancel; its late result is discarded.
+            result = parsed.success ? await Promise.race([entry!.tool.handler(parsed.data), turn.aborted]) : {isError:true,content:[{type:'text',text:schemaError(use.name, parsed.error)}]};
           }
           if (turn.terminalError) throw turn.terminalError;
           results.push({type:'tool_result',tool_use_id:use.id,content:result.content,...(result.isError?{is_error:true}:{})});

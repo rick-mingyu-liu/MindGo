@@ -259,6 +259,27 @@ test('direct: the deadline aborts a hanging request as agent_timeout', async () 
   } finally { config.agent.timeoutMs = oldTimeout; }
 });
 
+test('direct: the deadline and a cancel end the turn while a tool or revocation check is still pending', async () => {
+  // A hung query, pool connect or rate lookup must not hold the turn, and with it
+  // the process's model slot, past the deadline. The handler never settles here.
+  const hang = () => new Promise<never>(() => {});
+  const oldTimeout = config.agent.timeoutMs; config.agent.timeoutMs = 30;
+  try {
+    for (const hung of [{ records: { ...okRecords().records, listGoals: hang } }, { records: okRecords().records, assertActive: hang }]) {
+      const s = scripted([uses([['list_goals', {}]])]);
+      const started = Date.now();
+      await assert.rejects(s.runtime({ ...input, ...hung }), { code: 'agent_timeout', status: 504 });
+      assert.ok(Date.now() - started < 1000, 'returned at the deadline, not when the tool settled');
+      assert.equal(s.requests.length, 1);
+    }
+  } finally { config.agent.timeoutMs = oldTimeout; }
+  const controller = new AbortController();
+  const s = scripted([uses([['list_goals', {}]])]);
+  const records = { ...okRecords().records, listGoals: () => { setTimeout(() => controller.abort(), 5); return hang(); } };
+  await assert.rejects(s.runtime({ ...input, records, signal: controller.signal }), { code: 'agent_cancelled', status: 409 });
+  assert.equal(s.requests.length, 1);
+});
+
 test('direct: provider errors map to agent_provider_error and log name and code only', async () => {
   const secret = 'secret raw provider payload: Fictional lunch 42.00';
   const failures: Step[][] = [
