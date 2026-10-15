@@ -13,7 +13,7 @@ A study term and a co-op term are both four months, and that is the unit student
 
 **Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
 
-The API runs on Render's free plan, which sleeps after ~15 minutes of inactivity, so the first request can wait about 20 seconds on a cold start. That is the server waking up, not the app hanging.
+The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not sleep.
 
 ---
 
@@ -545,7 +545,7 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
 ## Deployment
 
-The backend runs on **Render**, the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
+The backend runs on **Render** (Starter instance, Oregon), the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
