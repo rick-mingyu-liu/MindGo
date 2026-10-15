@@ -300,7 +300,7 @@ export default function Dashboard() {
     if (summary.year) return summary.year
     if (summary.term) {
       const [year, season] = summary.term.split('-')
-      return t('termWindowLabel', { season: t(SEASONS[season] ?? season), year })
+      return t('{{season}} {{year}}', { season: t(SEASONS[season] ?? season), year })
     }
     return summary.periodLabel ?? summary.period
   })()

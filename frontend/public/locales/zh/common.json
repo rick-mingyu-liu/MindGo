@@ -342,7 +342,7 @@
   "Winter": "冬季",
   "Spring": "春季",
   "Fall": "秋季",
-  "termWindowLabel": "{{year}}年{{season}}",
+  "{{season}} {{year}}": "{{year}}年{{season}}",
   "Income vs Expenses": "收入与支出",
   "Import from screenshot": "从截图导入",
   "Import transactions": "导入交易",

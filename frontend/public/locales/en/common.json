@@ -334,7 +334,7 @@
   "Winter": "Winter",
   "Spring": "Spring",
   "Fall": "Fall",
-  "termWindowLabel": "{{season}} {{year}}",
+  "{{season}} {{year}}": "{{season}} {{year}}",
   "Income vs Expenses": "Income vs Expenses",
   "Import from screenshot": "Import from screenshot",
   "Import transactions": "Import transactions",
