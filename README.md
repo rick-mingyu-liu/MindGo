@@ -373,6 +373,12 @@ The frontend has no test runner. Verify UI changes by running the app.
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs backend lint and tests against a Postgres service container, plus `check:locales`, lint and `build` for the frontend (which downloads and checksums the OCR model). It uses `npm ci`, so a `package.json` that disagrees with its lockfile fails the build.
 
+### Dependency updates
+
+[Dependabot](.github/dependabot.yml) checks the backend, frontend, OCR evaluation project and GitHub Actions every Monday at 9 a.m. Toronto time. Minor and patch version updates are grouped separately for each project; major version updates get individual PRs. Routine open PRs are capped at three per npm project and two for Actions. Security-update groups are separate and do not wait for the weekly schedule; their repository-level alerts and security-update settings are managed in GitHub.
+
+Updates require manual review and passing CI; no auto-merge workflow is configured. For OCR dependency updates, also run the `eval/` tests and benchmark before merging: the existing application CI does not run that project's test command or OCR benchmark. Dependabot cannot fix a vulnerability without a suitable upstream release. The remaining frontend build-tool advisories and the tested PostCSS override are documented in [`frontend/DEPENDENCIES.md`](frontend/DEPENDENCIES.md).
+
 ---
 
 ## API
