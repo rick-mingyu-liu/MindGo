@@ -185,6 +185,22 @@ describe('agent storage safety', { skip: !enabled }, () => {
     assert.deepEqual(replay.history.map(m=>m.content),['Fictional kept turn','Kept reply','Fictional next turn']);
     await store.cancelRun(bob,c.id,next);
   });
+  test('a failed run keeps the counts the runtime reported, and stays null without them',async()=>{
+    const c=await store.createConversation(bob,settings);
+    const limited=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:limited,content:'Fictional limited turn'});
+    await store.failTurn(bob,c.id,limited,'agent_limit_exceeded',{inputTokens:24319,outputTokens:5392,toolCalls:8});
+    const plain=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:plain,content:'Fictional plain failure'});
+    await store.failTurn(bob,c.id,plain,'agent_provider_error');
+    const rows=(await db.query<{id:string;status:string;error_code:string;input_tokens:number|null;output_tokens:number|null;tool_calls:number|null}>('SELECT id,status,error_code,input_tokens,output_tokens,tool_calls FROM agent_runs WHERE id=ANY($1::uuid[])',[[limited,plain]])).rows;
+    const byId=new Map(rows.map(r=>[r.id,r]));
+    assert.deepEqual({...byId.get(limited)!,id:undefined},{id:undefined,status:'failed',error_code:'agent_limit_exceeded',input_tokens:24319,output_tokens:5392,tool_calls:8});
+    assert.deepEqual({...byId.get(plain)!,id:undefined},{id:undefined,status:'failed',error_code:'agent_provider_error',input_tokens:null,output_tokens:null,tool_calls:null});
+    // Values the columns cannot hold become null instead of failing the UPDATE and stranding the run as running.
+    const oversized=randomUUID();await store.beginTurn(bob,c.id,{...settings,requestId:oversized,content:'Fictional oversized counts'});
+    await store.failTurn(bob,c.id,oversized,'agent_limit_exceeded',{inputTokens:2_147_483_648,outputTokens:2_147_483_647,toolCalls:9});
+    const row=(await db.query<{status:string;input_tokens:number|null;output_tokens:number|null;tool_calls:number|null}>('SELECT status,input_tokens,output_tokens,tool_calls FROM agent_runs WHERE id=$1',[oversized])).rows[0]!;
+    assert.deepEqual({...row},{status:'failed',input_tokens:null,output_tokens:2147483647,tool_calls:null});
+  });
   test('without a provider key, replays answer from saved state and new runs are refused',async()=>{
     const c=await store.createConversation(bob,settings);const requestId=randomUUID();const input={...settings,requestId,content:'Fictional replay'};
     await store.beginTurn(bob,c.id,input);await store.finishTurn(bob,c.id,requestId,{text:'Replay reply'});

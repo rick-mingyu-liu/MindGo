@@ -87,11 +87,12 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
     const state=await store.finishTurn(userId,conversationId,input.requestId,result);
     if(!res.destroyed) res.json(state);
   } catch(error) {
-    const failure=timedOut?new AgentError('agent_timeout',504):controller.signal.aborted?new AgentError('agent_cancelled',409):error instanceof AgentError?error:new AgentError('agent_provider_error',502);
+    // The route's own deadline replaces the runtime's error but keeps the counts it carried.
+    const failure=timedOut?new AgentError('agent_timeout',504,error instanceof AgentError?error.usage:undefined):controller.signal.aborted?new AgentError('agent_cancelled',409):error instanceof AgentError?error:new AgentError('agent_provider_error',502);
     if(started) {
       try {
         if(failure.code==='agent_cancelled') await store.cancelRun(userId,conversationId,input.requestId);
-        else await store.failTurn(userId,conversationId,input.requestId,failure.code);
+        else await store.failTurn(userId,conversationId,input.requestId,failure.code,failure.usage);
       } catch(persistError) {
         if(!(persistError instanceof AgentError && persistError.code==='agent_not_found')) logger.error('Agent terminal state failed',{userId,...errorSummary(persistError)});
       }

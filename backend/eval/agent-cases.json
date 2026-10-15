@@ -398,6 +398,20 @@
       }
     },
     {
+      "id": "en-plan-biweekly-save-by-december",
+      "language": "en",
+      "today": "2026-10-15",
+      "message": "If co-op pays $2,400 a biweekly from September, can I save $5,000 by December based on my overall spending habit?",
+      "note": "Mirrors a production failure (agent_limit_exceeded): a biweekly pay schedule plus a spending baseline. Before the fix DeepSeek reasoned by default (thinking blocks counted against the output budgets) and biweekly pay could only be modelled as weekly. The turn must finish inside the limits; it may project with a two_weeks repeat or ask for cash on hand, but must not promise the goal is reachable.",
+      "expect": {
+        "tools": { "include": ["spending_baseline"], "exclude": ["propose_transactions", "propose_goal"] },
+        "maxToolCalls": 5,
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": { "mustNotMatch": ["you(?:'ll| will) (?:definitely|easily|comfortably) (?:save|reach|hit)", "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"] }
+      }
+    },
+    {
       "id": "en-goal-create",
       "language": "en",
       "message": "Create a savings goal called \"Reading Week Trip\" with a target of 800 CAD by 2027-02-14.",

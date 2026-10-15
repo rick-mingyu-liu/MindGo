@@ -1,5 +1,7 @@
+/** What a run used before it ended: counts only, attached to a runtime failure so the run row can record them. */
+export interface RunUsage { inputTokens: number; outputTokens: number; toolCalls: number }
 export class AgentError extends Error {
-  constructor(public readonly code: string, public readonly status = 400) { super(code); this.name = 'AgentError'; }
+  constructor(public readonly code: string, public readonly status = 400, public readonly usage?: RunUsage) { super(code); this.name = 'AgentError'; }
 }
 export interface ConversationSettings { currency: string; timezone: string; language: 'auto' | 'en' | 'zh' }
 export interface Conversation extends ConversationSettings { id: string; title: string; created_at: Date; updated_at: Date }

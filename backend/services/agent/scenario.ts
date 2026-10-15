@@ -21,7 +21,8 @@ const MAX_LABEL_CHARS = 60;
 
 export type RateLookup = (from: string, to: string) => Promise<number>;
 
-interface Repeat { every: 'week' | 'month'; until_exclusive: string }
+/** 'two_weeks' is biweekly pay: every 14 days from the event's date, 26 a year, not twice a month. */
+interface Repeat { every: 'week' | 'two_weeks' | 'month'; until_exclusive: string }
 interface ScenarioEvent { label: string; kind: 'income' | 'expense'; cents: number; currency: string; date: string; repeat: Repeat | null }
 interface Scenario {
   currency: string; start: string; end_exclusive: string;
@@ -72,7 +73,7 @@ function validate(raw: unknown, today: string): Scenario {
     let repeat: Repeat | null = null;
     if (event.repeat !== undefined) {
       const r = record(event.repeat, ['every', 'until_exclusive'], ['every', 'until_exclusive']);
-      if (r.every !== 'week' && r.every !== 'month') invalid();
+      if (r.every !== 'week' && r.every !== 'two_weeks' && r.every !== 'month') invalid();
       const until = validateDay(r.until_exclusive);
       if (until <= date) invalid();
       repeat = { every: r.every as Repeat['every'], until_exclusive: until };
@@ -128,7 +129,8 @@ function occurrencesOf(event: ScenarioEvent, start: string, end: string, budget:
   if (!event.repeat) { visit(event.date); return { inside, before, after }; }
   // Bounded: dates are 1900-2100, so at most about 10,500 weekly steps.
   for (let n = 0; ; n++) {
-    const date = event.repeat.every === 'week' ? addDays(event.date, 7 * n) : addMonthsClamped(event.date, n);
+    const every = event.repeat.every;
+    const date = every === 'month' ? addMonthsClamped(event.date, n) : addDays(event.date, (every === 'week' ? 7 : 14) * n);
     if (date >= event.repeat.until_exclusive) break;
     visit(date);
   }

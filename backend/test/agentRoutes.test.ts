@@ -109,6 +109,20 @@ test('application deadline aborts a provider and persists a safe timeout',async(
   mock.method(store,'failTurn',async(_user:number,_conversation:string,_run:string,code:string)=>{failed=code;return state;});
   const result=await post();assert.equal(result.status,504);assert.equal(failed,'agent_timeout');assert.equal(financialWrites,0);
 });
+test('a runtime limit persists the failed run with the counts it used, and answers only the code',async()=>{
+  let failed:unknown[]=[];
+  mock.method(runtime,'runAgent',async()=>{throw new AgentError('agent_limit_exceeded',429,{inputTokens:24000,outputTokens:900,toolCalls:3});});
+  mock.method(store,'failTurn',async(...args:unknown[])=>{failed=args.slice(3);return state;});
+  const result=await post();assert.equal(result.status,429);assert.deepEqual(result.body,{error:'agent_limit_exceeded',code:'agent_limit_exceeded'});
+  assert.deepEqual(failed,['agent_limit_exceeded',{inputTokens:24000,outputTokens:900,toolCalls:3}]);assert.equal(financialWrites,0);
+});
+test('the route deadline keeps the counts the runtime reported',async()=>{
+  config.agent.timeoutMs=25;let failed:unknown[]=[];
+  mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409,{inputTokens:9000,outputTokens:300,toolCalls:2})),{once:true})));
+  mock.method(store,'failTurn',async(...args:unknown[])=>{failed=args.slice(3);return state;});
+  const result=await post();assert.equal(result.status,504);
+  assert.deepEqual(failed,['agent_timeout',{inputTokens:9000,outputTokens:300,toolCalls:2}]);assert.equal(financialWrites,0);
+});
 test('process concurrency limit releases its slot after cancellation',async()=>{
   config.agent.maxConcurrentRuns=1;
   let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});

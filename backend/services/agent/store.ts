@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { getPool } from '../../db/connection';
 import config = require('../../config');
 import type { AgentConversationRow, AgentDraftRow, AgentGoalProposalRow, AgentRunRow, AgentReceiptRow, AgentTransactionVersion } from '../../types/db';
-import { AgentError, type Conversation, type ConversationSettings, type ConversationState, type GoalProposal, type Message, type DraftRow, type TurnInput, type TurnResult, type BeginTurnResult } from './types';
+import { AgentError, type RunUsage, type Conversation, type ConversationSettings, type ConversationState, type GoalProposal, type Message, type DraftRow, type TurnInput, type TurnResult, type BeginTurnResult } from './types';
 import { validateSettings, validateRows, validateUuid, validateMessage } from './validation';
 import { validateGoalDraft, goalProposalsAvailable, GOAL_VERSION_SQL } from './planning';
 import logger = require('../../utils/logger');
@@ -168,11 +168,15 @@ export async function finishTurn(userId:number,id:string,runId:string,result:Tur
     await client.query('UPDATE agent_conversations SET updated_at=now() WHERE id=$1',[id]); return state(client,userId,id);
   });
 }
-export async function failTurn(userId:number,id:string,runId:string,errorCode:string):Promise<ConversationState> {
+/** `usage` is what the runtime counted before it stopped (counts only), so a failed run still shows what it cost. */
+export async function failTurn(userId:number,id:string,runId:string,errorCode:string,usage?:RunUsage):Promise<ConversationState> {
   if(!/^agent_[a-z_]{1,50}$/.test(errorCode)) errorCode='agent_provider_error';
+  // Out-of-range counts become null: the columns are int4 and tool_calls is checked 0-8, and a
+  // violation would make this UPDATE throw and strand the run as 'running'.
+  const counted=(n:number|undefined,max=2_147_483_647)=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0&&n<=max?n:null;
   return owned(userId,async client=>{
     await conversation(client,userId,id);
-    await client.query("UPDATE agent_runs SET status='failed',error_code=$4,finished_at=now() WHERE id=$1 AND conversation_id=$2 AND user_id=$3 AND status='running'",[runId,id,userId,errorCode]);
+    await client.query("UPDATE agent_runs SET status='failed',error_code=$4,finished_at=now(),input_tokens=$5,output_tokens=$6,tool_calls=$7 WHERE id=$1 AND conversation_id=$2 AND user_id=$3 AND status='running'",[runId,id,userId,errorCode,counted(usage?.inputTokens),counted(usage?.outputTokens),counted(usage?.toolCalls,8)]);
     await client.query("UPDATE agent_messages SET status='failed' WHERE run_id=$1 AND conversation_id=$2 AND user_id=$3 AND role='user' AND EXISTS(SELECT 1 FROM agent_runs WHERE id=$1 AND status='failed')",[runId,id,userId]);return state(client,userId,id);
   });
 }
