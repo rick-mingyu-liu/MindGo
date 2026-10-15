@@ -346,7 +346,20 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
-**`api.test.ts`, `agentStore.test.ts`, `agentGoalProposals.test.ts`, `agentMigration.test.ts`, `goalProposalMigration.test.ts` and `dropWatchlistMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
+**`api.test.ts`, `agentStore.test.ts`, `agentGoalProposals.test.ts`, `agentMigration.test.ts`, `goalProposalMigration.test.ts` and `dropWatchlistMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`.
+
+The quickest disposable database is the PostgreSQL 17 in [`docker-compose.test.yml`](docker-compose.test.yml), the same major version CI uses. It listens on this machine only, needs no password and keeps its data in memory, so each `up` starts empty:
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+cd backend
+export TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/termpocket_test
+npm run build && DATABASE_URL=$TEST_DATABASE_URL npm run db:setup
+npm test
+docker compose -f docker-compose.test.yml down
+```
+
+Any other PostgreSQL 15+ works too (013 needs 15):
 
 ```bash
 TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
@@ -539,6 +552,49 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
 **Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+
+### Deploying Pocky to production
+
+`npm run agent:preflight` ([`backend/scripts/agentPreflight.ts`](backend/scripts/agentPreflight.ts)) checks a host and its database before and after each step below. It prints one `PASS|FAIL|WARN|SKIP` line per check and exits non-zero only on a FAIL. It prints booleans, counts and versions only: never a key, a connection string, a hostname or a row. Every database statement is a catalog read or a count inside a rolled-back `READ ONLY` transaction with a 5-second `statement_timeout`. A missing 013 is a FAIL only once `AGENT_ENABLED=true`, and host or network problems are FAILs only once both the flag and the key are set. Before that they are WARNs.
+
+The order constraints: **frontend, then backend, then 014** (the previous frontend calls the removed watchlist endpoint, and the previous backend queries `ai_plans`). **013 before `AGENT_ENABLED=true`.** 015 is optional but recommended before enabling: without it goal proposals answer `agent_unavailable`.
+
+0. **Rehearse locally (optional, recommended).** With Docker running: `docker compose -f docker-compose.test.yml up -d --wait`, then `backend/scripts/rehearse-linux.sh --live`. In a fresh `node:<.node-version>` container it runs Render's `npm ci --include=dev`, loads the schema into the compose database (with SSL, as under `NODE_ENV=production`) and runs the preflight, including one fictional live turn. The source is streamed in without any `.env` file, and only `DEEPSEEK_API_KEY` is read from `backend/.env`, withheld from `npm ci`. It runs this machine's architecture: on an Apple-silicon Mac, QEMU aborts the SDK's x64 binary, so the real x64 check is step 4's preflight in the Render Shell.
+1. **Check the Render service.** Run `render login`, then confirm in the dashboard that the backend's instance type allows child processes, has a writable `/tmp`, and has enough memory to run the SDK's native binary (about 250 MB on disk) next to Node. Confirm that the request timeout is longer than the 90-second model deadline. Render web services allow long-running requests, but verify this for the current plan. The Render **Shell** used below is only available on paid instance types.
+2. **Merge to `main`.** Vercel deploys the frontend. If Render auto-deploys `main`, the backend deploys at the same time; the brief window where one is old is harmless, because the hard constraint is only that 014 waits until both are live. Confirm the first Render build log says Node 22 (from `backend/.node-version`).
+3. **Deploy the backend on Render** with `AGENT_ENABLED` unset or `false`. The build (`npm ci --include=dev`) must keep optional dependencies, because the SDK's `@anthropic-ai/claude-agent-sdk-linux-x64` binary is one.
+4. **Preflight before migrating.** In the Render Shell:
+
+   ```bash
+   cd backend && npm run agent:preflight
+   ```
+
+   Expect `WARN` for `migration.013`, `migration.014` (with the two tables' row counts) and `migration.015`, and `PASS` for `db.server_version` (PostgreSQL 15+), `db.transaction_sources` (0 incompatible values), `host.sdk_binary`, `host.sdk_launch` and `network.deepseek`. Fix any FAIL before going on. A non-zero `db.transaction_sources` means 013 will abort; review those rows and do not rewrite them blindly.
+5. **Apply the migrations from your own machine**, through Neon's **direct** endpoint (the pooled host without `-pooler`), never the pooler. 013 and 015 need PostgreSQL 15 or later, and each migration is idempotent:
+
+   ```bash
+   cd backend
+   read -rs 'DIRECT_URL?Neon direct URL: ' && export DIRECT_URL   # zsh; in bash: read -rsp 'Neon direct URL: ' DIRECT_URL
+   # Typed at a hidden prompt, so the connection string never reaches shell history.
+   psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/013_conversational_transactions.sql
+   # Before dropping anything, look at what 014 will drop (counts only):
+   psql "$DIRECT_URL" -c "SELECT (SELECT count(*) FROM watchlist) AS watchlist_rows, (SELECT count(*) FROM ai_plans) AS ai_plans_rows;"
+   psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/014_drop_watchlist_ai_plans.sql
+   psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/015_agent_goal_proposals.sql
+   unset DIRECT_URL
+   ```
+
+   013 prints its source audit and aborts without changing anything if a row is incompatible. 014 prints only row counts. Run the preflight again: `migration.013`, `.014` and `.015` should now PASS.
+6. **Enable.** In Render → Environment, set `AGENT_ENABLED=true` and `DEEPSEEK_API_KEY`. Leave `DEEPSEEK_MODEL` unset to use `deepseek-flash`. Save and redeploy.
+7. **Live preflight.** In the Render Shell:
+
+   ```bash
+   cd backend && npm run agent:preflight -- --live
+   ```
+
+   This runs one fictional turn ("I spent 12.50 CAD on lunch today") through the real runtime against in-memory fake records. It touches no database. It reports the tool-call count, token counts and latency, or a stable `agent_*` error code, and never the prompt or the reply. Expect `PASS  live.turn  1 tool call(s), 1 row(s) proposed, …`.
+8. **Smoke-test in the app** with fictional input only. Open `/agent`, send "I spent 12.50 CAD on lunch today", check the drafted row, and confirm it. Check that the transaction appears with the right day and currency. Undo it within ten minutes and check that it is gone. Then delete the conversation.
+9. **Rollback.** Setting `AGENT_ENABLED=false` and redeploying turns off the agent routes and agent maintenance before any agent query. Leave the migrations in place and do not drop the agent tables: stored history and saved transactions stay intact for when the feature is turned back on. To stop model calls but keep history, edits, confirmation, undo and deletion working, remove `DEEPSEEK_API_KEY` instead and leave `AGENT_ENABLED=true`. `/agent/status` then reports that new turns are unavailable.
 
 ---
 
