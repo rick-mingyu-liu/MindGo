@@ -27,7 +27,7 @@ export interface UserRow {
 }
 
 export type TransactionType = 'income' | 'expense';
-export type TransactionSource = 'manual' | 'ocr' | 'ocr_llm';
+export type TransactionSource = 'manual' | 'ocr' | 'ocr_llm' | 'agent';
 
 export interface TransactionRow {
   id: number;
@@ -90,3 +90,21 @@ export interface AiPlanRow {
   response: string;
   created_at: Date | null;
 }
+
+// Conversational transaction storage (migration 013).
+import type { Conversation, Message, Draft, Receipt, Run } from '../services/agent/types';
+export interface AgentConversationRow extends Conversation { user_id: number; draft_version: number }
+export interface AgentRunRow extends Run {
+  conversation_id: string; user_id: number; request_hash: string;
+  created_at: Date; lease_until: Date; finished_at: Date | null;
+  input_tokens: number | null; output_tokens: number | null; tool_calls: number | null;
+}
+export interface AgentMessageRow extends Message { conversation_id: string; user_id: number; run_id: string | null }
+export interface AgentDraftRow extends Draft { conversation_id: string; user_id: number; created_at: Date }
+export interface AgentTransactionVersion { id: number; updated_at: string; xmin: string }
+export interface AgentReceiptRow extends Receipt {
+  conversation_id: string | null; user_id: number; request_hash: string;
+  transaction_versions: AgentTransactionVersion[];
+}
+
+export interface AgentAdmissionRow { id: string; user_id: number; created_at: Date }

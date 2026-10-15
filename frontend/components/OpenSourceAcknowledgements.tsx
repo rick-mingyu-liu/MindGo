@@ -87,7 +87,7 @@ export default function OpenSourceAcknowledgements({ open, onOpenChange, classNa
       <DialogContent className={cn('max-h-[80vh] max-w-2xl overflow-y-auto', className)}>
         <DialogHeader>
           <DialogTitle>{t('Open Source Acknowledgements')}</DialogTitle>
-          <DialogDescription>{t('TermPocket is built with these open source projects. Thank you to their maintainers and contributors.')}</DialogDescription>
+          <DialogDescription>{t('agent.acknowledgementsIntro')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
           <section className="space-y-3">
@@ -104,9 +104,21 @@ export default function OpenSourceAcknowledgements({ open, onOpenChange, classNa
             <ProjectLinks projects={ocrProjects} />
           </section>
           <section className="space-y-3 border-t pt-4">
+            <h3 className="font-semibold">{t('agent.additionalSoftware')}</h3>
+            <ProjectLinks projects={[
+              ['Claude Agent SDK — Anthropic', 'https://github.com/anthropics/claude-agent-sdk-typescript'],
+              [t('agent.sdkLicense'), 'https://github.com/anthropics/claude-agent-sdk-typescript/blob/main/LICENSE.md'],
+              [t('agent.sdkLegal'), 'https://code.claude.com/docs/en/legal-and-compliance'],
+            ]} />
+            <p className="text-sm text-muted-foreground">{t('agent.sdkAcknowledgement')}</p>
+          </section>
+          <section className="space-y-3 border-t pt-4">
             <h3 className="font-semibold">{t('External services')}</h3>
             <p className="text-sm text-muted-foreground">{t('These API services are listed separately from the open source libraries above.')}</p>
             <ul className="space-y-2 text-sm">
+              <li><ProjectLinks projects={[
+                ['DeepSeek', 'https://www.deepseek.com'],
+              ]} /><p className="mt-1 text-muted-foreground">{t('agent.providerAcknowledgement')}</p></li>
               <li><ProjectLinks projects={[
                 ['Frankfurter', 'https://frankfurter.dev']
               ]} /><p className="mt-1 text-muted-foreground">{t('Currency exchange rates')}</p></li>

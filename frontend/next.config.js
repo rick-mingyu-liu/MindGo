@@ -9,7 +9,7 @@ const nextConfig = {
     // the locale prefix, so old bookmarks land on a working screen.
     return [
       { source: '/investments', destination: '/', permanent: false },
-      { source: '/ai-planning', destination: '/goals', permanent: false },
+      { source: '/ai-planning', destination: '/agent', permanent: false },
     ];
   },
   webpack: (config) => {

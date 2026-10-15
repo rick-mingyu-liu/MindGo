@@ -43,6 +43,13 @@ api.interceptors.response.use(
   (error) => {
     const { response } = error
 
+    // Conversation controls own every error and cancellation state. Keep the
+    // shared authentication expiry behavior, without a second generic dialog.
+    if (error.config?.url?.startsWith('/agent')) {
+      if (response?.status === 401) logout()
+      return Promise.reject(error)
+    }
+
     // Don't show automatic toast for auth endpoints (handled manually in components).
     // The screenshot import reports its own 4xx errors next to the row or image
     // they concern, so it is exempt too.

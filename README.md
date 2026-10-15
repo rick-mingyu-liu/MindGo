@@ -4,7 +4,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-blue.svg)](https://nextjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
 
 TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
@@ -22,6 +22,7 @@ The API runs on Render's free plan, which sleeps after ~15 minutes of inactivity
 - [Why terms](#why-terms)
 - [Features](#features)
 - [Screenshot import](#screenshot-import)
+- [Conversation recording](#conversation-recording)
 - [Quick start](#quick-start)
 - [The demo account](#the-demo-account)
 - [Architecture](#architecture)
@@ -57,6 +58,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 |---|---|
 | **Transactions** | Income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in, and every total is shown in the display currency you choose. |
 | **Screenshot import** | Drop in screenshots from a bank app, a receipt photo, Uber, Uber Eats or WeChat Pay. The text is read **in your browser**, every row is checked and flagged, and nothing is saved until you confirm. [Details below](#screenshot-import). |
+| **Conversation recording** | When enabled by the deployment, describe actual income and spending in English, Chinese or both, correct the pending draft, then review and explicitly confirm selected rows. Conversations resume across visits; an unchanged saved batch can be undone for ten minutes. [Details below](#conversation-recording). |
 | **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
 | **Savings goals** | Create and edit targets with progress bars and days remaining. |
 | **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
@@ -120,9 +122,25 @@ The recorded OCR output is replayed through the parser in CI, so a parser change
 
 ---
 
+## Conversation recording
+
+Open the dashboard's **Record with Pocky** panel or `/agent`. Pocky is TermPocket’s frog assistant. Conversations stay ordered by creation time, newest first, regardless of visits or later messages. Type transactions, including several in one message, and correct the pending batch through chat or its editable rows. The screen shows the default currency, timezone and reply language. Missing currency uses that displayed default; ambiguous amounts need clarification. Review every amount, date, currency and category before confirming selected rows or the whole batch. Typing “yes” in chat does not save anything.
+
+Only the confirmation endpoint creates financial records. Confirmation binds the reviewed draft version and selected row IDs to a retry key; retrying the same confirmation cannot insert the batch twice. Pending drafts last 24 hours from the model proposal; manual edits and partial confirmation keep that deadline. Each saved batch offers ten-minute undo, which refuses if any of its transactions was edited or deleted afterward. Conversation deletion clears its messages and drafts while keeping saved transactions; Settings' broader clear-all action separately deletes financial records too.
+
+Messages persist in TermPocket's database until their conversation is deleted. Each model request receives bounded recent history and the current pending draft. There are no conversation summaries, durable fact memory, financial planning, spending-analysis tools or voice input in this release. Manual recording, screenshot import, savings goals and external read-only MCP remain available.
+
+**Data handling:** messages, relevant history, pending rows and the displayed date/currency/timezone context are sent to DeepSeek. TermPocket stores conversations, and authorized administrators may access them. This is not end-to-end encrypted storage. DeepSeek handles submitted data under its own terms; deleting local history does not promise deletion from provider systems. Do not include account passwords or credentials. Operational agent logs contain metadata and safe error codes, not conversation contents or raw provider errors.
+
+The feature is off by default. `AGENT_ENABLED=true` enables migrated agent storage; a configured `DEEPSEEK_API_KEY` additionally enables new model turns. If the key is removed while storage remains enabled, history, draft editing/confirmation, undo and deletion remain available. With `AGENT_ENABLED=false`, agent routes and agent maintenance make no agent database queries; existing stored history remains until storage is enabled and deleted or cleaned up under the rules below.
+
+Limits: one active turn per user, four active model requests per backend process, 20 new turns per user per rolling hour, 100 conversations per user and 200 messages per conversation. A request accepts 4,000 characters, uses at most 30 recent messages / 24,000 history characters, proposes at most 12 rows, and has a 90-second deadline with at most eight tool attempts. Cancellation stops the local request promptly; PostgreSQL checks prevent a late response from restoring a cancelled or deleted conversation. Use Refresh or the same request's recovery action after an uncertain response; the UI does not poll.
+
+---
+
 ## Quick start
 
-**Prerequisites:** Node.js 22 (what CI runs), PostgreSQL 13+.
+**Prerequisites:** Node.js 22 (what CI runs), PostgreSQL 15+. The agent schema uses column-specific `ON DELETE SET NULL`, introduced in PostgreSQL 15.
 
 ```bash
 git clone <repository-url>
@@ -143,9 +161,14 @@ JWT_SECRET=<at least 32 characters>
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
 EMAIL_PASS=
+
+# Optional conversation recording: enable only after migration 013.
+AGENT_ENABLED=false
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-flash
 ```
 
-The app **refuses to boot** without `DATABASE_URL` and `JWT_SECRET`, and warns about each missing optional key, naming what it disables.
+The app **refuses to boot** without database configuration and `JWT_SECRET`, and warns about missing email and address-validation credentials. Conversation recording reports its availability through `/agent/status`; a missing DeepSeek key does not stop the rest of the application.
 
 `frontend/.env` — see [`frontend/.env.example`](frontend/.env.example):
 
@@ -168,6 +191,8 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/011_add_import_tracking
 ```
 
 `schema.sql` is the desired end state; a migration without a matching `schema.sql` edit means fresh setups and existing databases diverge.
+
+Conversation recording needs [`013_conversational_transactions.sql`](backend/db/migrations/013_conversational_transactions.sql) on an existing database, after earlier migrations. Apply and verify it manually on a disposable local database or staging first; this implementation does not migrate production. It audits existing transaction sources and aborts on incompatible values without rewriting financial rows. Fresh setups include the same tables in `schema.sql`. Leave `AGENT_ENABLED=false` until the migration is installed; production migration and enablement are separate operator actions.
 
 ### Run
 
@@ -216,7 +241,8 @@ backend/                        Express + PostgreSQL API (TypeScript)
 │   │   ├── categorize.ts       first-guess category from the merchant
 │   │   ├── duplicates.ts       possible_duplicate lookup
 │   │   └── parse.ts            confidence, flags, output
-│   ├── schedulerService.ts     weekly email (cron, Toronto time) + cleanup intervals
+│   ├── agent/                  isolated model runtime, validated drafts, owned storage
+│   ├── schedulerService.ts     weekly email (cron, Toronto time) + hourly maintenance
 │   └── …                       email, exchange rates, financial facts
 ├── types/
 │   ├── db.ts                   one interface per table — edit with schema.sql
@@ -227,7 +253,7 @@ backend/                        Express + PostgreSQL API (TypeScript)
 │   ├── dates.ts                calendar-day helpers
 │   ├── logger.ts               info/warn/debug are dev-only; error/audit always print
 │   └── privacy.ts              maskEmail()
-├── test/                       30 files, 508 tests, node --test
+├── test/                       unit + opt-in database tests, node --test
 └── dist/                       tsc output (CommonJS) — gitignored; what production runs
 
 frontend/                       Next.js 14, Pages Router, TypeScript
@@ -313,12 +339,13 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - retired stock and one-shot AI endpoints return authenticated retirement responses without database or provider calls; legacy history and archived-data deletion remain available
 - that registration and the import routes never write a token, an address, screenshot text or a row value to the log
 - the screenshot parser piece by piece and end to end, including layouts copied from real screenshots
+- agent row validation, authenticated routes, unavailable-mode behavior, cancellation, runtime tool restrictions, token limits, safe failures and temporary-directory cleanup
 
 **Drift guards** (`sharedContracts.test.ts`, `demoData.test.ts`) pin what the backend and frontend both define: the seed's category list must match the picker's, and every category the picker offers must have a colour. The two projects are deliberately not npm workspaces, since workspaces move every lockfile to the repo root and break `npm ci` for both deploys (Render builds `backend`, Vercel `frontend`).
 
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
-**`api.test.ts` needs a database and skips without one.** It refuses to borrow `DATABASE_URL` from `.env`:
+**`api.test.ts`, `agentStore.test.ts` and `agentMigration.test.ts` need a disposable database and skip without one.** They use an explicit `TEST_DATABASE_URL`, never the production URL from `.env`:
 
 ```bash
 TEST_DATABASE_URL=postgresql://user@localhost:5432/mindgo_test npm test
@@ -389,13 +416,31 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 
 ### Retired stock and one-shot planning endpoints
 
-Stock/watchlist features and the old AI Planning interface are retired. `/investments` bookmarks redirect to the dashboard; `/ai-planning` bookmarks redirect to savings goals. The proposed conversational agent is not yet implemented or advertised as available.
+Stock/watchlist features and the old AI Planning interface are retired. `/investments` bookmarks redirect to the dashboard; `/ai-planning` bookmarks redirect to `/agent`, the optional conversation-recording flow. This does not restore one-shot plans or stock features.
 
 Authenticated stock operations under `/investments` return **`410 Gone`**. The one retained mutation is `DELETE /investments/watchlist/clear-all`: Settings uses it to delete the user's archived watchlist rows alongside transactions and goals. No stock quote, search, news or analysis provider is called.
 
 `POST /ai/plan`, `/ai/budget-recommendations`, `/ai/investment-advice` and `/goals/from-ai-plan` return **`410 Gone`**. `GET /ai/plans` and `GET /ai/plans/:id` remain authenticated, read-only legacy history endpoints. Existing plans expire 30 minutes after creation, enforced at read time and physically swept by the existing hourly maintenance job. No new one-shot plans can be created.
 
 The `watchlist` and `ai_plans` tables remain in the schema; this retirement needs no database migration and does not delete existing rows. Archived watchlist rows remain until the user clears them or the owning account is deleted. A future storage removal requires a separately reviewed data transition.
+
+### `/agent` — conversation recording
+
+All endpoints require the login JWT and return `Cache-Control: no-store`. Errors use stable application codes; SDK types never enter the HTTP contract.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /status` | `{available}` for new model turns; no database query |
+| `GET, POST /conversations` | List or create owned conversations |
+| `GET, DELETE /conversations/:id` | Read or delete owned history and pending drafts |
+| `DELETE /conversations` | Clear owned history and drafts; saved transactions survive |
+| `POST /conversations/:id/messages` | Run a turn with a UUID request ID and explicit currency/timezone/language |
+| `POST /conversations/:id/runs/:runId/cancel` | Cancel an owned run |
+| `PATCH, DELETE /conversations/:id/draft` | Save edits or discard a specific draft version |
+| `POST /conversations/:id/confirm` | Confirm a version and selected row IDs with a UUID request ID |
+| `POST /receipts/:id/undo` | Undo an unchanged saved batch within ten minutes |
+
+When `AGENT_ENABLED=false`, only status is available. When it is true but the provider key is missing, only new model turns are unavailable. Request IDs bind their original payload; reuse with a different payload conflicts. Amounts are two-place decimal strings, and dates are calendar days.
 
 ### `/mcp` — read-only, for a personal agent
 
@@ -487,11 +532,13 @@ The backend runs on **Render**, the frontend on **Vercel**, the database on **Ne
 
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
-**Before a deploy** that includes a new migration, apply it to the production database (use Neon's direct endpoint). Set the email credentials in Render when enabling email reports. Stock-provider and DeepSeek credentials are no longer used by the application; the isolated agent compatibility probe uses its own explicitly supplied DeepSeek credential.
+**Migration and enablement:** verify migration `013` on PostgreSQL 15+ locally or in staging before an operator applies it to production through the direct database endpoint. No production migration or deployment is performed by this implementation. `AGENT_ENABLED=false` permits the application to run without the new tables being queried by agent routes or maintenance. Enable it only after migration verification. Configure `DEEPSEEK_API_KEY` and, optionally, `DEEPSEEK_MODEL` (default `deepseek-flash`) for new model turns. Stock-provider credentials remain unused.
+
+**Agent hosting requirements:** the backend needs a Node host that permits the Claude Agent SDK's platform-specific child process, writable temporary storage for isolated configuration/cwd, and outbound HTTPS to `https://api.deepseek.com/anthropic`. Retain the SDK's optional platform dependency during installation. Allow HTTP requests to run beyond the 90-second model deadline so terminal state and cleanup can finish; a short-lived edge handler is insufficient. Each run deletes its temporary directory and disables SDK session persistence. Local adapter tests exercised real DeepSeek calls, cancellation and failures; deployed Linux compatibility, memory capacity and provider throttling still need validation on the intended host. Four model requests per process is a process limit, not a fleet-wide cap. Set the email credentials separately when enabling reports.
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus interval jobs that delete expired AI plans and unverified accounts. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes expired AI plans and unverified accounts and, when agent storage is enabled, expires agent drafts and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ---
 
@@ -503,11 +550,17 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
-**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail.
+**Conversation runtime** — [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) `0.3.300`, Zod `4.6.7`, and DeepSeek's Anthropic-compatible API. The SDK's package-specific license applies; see its bundled `LICENSE.md`.
+
+**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail; [DeepSeek](https://api-docs.deepseek.com/guides/anthropic_api/) for optional conversation recording.
 
 ## Database
 
-Seven tables: `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches`, `access_tokens`. `watchlist` and `ai_plans` are legacy storage retained under the retirement policy above. `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` (`manual` | `ocr` | `ocr_llm`, migration `011`) records where a row came from; `import_batches` holds one row per confirmed screenshot import — counts only, never text or amounts.
+The original tables are `users`, `transactions`, `savings_goals`, `watchlist`, `ai_plans`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. `watchlist` and `ai_plans` remain legacy storage under the retirement policy above.
+
+`updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` accepts `manual`, `ocr`, `ocr_llm` and `agent`; only confirmation writes `agent` rows. `import_batches` records counts for confirmed screenshot imports.
+
+Agent messages and conversations have no automatic age-based deletion. Drafts expire 24 hours after the model proposal; manual edits and partial confirmation retain that deadline. Expiry is checked when read or confirmed. Terminal run metadata and admission records are removed after 30 days. Confirmation receipts retain request hashes, transaction IDs and exact transaction versions, without descriptions or amounts: they expire from storage after 30 days, or after the undo deadline once their conversation is deleted. The enabled hourly sweep performs physical cleanup; expiry remains enforced between sweeps. Deleting history also removes its runs, but retained admission records prevent deletion from resetting the hourly turn budget. No SDK session transcripts or hidden durable memory are retained.
 
 ## Known gaps
 

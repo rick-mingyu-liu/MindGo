@@ -6,6 +6,7 @@ import { query } from '../db/connection';
 import { sendWeeklyReport, generateWeeklyReport } from './emailService';
 import * as cleanupService from './cleanupService';
 import * as demoAccountService from './demoAccountService';
+import { cleanupAgentData } from './agent/store';
 
 // name -> { job, kind }. `kind` is what tells stop() and getStatus() which
 // API they are holding; the two types share no methods worth guessing at.
@@ -19,6 +20,7 @@ const MAX_TIMER_DELAY = 2_147_483_647;
 interface MaintenanceResult {
   aiPlans: number | null;
   unverifiedAccounts: number | null;
+  agentData?: number | null;
 }
 
 /**
@@ -141,6 +143,9 @@ class SchedulerService {
       this.maintenanceRun = (async () => ({
         aiPlans: await attempt('aiPlanCleanup', cleanupService.deleteOldAIPlans),
         unverifiedAccounts: await attempt('accountCleanup', cleanupService.deleteUnverifiedAccounts),
+        // Agent tables are queried only after the feature/migration is enabled.
+        // Share the existing hourly wake-up; never add a keep-alive interval.
+        ...(config.agent.enabled ? {agentData: await attempt('agentCleanup', cleanupAgentData)} : {}),
       }))().finally(() => {
         this.maintenanceRun = null;
       });
