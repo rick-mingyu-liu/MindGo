@@ -1,6 +1,5 @@
 import { getPool, query } from '../db/connection';
 import { buildDemoData } from '../db/demoData';
-import { toDay } from '../utils/dates';
 import config = require('../config');
 import logger = require('../utils/logger');
 import type { PoolClient } from 'pg';
@@ -182,39 +181,47 @@ async function refreshDemoAccountOnSchedule(now: Date = new Date()): Promise<num
 
 type DemoFreshness =
   | { state: 'absent' }
-  | { state: 'fresh' | 'stale'; userId: number; newest: string | null; ageDays: number | null };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+  | { state: 'fresh' | 'stale'; userId: number; refreshedAt: string | null };
 
 /**
- * How stale the demo account is, in one read: the newest demo transaction on
- * or before today (UTC). Future-dated rows are ignored so that a visitor who
- * adds one cannot keep a stale demo "fresh" forever.
+ * The staleness check, exported so the database-backed test runs the exact
+ * statement. `$1` is the limit in days.
+ *
+ * It measures the age of the last refresh, not of the newest transaction. The
+ * demo login is public, so anything about the data a visitor can add (a row
+ * dated today, a row dated next year) would let them postpone the refresh
+ * indefinitely. The refresh inserts every row in one statement, so they share
+ * a `created_at`; rows a visitor adds afterwards are created later, and an
+ * edit does not change `created_at`. So `MIN(created_at)` is the time of the
+ * last refresh for as long as any refreshed row survives. A visitor can move
+ * it only by deleting every refreshed row, and even then only to the time of
+ * their own oldest row, which ages like any other.
+ *
+ * `created_at` is a zone-less TIMESTAMP written in UTC (db/connection.ts runs
+ * every session in UTC), so it is compared with `now()` taken in UTC, in SQL,
+ * on the database's clock. No local-time arithmetic anywhere.
  *
  * Resolved by `is_demo`, never by email, like the refresh itself. No row means
- * there is no demo account; a row with a null `newest` means it has no
- * transactions up to today, which is stale.
+ * there is no demo account; a demo account with no transactions is stale.
  */
-async function demoAccountFreshness(now: Date = new Date(), staleDays: number = config.demo.staleDays): Promise<DemoFreshness> {
-  // The UTC day, from the ISO string: toDay(Date) reads the host's local day.
-  const today = toDay(now.toISOString()) as string;
-  const result = await query<{ id: number; newest: string | null }>(
-    `SELECT u.id, MAX(t.date) FILTER (WHERE t.date <= $1::date) AS newest
-       FROM users u
-       LEFT JOIN transactions t ON t.user_id = u.id
-      WHERE u.is_demo = TRUE
-      GROUP BY u.id`,
-    [today]
+const DEMO_FRESHNESS_SQL = `
+  SELECT u.id,
+         to_char(MIN(t.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS refreshed_at,
+         COALESCE(MIN(t.created_at) < (now() AT TIME ZONE 'UTC') - make_interval(days => $1::int), TRUE) AS stale
+    FROM users u
+    LEFT JOIN transactions t ON t.user_id = u.id
+   WHERE u.is_demo = TRUE
+   GROUP BY u.id`;
+
+/** How stale the demo account is, in one read. See DEMO_FRESHNESS_SQL. */
+async function demoAccountFreshness(staleDays: number = config.demo.staleDays): Promise<DemoFreshness> {
+  const result = await query<{ id: number; refreshed_at: string | null; stale: boolean }>(
+    DEMO_FRESHNESS_SQL,
+    [staleDays]
   );
   const row = result.rows[0];
   if (!row) return { state: 'absent' };
-
-  const newest = row.newest === null ? null : toDay(row.newest);
-  // Both are 'YYYY-MM-DD', which Date.parse reads as UTC midnight, so the
-  // difference is a whole number of days whatever the host's timezone.
-  const ageDays = newest === null ? null : Math.round((Date.parse(today) - Date.parse(newest)) / DAY_MS);
-  const stale = ageDays === null || ageDays > staleDays;
-  return { state: stale ? 'stale' : 'fresh', userId: row.id, newest, ageDays };
+  return { state: row.stale ? 'stale' : 'fresh', userId: row.id, refreshedAt: row.refreshed_at };
 }
 
 // Whether the missing-account error has been logged since this process started
@@ -230,7 +237,7 @@ let absenceReported = false;
  * and logs that once per process.
  */
 async function refreshDemoAccountIfStale(now: Date = new Date()): Promise<number> {
-  const freshness = await demoAccountFreshness(now);
+  const freshness = await demoAccountFreshness();
 
   if (freshness.state === 'absent') {
     if (!absenceReported) {
@@ -248,8 +255,8 @@ async function refreshDemoAccountIfStale(now: Date = new Date()): Promise<number
   if (freshness.state === 'fresh') return 0;
 
   logger.info(
-    `demoRefresh: newest demo transaction is ${freshness.newest ?? 'none'} ` +
-    `(${freshness.ageDays ?? '-'} day(s) old, limit ${config.demo.staleDays}); refreshing`
+    `demoRefresh: last refreshed ${freshness.refreshedAt ?? 'never (no transactions)'}, ` +
+    `limit ${config.demo.staleDays} day(s); refreshing`
   );
   return refreshDemoAccountOnSchedule(now);
 }
@@ -265,6 +272,7 @@ export {
   refreshDemoAccountIfStale,
   demoAccountFreshness,
   resetAbsenceReport,
+  DEMO_FRESHNESS_SQL,
   DEMO_EMAIL,
   DEMO_PASSWORD,
   DEMO_PASSWORD_HASH,

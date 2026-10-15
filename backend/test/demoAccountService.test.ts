@@ -181,13 +181,15 @@ describe('what the scheduler logs', () => {
 
 describe('how stale the demo account is', () => {
   // The hourly maintenance run asks this before refreshing. One aggregate
-  // SELECT through the pool; the refresh's client is used only when stale.
+  // SELECT through the pool, which decides staleness itself against the
+  // database clock (test/demoFreshnessDb.test.ts runs it for real); the
+  // refresh's client is used only when stale.
   let checks: Query[];
-  let answer: Array<{ id: number; newest: string | null }>;
+  let answer: Array<{ id: number; refreshed_at: string | null; stale: boolean }>;
 
   beforeEach(() => {
     checks = [];
-    answer = [{ id: 42, newest: '2026-10-10' }];
+    answer = [{ id: 42, refreshed_at: '2026-10-10T03:00:00Z', stale: false }];
     resetAbsenceReport();
     mock.method(db, 'query', async (text: string, params?: unknown[]) => {
       checks.push({ text: text.replace(/\s+/g, ' ').trim(), params });
@@ -195,43 +197,38 @@ describe('how stale the demo account is', () => {
     });
   });
 
-  test('is one SELECT resolved by is_demo, with today as the UTC day', async () => {
-    // 23:30 in Toronto is already the next day in UTC.
-    await demoAccountFreshness(new Date('2026-10-15T23:30:00-04:00'), 14);
+  test('is one SELECT resolved by is_demo, measuring the last refresh in SQL', async () => {
+    await demoAccountFreshness(14);
     assert.equal(checks.length, 1);
-    assert.match(checks[0]!.text, /^SELECT /);
-    assert.match(checks[0]!.text, /is_demo = TRUE/);
-    assert.doesNotMatch(checks[0]!.text, /email/i);
-    // Future-dated rows a visitor adds cannot keep it looking fresh.
-    assert.match(checks[0]!.text, /FILTER \(WHERE t\.date <= \$1::date\)/);
-    assert.deepEqual(checks[0]!.params, ['2026-10-16']);
+    const { text, params } = checks[0]!;
+    assert.match(text, /^SELECT /);
+    assert.match(text, /is_demo = TRUE/);
+    assert.doesNotMatch(text, /email/i);
+    // The last refresh, not the newest row: a visitor's rows are always created later.
+    assert.match(text, /MIN\(t\.created_at\)/);
+    assert.doesNotMatch(text, /MAX\(/);
+    // Compared on the database clock, in UTC.
+    assert.match(text, /now\(\) AT TIME ZONE 'UTC'/);
+    assert.deepEqual(params, [14]);
   });
 
-  test('is fresh up to the limit and stale one day past it', async () => {
-    const now = new Date('2026-10-15T12:00:00Z');
-    answer = [{ id: 42, newest: '2026-10-01' }];
-    assert.deepEqual(await demoAccountFreshness(now, 14),
-      { state: 'fresh', userId: 42, newest: '2026-10-01', ageDays: 14 });
-    answer = [{ id: 42, newest: '2026-09-30' }];
-    assert.equal((await demoAccountFreshness(now, 14)).state, 'stale');
-  });
-
-  test('no transactions is stale; no flagged user is absent', async () => {
-    answer = [{ id: 42, newest: null }];
-    assert.equal((await demoAccountFreshness(new Date(), 14)).state, 'stale');
+  test('reports what the database decided', async () => {
+    assert.deepEqual(await demoAccountFreshness(14),
+      { state: 'fresh', userId: 42, refreshedAt: '2026-10-10T03:00:00Z' });
+    answer = [{ id: 42, refreshed_at: null, stale: true }];
+    assert.deepEqual(await demoAccountFreshness(14), { state: 'stale', userId: 42, refreshedAt: null });
     answer = [];
-    assert.deepEqual(await demoAccountFreshness(new Date(), 14), { state: 'absent' });
+    assert.deepEqual(await demoAccountFreshness(14), { state: 'absent' });
   });
 
   test('refreshDemoAccountIfStale leaves fresh data alone', async () => {
-    answer = [{ id: 42, newest: toDayUtc(new Date()) }];
     assert.equal(await refreshDemoAccountIfStale(), 0);
     assert.deepEqual(queries, [], 'opened a refresh transaction for fresh data');
   });
 
   test('refreshDemoAccountIfStale refreshes stale data and returns the deleted count', async () => {
     mock.method(logger, 'info', () => {});
-    answer = [{ id: 42, newest: '2020-01-01' }];
+    answer = [{ id: 42, refreshed_at: '2020-01-01T00:00:00Z', stale: true }];
     assert.equal(await refreshDemoAccountIfStale(), OWNED_TABLES.length * 7);
     assert.ok(ran(/^COMMIT$/));
   });
@@ -248,7 +245,7 @@ describe('how stale the demo account is', () => {
   });
 
   test('a refresh failure propagates to the caller', async () => {
-    answer = [{ id: 42, newest: null }];
+    answer = [{ id: 42, refreshed_at: null, stale: true }];
     mock.method(logger, 'info', () => {});
     client.query = async (text) => {
       if (/INSERT INTO transactions/.test(text)) throw new Error('connection lost');
@@ -257,8 +254,6 @@ describe('how stale the demo account is', () => {
     await assert.rejects(refreshDemoAccountIfStale(), /connection lost/);
   });
 });
-
-const toDayUtc = (d: Date): string => d.toISOString().slice(0, 10);
 
 /**
  * The demo credential is the one piece of this file a user types by hand, and

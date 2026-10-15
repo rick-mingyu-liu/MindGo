@@ -643,14 +643,18 @@ describe('the demo refresh rides the hourly maintenance run', () => {
    * It used to be its own 30-day interval. scheduleInterval's first run is one
    * interval after scheduling and the clock restarts with the process, so on a
    * host that redeploys several times a day it never ran and the demo went
-   * stale. Now each maintenance run asks one question — how old is the newest
-   * demo transaction? — and refreshes only when the answer is too old.
+   * stale. Now each maintenance run asks one question — how long ago was the
+   * last refresh? — and refreshes only when the answer is too long.
    *
-   * db.query answers the staleness SELECT and the account cleanup; the
-   * refresh's own transaction runs on a fake client from getPool(), so
-   * `connects` counts refreshes.
+   * db.query stands in for PostgreSQL: it answers the staleness SELECT by
+   * computing MIN(created_at) over a fake set of demo rows against the mocked
+   * clock, as the real statement does (test/demoFreshnessDb.test.ts runs the
+   * real one). The refresh's own transaction runs on a fake client from
+   * getPool(), so `connects` counts refreshes, and its COMMIT replaces the
+   * fake rows with rows created now.
    */
   const hour = config.cron.maintenance;
+  const day = 24 * hour;
   const today = '2026-10-15';
   let sql: string[];
   let params: unknown[][];
@@ -658,11 +662,15 @@ describe('the demo refresh rides the hourly maintenance run', () => {
   let errors: string[];
   let audits: string[];
   let connects: number;
-  let demo: Array<{ id: number; newest: string | null }>;
+  // The demo account's transactions, as their created_at in ms; null = no demo user.
+  let demo: { id: number; createdAt: number[] } | null;
   let refreshFails: boolean;
   let usersFails: boolean;
   let savedDemo: boolean;
   let savedAgent: boolean;
+
+  const refreshedDaysAgo = (days: number, rows = 3): number[] =>
+    Array.from({ length: rows }, () => Date.now() - days * day);
 
   beforeEach(() => {
     savedDemo = config.demo.refreshEnabled;
@@ -678,7 +686,7 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     errors = [];
     audits = [];
     connects = 0;
-    demo = [{ id: 42, newest: '2026-09-01' }];
+    demo = { id: 42, createdAt: refreshedDaysAgo(30) };
     refreshFails = false;
     usersFails = false;
     mock.method(logger, 'info', () => {});
@@ -688,18 +696,24 @@ describe('the demo refresh rides the hourly maintenance run', () => {
       sql.push(text.replace(/\s+/g, ' ').trim());
       params.push(values ?? []);
       if (usersFails && text.startsWith('DELETE FROM users')) throw new Error('connection terminated');
-      if (/is_demo/.test(text)) return { rows: demo, rowCount: demo.length };
+      if (/MIN\(t\.created_at\)/.test(text)) {
+        if (!demo) return { rows: [], rowCount: 0 };
+        const limitDays = Number(values?.[0]);
+        const oldest = demo.createdAt.length ? Math.min(...demo.createdAt) : null;
+        const stale = oldest === null || oldest < Date.now() - limitDays * day;
+        return { rows: [{ id: demo.id, refreshed_at: oldest === null ? null : new Date(oldest).toISOString(), stale }], rowCount: 1 };
+      }
       return { rows: [], rowCount: 0 };
     });
     const client = {
       query: async (text: string) => {
         clientSql.push(text.replace(/\s+/g, ' ').trim());
         if (/SELECT id FROM users WHERE is_demo/.test(text)) {
-          return { rows: demo.map(({ id }) => ({ id })), rowCount: demo.length };
+          return { rows: demo ? [{ id: demo.id }] : [], rowCount: demo ? 1 : 0 };
         }
         if (/^\s*DELETE FROM/.test(text)) return { rows: [], rowCount: 3 };
-        // The rewrite is what makes the data fresh again.
-        if (text === 'COMMIT' && demo[0]) demo[0].newest = today;
+        // The rewrite: every row is replaced by one created now.
+        if (text === 'COMMIT' && demo) demo.createdAt = refreshedDaysAgo(0, 5);
         return { rows: [], rowCount: 0 };
       },
       release: () => {},
@@ -749,41 +763,42 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     assert.ok(audits.some((line) => /demoRefresh: deleted 6 row\(s\)/.test(line)), audits.join(' | '));
   });
 
-  test('the staleness check is one SELECT, scoped by is_demo and never by email, as of the UTC day', async () => {
+  test('the staleness check is one SELECT, scoped by is_demo and never by email, with the limit in days', async () => {
     await scheduler.runMaintenance();
     const [check, ...rest] = demoQueries();
     assert.equal(rest.length, 0);
     assert.match(check!, /^SELECT /);
     assert.match(check!, /WHERE u\.is_demo = TRUE/);
     assert.doesNotMatch(check!, /email/i);
-    assert.deepEqual(params[sql.indexOf(check!)], [today]);
+    assert.deepEqual(params[sql.indexOf(check!)], [config.demo.staleDays]);
   });
 
   test('a demo account with no transactions is stale', async () => {
-    demo = [{ id: 42, newest: null }];
+    demo = { id: 42, createdAt: [] };
     await scheduler.runMaintenance();
     assert.equal(connects, 1);
   });
 
   test('fresh: no refresh, and nothing beyond the one SELECT', async () => {
-    for (const newest of [today, '2026-10-01']) { // 0 and exactly 14 days old
-      sql = [];
-      demo = [{ id: 42, newest }];
-      const result = await scheduler.runMaintenance();
-      assert.equal(connects, 0, `refreshed data from ${newest}`);
-      assert.equal(result.demoRefresh, 0);
-      const others = sql.filter((text) => !text.startsWith('DELETE FROM users'));
-      assert.equal(others.length, 1);
-      assert.match(others[0]!, /^SELECT /);
-    }
-    // One day past the limit is stale.
-    demo = [{ id: 42, newest: '2026-09-30' }];
+    demo = { id: 42, createdAt: refreshedDaysAgo(config.demo.staleDays - 1) };
+    const result = await scheduler.runMaintenance();
+    assert.equal(connects, 0);
+    assert.equal(result.demoRefresh, 0);
+    const others = sql.filter((text) => !text.startsWith('DELETE FROM users'));
+    assert.equal(others.length, 1);
+    assert.match(others[0]!, /^SELECT /);
+  });
+
+  test('a visitor row added today does not postpone a refresh that is due', async () => {
+    // The demo login is public. A row dated (and created) today must not count
+    // as a refresh, or anyone adding one regularly would block it for ever.
+    demo = { id: 42, createdAt: [...refreshedDaysAgo(config.demo.staleDays + 1), Date.now()] };
     await scheduler.runMaintenance();
     assert.equal(connects, 1);
   });
 
   test('no demo user: no write, and the error is logged once per process', async () => {
-    demo = [];
+    demo = null;
     for (let run = 0; run < 3; run++) {
       const result = await scheduler.runMaintenance();
       assert.equal(result.demoRefresh, 0);
@@ -813,7 +828,7 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     assert.deepEqual(result, { unverifiedAccounts: null, agentData: null, demoRefresh: 6 });
   });
 
-  test('runs within an hour of any boot, and is not repeated the next hour once fresh', async () => {
+  test('runs within an hour of any boot, and a fresh rewrite is not refreshed again the next hour', async () => {
     // A redeploy restarts the clock; with a staleness check that costs at most
     // an hour, not the whole interval.
     scheduler.scheduleCleanupTasks();
@@ -829,6 +844,29 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     await drain();
     assert.equal(connects, 1);
     assert.equal(sql.filter((text) => /is_demo/.test(text)).length, 2);
+  });
+});
+
+describe('DEMO_REFRESH_STALE_DAYS', () => {
+  // Read once at load, so each value is checked in a fresh process.
+  const staleDaysWith = (value: string | undefined): number => {
+    const env = { ...process.env };
+    if (value === undefined) delete env.DEMO_REFRESH_STALE_DAYS;
+    else env.DEMO_REFRESH_STALE_DAYS = value;
+    const result = spawnSync(process.execPath, ['-e',
+      `process.stdout.write(String(require(${JSON.stringify(require.resolve('../config'))}).demo.staleDays))`,
+    ], { encoding: 'utf8', env, timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    return Number(result.stdout);
+  };
+
+  test('defaults to 14, honours a larger value, and is never below 7', () => {
+    assert.equal(staleDaysWith(undefined), 14);
+    assert.equal(staleDaysWith('30'), 30);
+    assert.equal(staleDaysWith('7'), 7);
+    assert.equal(staleDaysWith('3'), 7);
+    assert.equal(staleDaysWith('1'), 7);
+    assert.equal(staleDaysWith('0'), 14); // not a positive integer: the default
   });
 });
 

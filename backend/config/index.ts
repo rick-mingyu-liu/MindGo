@@ -159,12 +159,12 @@ const config = {
     // not something to opt out of — it is something to opt in to. Set
     // DEMO_REFRESH_ENABLED=true only where a demo account is actually wanted.
     refreshEnabled: process.env.DEMO_REFRESH_ENABLED === 'true',
-    // How old the demo account's newest transaction (on or before today, UTC)
-    // may be before the hourly maintenance run rewrites it. Staleness, not a
-    // timer: a timer restarts with every deploy and, on a host that redeploys
-    // daily, never fires. The generated data has no gap longer than about a
-    // week, so a fresh rewrite is never stale again the next hour.
-    staleDays: intFromEnv('DEMO_REFRESH_STALE_DAYS', 14),
+    // How many days after the last refresh the hourly maintenance run rewrites
+    // the demo account again. Staleness, not a timer: a timer restarts with
+    // every deploy and, on a host that redeploys daily, never fires. At least
+    // 7: the refresh deletes everything a visitor added, and a smaller value
+    // would turn a demo into something that resets under people mid-visit.
+    staleDays: Math.max(7, intFromEnv('DEMO_REFRESH_STALE_DAYS', 14)),
   },
 
   // Email verification
