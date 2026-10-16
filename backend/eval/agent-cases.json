@@ -201,7 +201,31 @@
         "tools": { "exclude": ["propose_transactions", "propose_goal"] },
         "draft": { "count": 0 },
         "goalProposal": null,
-        "reply": { "mustContainAny": [["?", "could you", "can you", "please tell", "tell me"]] }
+        "reply": { "mustContainAny": [["?", "could you", "can you", "please tell", "tell me"]], "mustNotContain": ["saved", "recorded"] }
+      }
+    },
+    {
+      "id": "en-bare-dollars-non-dollar-currency",
+      "language": "en",
+      "currency": "CNY",
+      "message": "spent 20 dollars on lunch today",
+      "note": "A bare \"dollars\" in a conversation whose currency is not a dollar: never CNY, and not silently USD. Pocky asks which dollars.",
+      "expect": {
+        "tools": { "exclude": ["propose_transactions"] },
+        "draft": { "count": 0 },
+        "reply": { "mustContain": ["?"] }
+      }
+    },
+    {
+      "id": "en-dollar-sign-non-dollar-currency",
+      "language": "en",
+      "currency": "GBP",
+      "message": "coffee $5 today",
+      "note": "A \"$\" in a GBP conversation is not pounds: before the prompt named EUR, GBP and CNY this drafted 5.00 GBP in 3 of 3 runs.",
+      "expect": {
+        "tools": { "exclude": ["propose_transactions"] },
+        "draft": { "count": 0 },
+        "reply": { "mustContain": ["?"] }
       }
     },
     {
