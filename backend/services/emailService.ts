@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { query } from '../db/connection';
 import { getExchangeRate } from './exchangeRateService';
 import { toDay, formatDay } from '../utils/dates';
@@ -8,17 +9,31 @@ import type { TransactionRow } from '../types/db';
 // The dashboard defaults to CAD, so the report reads in the same currency.
 const REPORT_CURRENCY = 'CAD';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // Change if using another provider
-  auth: {
-    user: config.email.user,
-    pass: config.email.pass,
-  },
-});
+interface EmailConfig {
+  user?: string | undefined;
+  pass?: string | undefined;
+  host?: string | undefined;
+  port: number;
+  from?: string | undefined;
+}
+
+// EMAIL_HOST set: that SMTP server (implicit TLS on 465, STARTTLS otherwise).
+// Unset: Gmail, exactly as before.
+export const transportOptions = (email: EmailConfig): SMTPTransport.Options => {
+  const auth = { user: email.user, pass: email.pass };
+  if (!email.host) return { service: 'gmail', auth };
+  return { host: email.host, port: email.port, secure: email.port === 465, auth };
+};
+
+export const fromAddress = (email: EmailConfig): string => email.from ?? `"TermPocket" <${email.user}>`;
+
+const transporter = nodemailer.createTransport(transportOptions(config.email));
+
+const verificationMinutes = Math.round(config.emailVerification.tokenExpiry / 60000);
 
 export const sendWeeklyReport = async (to: string, content: string, htmlContent: string): Promise<void> => {
   await transporter.sendMail({
-    from: `"TermPocket" <${config.email.user}>`,
+    from: fromAddress(config.email),
     to,
     subject: 'Your Weekly Financial Report',
     text: content,
@@ -61,7 +76,7 @@ export const sendEmailVerification = async (to: string, firstName: string, verif
         </p>
 
         <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
-          This verification link will expire in 30 minutes. If you didn't create a TermPocket account, you can safely ignore this email.
+          This verification link will expire in ${verificationMinutes} minutes. If you didn't create a TermPocket account, you can safely ignore this email.
         </p>
       </div>
 
@@ -80,14 +95,14 @@ Thank you for creating your TermPocket account. To complete your registration an
 
 ${verificationUrl}
 
-This verification link will expire in 24 hours. If you didn't create a TermPocket account, you can safely ignore this email.
+This verification link will expire in ${verificationMinutes} minutes. If you didn't create a TermPocket account, you can safely ignore this email.
 
 Best regards,
 The TermPocket Team
   `;
 
   await transporter.sendMail({
-    from: `"TermPocket" <${config.email.user}>`,
+    from: fromAddress(config.email),
     to,
     subject: 'Verify your TermPocket account',
     text: textContent,
