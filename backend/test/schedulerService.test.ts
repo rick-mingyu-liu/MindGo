@@ -907,3 +907,46 @@ describe('scheduleWeeklyReports', () => {
     assert.deepEqual([parts.weekday, parts.hour, parts.minute], ['Sun', '19', '00']);
   });
 });
+
+describe('the weekly report gate', () => {
+  // A local backend on the Neon dev branch mailed real users' copied addresses.
+  const enabledWith = (nodeEnv: string | undefined, flag: string | undefined): boolean => {
+    const env = { ...process.env };
+    delete env.NODE_ENV; delete env.WEEKLY_REPORT_ENABLED;
+    if (nodeEnv !== undefined) env.NODE_ENV = nodeEnv;
+    if (flag !== undefined) env.WEEKLY_REPORT_ENABLED = flag;
+    const result = spawnSync(process.execPath, ['-e',
+      `process.stdout.write(String(require(${JSON.stringify(require.resolve('../config'))}).email.weeklyReportsEnabled))`,
+    ], { encoding: 'utf8', env, timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout === 'true';
+  };
+
+  test('is on only in production unless WEEKLY_REPORT_ENABLED says otherwise', () => {
+    assert.equal(enabledWith('production', undefined), true);
+    assert.equal(enabledWith('development', undefined), false);
+    assert.equal(enabledWith(undefined, undefined), false);
+    assert.equal(enabledWith('test', undefined), false);
+    assert.equal(enabledWith('development', 'true'), true);
+    assert.equal(enabledWith('production', 'false'), false);
+    assert.equal(enabledWith('development', 'yes'), false); // only "true" turns it on
+    assert.equal(enabledWith('production', ''), true);
+  });
+
+  const original = config.email.weeklyReportsEnabled;
+  beforeEach(() => { scheduler.jobs.clear(); });
+  afterEach(() => { scheduler.stop(); config.email.weeklyReportsEnabled = original; });
+
+  test('init() does not schedule the weekly report when it is disabled', () => {
+    config.email.weeklyReportsEnabled = false;
+    scheduler.init();
+    assert.equal(scheduler.jobs.has('weeklyReports'), false);
+    assert.equal(scheduler.jobs.has('maintenance'), true, 'maintenance still runs');
+  });
+
+  test('init() schedules it when enabled', () => {
+    config.email.weeklyReportsEnabled = true;
+    scheduler.init();
+    assert.equal(scheduler.jobs.get('weeklyReports')?.kind, 'cron');
+  });
+});

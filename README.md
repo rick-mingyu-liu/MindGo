@@ -163,6 +163,7 @@ JWT_SECRET=<at least 32 characters>
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
 EMAIL_PASS=
+WEEKLY_REPORT_ENABLED=   # unset: weekly reports only under NODE_ENV=production
 
 # Optional conversation recording: enable only after migration 013.
 AGENT_ENABLED=false
@@ -317,7 +318,7 @@ npm run dev              # runs ocr-assets first
 npm run build            # runs ocr-assets first
 npm start
 npm run lint
-npm run check:locales    # fails on duplicate or unresolved keys
+npm run check:locales    # every locale namespace: fails on duplicate keys or keys missing from one locale; warns on unresolved keys
 npm run ocr-assets       # fetch + checksum the OCR model, copy ONNX Runtime
 
 # eval
@@ -566,7 +567,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), scheduled only under `NODE_ENV=production` unless `WEEKLY_REPORT_ENABLED=true` (so a local backend never mails the users of the database it points at; `false` turns it off in production too), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ### Evaluating Pocky with fictional conversations
 
@@ -580,7 +581,7 @@ AGENT_ENABLED=true npm run agent:eval -- --json --min-pass 0.9
 
 `DEEPSEEK_API_KEY` is read through the usual backend configuration (`.env` or environment); `DEEPSEEK_MODEL` defaults to `deepseek-flash`. The eval runs whichever runtime `AGENT_RUNTIME` selects and prints it in its header (`AGENT_ENABLED=true AGENT_RUNTIME=direct npm run agent:eval`). Enabling the flag for this command only does not enable the deployed app. No database or migrations are needed. The runner replaces database queries and exchange rates with [`backend/eval/agent-fixture.json`](backend/eval/agent-fixture.json), blocks pool access, and rejects SQL it does not recognize. It executes the real runtime, tool validation, investigation and planning code. Its only external service is DeepSeek; it never confirms a transaction or goal, writes financial data, or reads your accounts.
 
-The 53 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), the reply language under the automatic setting, corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios (including expenses taken from recorded averages rather than invented), goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
+The 54 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), the reply language under the automatic setting, corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios (including expenses taken from recorded averages rather than invented, and payday counts quoted from the tool), goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
 
 Each run reports successful/failed assertions, tool names, token usage and elapsed time. Failed reply assertions include a bounded excerpt; the key and raw provider errors are never printed. `--json` returns one report (use `npm run --silent agent:eval -- --json` to omit npm's banner). Exit status is 0 when every run passes, 1 for evaluation failures, and 2 for invalid arguments, fixture/case files or missing configuration. `--min-pass` deliberately relaxes the aggregate threshold; it does not hide individual failures. `--repeat` accepts 1–20; repeated `--case` flags and comma-separated IDs select cases.
 

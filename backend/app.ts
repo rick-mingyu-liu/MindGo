@@ -16,6 +16,7 @@ import logger = require('./utils/logger');
 import ErrorHandler = require('./utils/errorHandler');
 import schedulerService = require('./services/schedulerService');
 import { apiLimiter } from './middleware/rateLimiter';
+import { redactUrl } from './utils/redactUrl';
 
 // Import routes
 import authRoutes = require('./routes/auth');
@@ -39,7 +40,16 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
-app.use(morgan('combined'));
+// morgan's 'combined' format, with the URL and the Referer passed through
+// redactUrl first. The stock :url and :referrer printed every email
+// verification token: the request is GET /auth/verify-email/<token>, and the
+// page that sends it is /verify-email?token=<token>. Every other field is
+// 'combined''s own.
+morgan.token<Request, Response>('redacted-url', (req) => redactUrl(req.originalUrl || req.url));
+morgan.token<Request, Response>('redacted-referrer', (req) => redactUrl(req.headers.referer || req.headers.referrer));
+app.use(morgan(
+  ':remote-addr - :remote-user [:date[clf]] ":method :redacted-url HTTP/:http-version" :status :res[content-length] ":redacted-referrer" ":user-agent"'
+));
 app.use(cors(config.cors));
 // Parsed here, before the app-wide parser, because the default 100 kB limit is
 // too small for one long screenshot's OCR output. The app-wide parser skips a

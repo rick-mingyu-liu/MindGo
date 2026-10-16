@@ -310,8 +310,8 @@ export default function EditTransaction() {
                     />
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-6">
+                  {/* Action Buttons: stacked below sm, Save on top; three labels do not fit one row at 375 px */}
+                  <div className="flex flex-col-reverse gap-2 pt-6 sm:flex-row">
                     <Button
                       type="button"
                       variant="destructive"
