@@ -321,7 +321,7 @@ export default function AgentPage() {
         <div><h1 className="flex items-center gap-2 text-2xl font-bold"><MessageSquare className="h-6 w-6" />{t('agent.title')}</h1><p className="mt-1 text-sm text-muted-foreground">{t('agent.subtitle')}</p></div>
       </div></header>
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
-        <p className="rounded-lg border bg-card p-3 text-xs leading-relaxed text-muted-foreground">{t('agent.privacy')}{' '}<Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">{t('Privacy Policy')}</Link></p>
+        <p className="rounded-lg border bg-card p-3 text-xs leading-relaxed text-muted-foreground">{t('agent.privacy')}{' '}<Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">{t('agent.privacyLink')}</Link></p>
         {error && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">{error.startsWith('goal:')
           ? t(`agent.goal.errors.${error.slice(5)}`, { defaultValue: t(`agent.errors.${error.slice(5)}`, { defaultValue: t('agent.errors.generic') }) })
           : t(`agent.errors.${error}`, { defaultValue: t('agent.errors.generic') })}</div>}
