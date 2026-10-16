@@ -163,6 +163,9 @@ JWT_SECRET=<at least 32 characters>
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
 EMAIL_PASS=
+EMAIL_HOST=             # optional SMTP server (e.g. smtp.resend.com); unset = Gmail
+EMAIL_PORT=             # optional, default 465
+EMAIL_FROM=             # optional From header, e.g. TermPocket <noreply@termpocket.com>
 WEEKLY_REPORT_ENABLED=   # unset: weekly reports only under NODE_ENV=production
 
 # Optional conversation recording: enable only after migration 013.
