@@ -163,6 +163,7 @@ JWT_SECRET=<at least 32 characters>
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
 EMAIL_USER=              # weekly reports (Gmail)
 EMAIL_PASS=
+WEEKLY_REPORT_ENABLED=   # unset: weekly reports only under NODE_ENV=production
 
 # Optional conversation recording: enable only after migration 013.
 AGENT_ENABLED=false
@@ -566,7 +567,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), scheduled only under `NODE_ENV=production` unless `WEEKLY_REPORT_ENABLED=true` (so a local backend never mails the users of the database it points at; `false` turns it off in production too), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ### Evaluating Pocky with fictional conversations
 
