@@ -24,8 +24,18 @@ function list<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
 }
 
+const LINK_CLASS = 'text-green-700 underline underline-offset-2 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300'
+
+/** Renders `[label](https://...)` as a link; anything else stays literal text. */
+function Rich({ text }: { text: string }) {
+  const parts = text.split(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/)
+  return <>{parts.map((part, i) => i % 3 === 1
+    ? <a key={i} href={parts[i + 1]} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>{part}</a>
+    : i % 3 === 2 ? null : part)}</>
+}
+
 function Paragraphs({ text }: { text?: string[] }) {
-  return <>{(text ?? []).map((para, i) => <p key={i} className="leading-relaxed text-muted-foreground">{para}</p>)}</>
+  return <>{(text ?? []).map((para, i) => <p key={i} className="leading-relaxed text-muted-foreground"><Rich text={para} /></p>)}</>
 }
 
 /** Public, unauthenticated page for the privacy policy or the terms. */
@@ -77,13 +87,13 @@ export default function LegalPage({ doc }: { doc: LegalDoc }) {
               <Paragraphs text={section.p} />
               {section.items && (
                 <ul className="list-disc space-y-2 pl-5 leading-relaxed text-muted-foreground marker:text-green-600">
-                  {section.items.map((item, j) => <li key={j}>{item}</li>)}
+                  {section.items.map((item, j) => <li key={j}><Rich text={item} /></li>)}
                 </ul>
               )}
               <Paragraphs text={section.after} />
               {section.links?.map(link => (
                 <p key={link.href}>
-                  <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-green-700 underline underline-offset-2 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300">
+                  <a href={link.href} target="_blank" rel="noopener noreferrer" className={LINK_CLASS}>
                     {link.label}
                   </a>
                 </p>
