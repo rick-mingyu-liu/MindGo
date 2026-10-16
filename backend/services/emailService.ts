@@ -29,7 +29,8 @@ export const sendWeeklyReport = async (to: string, content: string, htmlContent:
 export const sendEmailVerification = async (to: string, firstName: string, verificationToken: string): Promise<void> => {
   const frontendUrl = config.frontendUrl;
   const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
-  console.log(`[EmailService] Using verification URL: ${verificationUrl}`);
+  // Not the URL: it carries the token, and console.log prints in production.
+  console.log(`[EmailService] Using verification URL base: ${frontendUrl}/verify-email`);
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
