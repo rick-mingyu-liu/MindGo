@@ -363,7 +363,7 @@
           "mustContainAny": [["cash", "balance", "savings"]],
           "mustNotMatch": [
             "(?<!\\b(?:whether|if)\\s)you can (?:comfortably |easily |still |safely )?afford",
-            "(?<!\\b(?:whether|if)\\s)(?:it's|it is|that's|that is|the trip is|this is) (?:comfortably |easily |still )?affordable",
+            "(?<!(?:\\b(?:whether|if)|(?:\\bcannot|\\bnot|n't) (?:say|confirm|tell|guarantee|promise)(?: that)?)\\s)(?:it's|it is|that's|that is|the trip is|this is) (?:comfortably |easily |still )?affordable",
             "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"
           ]
         }
@@ -380,7 +380,7 @@
         "goalProposal": null,
         "reply": {
           "mustContainAny": [["现金", "余额", "存款"]],
-          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问|(?:不能|无法|没法|没办法)(?:说|告诉你|判断|确定|保证)你?)负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
+          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问|[“\"「‘]|(?:不能|无法|没法|没办法)(?:说|告诉你|判断|确定|保证)你?)负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
         }
       }
     },
@@ -453,6 +453,34 @@
       }
     },
     {
+      "id": "en-plan-baseline-expenses-not-invented",
+      "language": "en",
+      "today": "2026-10-15",
+      "message": "I have 2,000 in savings today. My co-op pays 1,700 every two weeks starting October 23 until the end of December. Can my savings be around 5,000 by the end of December? Also analyze my spending habits.",
+      "note": "Mirrors a QA reply (2026-10-15, different figures) that invented rent 1,240 + 600 living a month and called the goal comfortably within reach. No expenses are stated, so they must come from spending_baseline (12 months: 2,086.77 a month). Charged monthly from today that ends December near 4,240, short of 5,000; the invented 1,840 a month ends near 4,980, which reads as reached. Asking for expenses instead of projecting also passes. Adding the baseline income on top of the stated pay double-counts it and ends near 8,653, so the reply must not call 5,000 reachable either.",
+      "expect": {
+        "tools": {
+          "include": ["spending_baseline"],
+          "exclude": ["propose_transactions", "propose_goal"],
+          "everyCall": [{ "tool": "calculate_scenario", "args": { "events": { "monthlyExpensesMin": 1850 }, "start": { "notBefore": "2026-10-15", "optional": true } } }]
+        },
+        "maxToolCalls": 6,
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": {
+          "mustContainAny": [["average", "recorded"]],
+          "mustNotMatch": [
+            "(?<!(?:\\bnot|n't) )(?:comfortably |well |easily )?within (?:your )?reach",
+            "\\b(?:looks|is|seems|be) (?:comfortably |easily |very )?reachable",
+            "\\babove (?:your |the )?(?:\\$?5,?000|target|goal)",
+            "(?<!(?:\\b(?:whether|if)|(?:\\bcannot|\\bnot|n't) (?:say|confirm|tell|guarantee|promise)(?: that)?)\\s)you(?:'ll| will) (?:definitely |easily |comfortably )?(?:reach|hit) (?:it|that|the|your|around|about|\\$?\\d)",
+            "(?<!(?:\\b(?:whether|if)|(?:\\bcannot|\\bnot|n't) (?:say|confirm|tell|guarantee|promise)(?: that)?)\\s)you(?:'re| are) on track",
+            "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"
+          ]
+        }
+      }
+    },
+    {
       "id": "en-goal-create",
       "language": "en",
       "message": "Create a savings goal called \"Reading Week Trip\" with a target of 800 CAD by 2027-02-14.",
@@ -508,6 +536,54 @@
         "draft": { "count": 0 },
         "goalProposal": null,
         "reply": { "mustContainAny": [["无法", "不能", "不提供", "超出", "不在"]] }
+      }
+    },
+    {
+      "id": "auto-en-record-replies-in-english",
+      "language": "auto",
+      "message": "I spent 14.75 on lunch at Lazeez today and 3.35 on the bus",
+      "note": "QA (2026-10-15): with language auto this English message was answered in Chinese once in three tries. The server now picks the reply language from currentMessage. The pattern is any CJK ideograph.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"], "exclude": ["propose_goal"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 2, "newRows": 2, "rows": [
+          { "type": "expense", "amount": "14.75", "currency": "CAD", "category": "Dining Out", "date": "2026-10-14" },
+          { "type": "expense", "amount": "3.35", "currency": "CAD", "category": "Transportation", "date": "2026-10-14" }
+        ] },
+        "goalProposal": null,
+        "reply": { "mustNotMatch": ["[\\u3400-\\u9fff]"] }
+      }
+    },
+    {
+      "id": "auto-zh-record-replies-in-chinese",
+      "language": "auto",
+      "message": "今天在大统华买菜花了四十二块三，坐公交三块三毛五",
+      "expect": {
+        "tools": { "include": ["propose_transactions"], "exclude": ["propose_goal"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 2, "newRows": 2, "rows": [
+          { "type": "expense", "amount": "42.30", "currency": "CAD", "category": "Groceries", "date": "2026-10-14" },
+          { "type": "expense", "amount": "3.35", "currency": "CAD", "category": "Transportation", "date": "2026-10-14" }
+        ] },
+        "goalProposal": null,
+        "reply": { "mustMatch": ["[\\u3400-\\u9fff]"] }
+      }
+    },
+    {
+      "id": "auto-en-after-chinese-history",
+      "language": "auto",
+      "history": [
+        { "role": "user", "content": "昨天买菜三十八块五" },
+        { "role": "assistant", "content": "已准备好一笔38.50 CAD的买菜支出（2026-10-13），请检查后点击确认保存。" }
+      ],
+      "message": "Also 6.50 for coffee at Tim Hortons today",
+      "note": "The history is Chinese; the current message is English, so the reply must be English. The earlier row is not pending, so only the coffee is drafted.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"], "exclude": ["propose_goal"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "newRows": 1, "rows": [{ "type": "expense", "amount": "6.50", "currency": "CAD", "category": "Dining Out", "date": "2026-10-14" }] },
+        "goalProposal": null,
+        "reply": { "mustNotMatch": ["[\\u3400-\\u9fff]"] }
       }
     }
   ]

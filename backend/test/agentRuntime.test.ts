@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { access } from 'node:fs/promises';
 import type { Options, Query, SDKMessage, SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { MessageCreateParamsNonStreaming, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
-import { createAgentRuntime, createDirectRuntime, type AgentInput, type AgentResult, type DirectResponse, type MessagesClient } from '../services/agent/runtime';
+import { createAgentRuntime, createDirectRuntime, languageOf, replyLanguage, type AgentInput, type AgentResult, type DirectResponse, type MessagesClient } from '../services/agent/runtime';
 import config = require('../config');
 import { AgentError } from '../services/agent/types';
 import { recordsFor } from '../services/agent/investigation';
@@ -188,6 +188,24 @@ for (const kind of kinds) {
     assert.deepEqual(calendar.previous_term_same_point, { start: '2026-01-01', end_exclusive: '2026-05-01', days: 120, clamped: true });
   });
 
+  test(`${kind}: the envelope carries the server-chosen reply language, never the raw setting`, async () => {
+    const zhHistory = [{ role: 'user' as const, content: '昨天买菜三十八块五' }, { role: 'assistant' as const, content: '已为你准备好草稿，请确认。' }];
+    for (const [language, content, history, expected] of [
+      ['auto', 'I spent 14.75 on lunch at Lazeez today and 3.35 on the bus', zhHistory, 'en'],
+      ['auto', '今天午饭花了十四块七毛五', [], 'zh'],
+      ['zh', 'Coffee 5 CAD today', [], 'zh'],
+    ] as const) {
+      const h = await harness(kind, async () => {});
+      await h.runtime({ ...input, language, content, history: [...history] });
+      const context = h.prompt().context as Record<string, unknown>;
+      assert.equal(context.reply_language, expected, content);
+      assert.equal('language' in context, false);
+    }
+    const h = await harness(kind, async () => {});
+    await h.runtime(input);
+    assert.match(h.system(), /context\.reply_language/);
+  });
+
   test(`${kind}: read and proposal calls share the eight-call cap`, async () => {
     const fake = fakeRecords();
     const h = await harness(kind, async call => {
@@ -355,6 +373,11 @@ for (const kind of kinds) {
     assert.match(system, /Do not recommend investments, stocks/);
     assert.match(system, /whole calendar months, so monthly_needed is conservative/);
     assert.match(system, /no Markdown/);
+    assert.match(system, /Never invent an expense amount/);
+    assert.match(system, /its monthly_expenses as one expense event repeating every month/);
+    assert.match(system, /Never run or report a projection without expenses/);
+    assert.match(system, /never add the baseline's monthly_income as well/);
+    assert.match(system, /When the user states some expenses, such as rent, project only the stated ones/);
   });
 }
 
@@ -515,4 +538,31 @@ test('sdk: the tool hook allows each application tool and denies others', async 
     });
     await f.runtime(input);
   }
+});
+
+test('reply language: a message\'s language is decided by its own words, Han characters counting half a word', () => {
+  assert.equal(languageOf('I spent 14.75 on lunch at Lazeez today and 3.35 on the bus'), 'en');
+  assert.equal(languageOf('昨天买菜三十八块五'), 'zh');
+  // Mixed text goes to the language most of its words are in.
+  assert.equal(languageOf('今天lunch花了15块'), 'zh');
+  assert.equal(languageOf('I spent 15 on 午饭 today'), 'en');
+  assert.equal(languageOf('Uber Eats 外卖'), 'en');
+  // A tie (one Latin word, two Han characters) goes to Chinese.
+  assert.equal(languageOf('Uber 打车'), 'zh');
+  for (const wordless of ['', '14.75', '$3.35!', '  ']) assert.equal(languageOf(wordless), undefined);
+});
+
+test('reply language: an explicit setting wins; auto follows the current message, never history, unless it has no words', () => {
+  const zh = [{ role: 'user' as const, content: '昨天买菜三十八块五' }];
+  const en = [{ role: 'user' as const, content: 'Lunch at the SLC' }];
+  assert.equal(replyLanguage('zh', 'Coffee 5 CAD today', []), 'zh');
+  assert.equal(replyLanguage('en', '今天咖啡五块', []), 'en');
+  assert.equal(replyLanguage('auto', 'Coffee 5 CAD today', zh), 'en');
+  assert.equal(replyLanguage('auto', '今天咖啡五块', en), 'zh');
+  // An amount alone answers a question: the latest user message with words decides.
+  assert.equal(replyLanguage('auto', '38.50', [...en, ...zh]), 'zh');
+  assert.equal(replyLanguage('auto', '38.50', [...zh, ...en]), 'en');
+  // Assistant messages never count, so a Chinese reply cannot pull the language along.
+  assert.equal(replyLanguage('auto', '38.50', [...en, { role: 'assistant', content: '请问金额是多少？' }]), 'en');
+  assert.equal(replyLanguage('auto', '38.50', []), 'en');
 });
