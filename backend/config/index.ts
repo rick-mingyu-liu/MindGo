@@ -55,7 +55,9 @@ const config = {
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // Comma-separated, so a new domain and the old one can both work while
+    // links already sent point at the old one. `cors` matches each exactly.
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean),
     credentials: true,
   },
 
