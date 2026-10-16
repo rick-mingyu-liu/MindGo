@@ -575,5 +575,26 @@
     "sdkLegal": "Anthropic legal agreements",
     "sdkAcknowledgement": "The transaction assistant uses Anthropic’s Claude Agent SDK. Its license notice reserves Anthropic’s rights and refers to the applicable Anthropic legal agreements; see the linked notice and terms.",
     "providerAcknowledgement": "AI processing for conversational transaction recording when configured"
+  },
+  "retention": {
+    "heading": "Automatic deletion",
+    "summary": "Delete old transactions automatically, a whole term at a time.",
+    "label": "Keep transactions from",
+    "off": "Off: keep everything",
+    "keep3": "The last 3 terms (1 year)",
+    "keep6": "The last 6 terms (2 years)",
+    "keep9": "The last 9 terms (3 years)",
+    "keep12": "The last 12 terms (4 years)",
+    "offHint": "Off. Nothing is deleted automatically.",
+    "onHint": "Transactions dated before {{date}} are deleted automatically. {{term}} and later terms are kept, the current term included.",
+    "scope": "Only transactions are deleted. Savings goals, Pocky conversations and AI connections are not affected.",
+    "notAvailable": "Automatic deletion is not available yet.",
+    "demo": "Automatic deletion is not available on the demo account.",
+    "confirmTitle": "Permanently delete old transactions?",
+    "confirmBody": "Keeping the last {{terms}} terms permanently deletes every transaction dated before {{date}} (everything before {{term}}). After that, each term's transactions are deleted once that term falls outside the window. This cannot be undone.",
+    "confirmCount": "Transactions that would be deleted now: {{count}}. Deletion starts within about an hour.",
+    "confirmButton": "Turn on and delete",
+    "loadError": "Could not load the automatic deletion setting.",
+    "previewError": "Could not check what would be deleted. Please try again."
   }
 }

@@ -64,7 +64,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 | **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
 | **Savings goals** | Create and edit targets with progress bars and days remaining. |
 | **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
-| **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, and read-only AI connections. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
+| **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, automatic deletion of old transactions (off by default; turning it on shows how many would be deleted and asks first), and read-only AI connections. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
 | **English and 中文** | Every user-facing string, in both languages. |
 
 ---
@@ -410,8 +410,9 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `PUT /:id`, `DELETE /:id` | update, delete |
 | `GET /categories` | categories in use |
 | `DELETE /clear-all` | delete every transaction |
-| `DELETE /auto-delete?months=N` | delete everything older than N months (1–60) |
-| `GET, PUT /retention-settings` | retention preferences (not persisted — see Known gaps) |
+| `GET /retention-settings` | automatic deletion: `{available, demo, retentionTerms, choices, window}`; `retentionTerms` is `null` (off, the default) or 3, 6, 9 or 12 terms kept, the current term included; `window` gives the first kept term and the cutoff day |
+| `PUT /retention-settings` | `{retentionTerms: 3\|6\|9\|12\|null}`; stores it and answers as GET. 503 `retention_unavailable` before migration 016, 403 `retention_demo` for turning it on on the demo account |
+| `GET /retention-preview?terms=N` | deletes nothing: `{terms, keepFromTerm, cutoff, count}` — how many of your transactions keeping N terms would delete now |
 | `POST /import` | write confirmed screenshot-import rows (1–100, all or nothing) plus one `import_batches` record |
 
 ### `/import`
@@ -565,7 +566,7 @@ The backend is built with `tsc` during Render's build (`npm ci --include=dev`, w
 
 **Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
 
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ### Evaluating Pocky with fictional conversations
 
@@ -648,7 +649,11 @@ The order constraints: **frontend, then backend, then 014** (the previous fronte
 
 ## Database
 
-The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables. Migration `015` adds `agent_goal_proposals` (goal changes awaiting the Confirm button); until it is applied, goal proposals are unavailable and nothing else is affected.
+The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables. Migration `015` adds `agent_goal_proposals` (goal changes awaiting the Confirm button); until it is applied, goal proposals are unavailable and nothing else is affected. Migration `016` adds `users.transaction_retention_terms` (automatic deletion; NULL, off, for everyone); until it is applied, Settings shows the option as unavailable and nothing is deleted.
+
+**Automatic deletion.** Off for every account unless its owner turns it on in Settings. A user keeps the last 3, 6, 9 or 12 terms (the current one included); the hourly maintenance run deletes that user's transactions dated before the first kept term's start, with the boundary from `utils/terms.ts`, so it removes whole terms and agrees with the dashboard's term view. Only transactions are deleted — goals, Pocky conversations, import records and tokens are not. At most 5,000 rows go per run across all users; the rest go on later runs. Each run audits one line per user with the user id and count only. The demo account is excluded: it cannot turn it on, and the sweep skips it. See [`backend/services/retentionService.ts`](backend/services/retentionService.ts).
+
+**Migration 016 (automatic deletion):** deploy the backend first (it tolerates the column's absence and notices it without a restart), then the frontend, then apply `016_transaction_retention.sql` through the direct endpoint (no `-pooler`): `psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/016_transaction_retention.sql`. It is additive and idempotent, and leaves every user off.
 
 `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` accepts `manual`, `ocr`, `ocr_llm` and `agent`; only confirmation writes `agent` rows. `import_batches` records counts for confirmed screenshot imports.
 
@@ -662,7 +667,6 @@ The improvement backlog is retired; the reasoning for anything already fixed liv
 - **Uber and Uber Eats imports can double-count** a card charge already imported from a bank screenshot. Duplicates are flagged only when the day, amount and currency all match.
 - **Each new app layout needs its own parser rules.** Every layout added so far needed at least one measured spacing rule; an unsupported app shows the recognised text for manual entry.
 - **The LLM fallback for screenshot import was not built.** The seven real screenshots tried so far were all read by the rule-based parser once their layouts were added; unsure rows report `ai_fallback_unavailable`.
-- **Retention settings do not persist.** `GET/PUT /transactions/retention-settings` reports a saved preference it never stores, and nothing acts on one. The settings page no longer shows or requests it.
 - **`/summary/rolling` returns every transaction twice** and aggregates in Node — one user's year is a ~154 kB response. This is the gate on an *All time* view.
 - **No frontend test runner**, so `lib/date.ts` and `lib/preferences.ts` are unguarded.
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.

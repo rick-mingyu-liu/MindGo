@@ -187,6 +187,16 @@ const config = {
     // unauthenticated and takes only an address) would keep someone else's
     // unverified registration of an address alive forever.
     unverifiedAccountMaxMinutes: 24 * 60,
+    // Settings → Automatic deletion: a user may keep only their last N terms
+    // of transactions (the current term counts as one). Off unless the user
+    // picks one of these; NULL in users.transaction_retention_terms is off.
+    // Migration 016's CHECK allows 3-12, so a value here outside that range
+    // could never be stored. Three terms is one calendar year.
+    transactionRetentionTermChoices: [3, 6, 9, 12] as readonly number[],
+    // At most this many transactions per hourly run, across all users. A
+    // first run after someone opts in with years of history finishes over
+    // several hours rather than as one long statement.
+    transactionRetentionBatch: 5000,
   },
 
   validation: {
