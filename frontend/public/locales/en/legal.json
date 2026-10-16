@@ -49,7 +49,7 @@
           "Google’s Gmail sends our email: the verification link when you sign up, and the weekly report, which contains a summary of your week’s income and spending. You can turn the weekly report off in Settings.",
           "MailboxLayer (apilayer) may check that your email address can receive mail when you register. It receives the address only.",
           "Frankfurter provides exchange rates. It receives only the currencies being converted, nothing about you.",
-          "If you connect an AI service of your own with a personal access token, that service receives the totals it asks for and handles them under its own terms."
+          "If you connect an AI service of your own with a personal access token, that service receives the totals and savings goals it asks for (goal names, amounts and dates) and handles them under its own terms."
         ],
         "after": [
           "Because these providers are in the United States (and DeepSeek in China), your information is stored and processed outside Canada."
@@ -71,7 +71,7 @@
         "h": "How long we keep it",
         "items": [
           "Unverified sign-ups: deleted once the verification link has expired (after 30 minutes), and in any case after 24 hours. A job runs about once an hour, so removal can take a little longer.",
-          "Your account and records: kept until you delete them or ask us to delete your account. If you enable automatic deletion in Settings, older transactions are deleted according to that setting.",
+          "Your account and records: kept until you delete them or ask us to delete your account.",
           "Pocky conversations: kept until you delete them, one at a time or all at once. Deleting a conversation does not delete the transactions you saved from it.",
           "Pocky drafts and goal proposals: they expire 24 hours after Pocky proposes them. Expired drafts are removed; goal proposals that were confirmed, cancelled or expired are deleted 30 days later.",
           "Pocky request records and undo receipts: deleted after 30 days, or sooner. Records used for usage limits are kept for up to 30 days even after you delete your conversations.",
@@ -169,7 +169,7 @@
       {
         "h": "AI connections",
         "p": [
-          "If you create a personal access token and connect another AI service, that service can read the totals TermPocket offers it until you revoke the token. You are responsible for which services you connect, and they handle what they receive under their own terms."
+          "If you create a personal access token and connect another AI service, that service can read the totals and savings goals TermPocket offers it (goal names, amounts and dates) until you revoke the token. You are responsible for which services you connect, and they handle what they receive under their own terms."
         ]
       },
       {
