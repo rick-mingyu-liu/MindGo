@@ -74,6 +74,8 @@ const config = {
     // Optional From header, e.g. `TermPocket <noreply@termpocket.com>`. Unset
     // keeps `"TermPocket" <EMAIL_USER>`.
     from: process.env.EMAIL_FROM || undefined,
+    // Where email footers send questions.
+    supportAddress: process.env.EMAIL_SUPPORT_ADDRESS || 'support@termpocket.com',
     // The Sunday report mails every opted-in address in whatever database this
     // process points at. A local backend on the Neon dev branch, which holds
     // copies of real users' addresses, sent them a report too. So it runs only
