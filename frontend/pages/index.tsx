@@ -449,7 +449,7 @@ export default function Dashboard() {
                 <button
                   className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
                   onClick={() => router.push('/transactions/new')}
-                  aria-label="Add Transaction"
+                  aria-label={t('Add Transaction')}
                 >
                   <Plus className="w-8 h-8" />
                 </button>

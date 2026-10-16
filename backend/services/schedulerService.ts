@@ -46,7 +46,9 @@ class SchedulerService {
 
   // Initialize all scheduled jobs
   init(): void {
-    this.scheduleWeeklyReports();
+    // Not scheduled at all when disabled, so no cron entry can fire it.
+    if (config.email.weeklyReportsEnabled) this.scheduleWeeklyReports();
+    else logger.info('Weekly reports disabled (NODE_ENV is not production; WEEKLY_REPORT_ENABLED=true overrides)');
     this.scheduleCleanupTasks();
     logger.info('Scheduler service initialized');
   }

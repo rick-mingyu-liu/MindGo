@@ -71,7 +71,8 @@
         "h": "How long we keep it",
         "items": [
           "Unverified sign-ups: deleted once the verification link has expired (after 30 minutes), and in any case after 24 hours. A job runs about once an hour, so removal can take a little longer.",
-          "Your account and records: kept until you delete them or ask us to delete your account.",
+          "Your account and records: kept until you delete them or ask us to delete your account, except as automatic deletion below removes old transactions.",
+          "Automatic deletion: off unless you turn it on in Settings → Automatic deletion. You can choose to keep the last 3, 6, 9 or 12 terms, the current term included; transactions dated before the first kept term are then deleted by a job that runs about once an hour, and this cannot be undone. Only transactions are deleted, not savings goals, Pocky conversations or AI connections. It is not available on the demo account.",
           "Pocky conversations: kept until you delete them, one at a time or all at once. Deleting a conversation does not delete the transactions you saved from it.",
           "Pocky drafts and goal proposals: they expire 24 hours after Pocky proposes them. Expired drafts are removed; goal proposals that were confirmed, cancelled or expired are deleted 30 days later.",
           "Pocky request records and undo receipts: deleted after 30 days, or sooner. Records used for usage limits are kept for up to 30 days even after you delete your conversations.",

@@ -30,6 +30,11 @@ export default function Login() {
   const [verificationError, setVerificationError] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
+  // The server renders the form before React attaches its submit handler. A
+  // click in that window would submit natively (a GET to this page, fields in
+  // the URL) or do nothing visible, so the button stays disabled until mounted.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => { setHydrated(true) }, [])
   
   const {
     register,
@@ -260,7 +265,7 @@ export default function Login() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading || !hydrated}>
                   {loading ? t('Signing in...') : t('Sign in')}
                 </Button>
               </form>
