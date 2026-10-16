@@ -172,7 +172,7 @@ test('direct: assertActive runs before every tool execution', async () => {
   assert.equal(r.requests.length, 1);
 });
 
-test('direct: each budget trips agent_limit_exceeded and logs its reason with counts only', async () => {
+test('direct: each budget trips a 429 agent_limit_exceeded and logs its reason with counts only', async () => {
   const many = (n: number, name = 'list_goals'): Array<[string, unknown]> => Array.from({ length: n }, () => [name, {}]);
   const cases: Array<{ reason: string; steps: Step[]; records?: AgentRecords; before?: () => void }> = [
     // Every execution is first an attempt, so a ninth call of any kind trips the
@@ -199,6 +199,8 @@ test('direct: each budget trips agent_limit_exceeded and logs its reason with co
       const s = scripted(steps);
       const { error, reason, fields } = await limitReason(() => s.runtime({ ...input, records: c.records ?? noRecords }));
       assert.equal(error.code, 'agent_limit_exceeded', c.reason);
+      // Mid-turn or at the final reply, a limit is the same 429.
+      assert.equal(error.status, 429, c.reason);
       assert.equal(reason, c.reason);
       assert.deepEqual(Object.keys(fields!).sort(), ['inputTokens', 'observedChars', 'outputTokens', 'reason', 'thinkingBlocks', 'toolAttempts', 'toolCalls', 'toolOutputChars']);
       assert.ok(error.usage, `${c.reason} carries usage`);

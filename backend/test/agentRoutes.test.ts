@@ -127,7 +127,7 @@ test('process concurrency limit releases its slot after cancellation',async()=>{
   config.agent.maxConcurrentRuns=1;
   let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});
   mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>{announce();return new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409)),{once:true}));});
-  const pending=post().then(res=>res);await entered;assert.equal((await post()).status,429);
+  const pending=post().then(res=>res);await entered;const full=await post();assert.equal(full.status,429);assert.equal(full.body.code,'agent_server_busy');
   await request(app).post(`/agent/conversations/${conversationId}/runs/${requestId}/cancel`).auth(token,{type:'bearer'});await pending;
   mock.method(runtime,'runAgent',async()=>({text:'Ready',usage:{inputTokens:1,outputTokens:1},toolCalls:0}));assert.equal((await post()).status,200);
 });

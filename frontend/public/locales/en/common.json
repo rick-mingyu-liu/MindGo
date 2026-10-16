@@ -544,6 +544,7 @@
       "agent_version_conflict": "This draft changed in another request. Refresh and review the latest version before confirming.",
       "agent_expired": "The draft or undo window has expired. Refresh to see the latest state.",
       "agent_busy": "Another turn is running. Wait for it to finish or cancel it before sending again.",
+      "agent_server_busy": "Pocky is busy with other replies right now. Wait a minute, then send again; your message is still here.",
       "agent_rate_limited": "Too many requests. Please try again later.",
       "agent_daily_limit": "You have reached Pocky's limit for the last 24 hours. Try again later, or add entries on the Transactions page.",
       "agent_daily_capacity": "Pocky has reached its overall limit for the last 24 hours. Try again later, or add entries on the Transactions page.",
