@@ -121,7 +121,9 @@ function resolveKey(tree, key) {
     .split('.')
     .reduce((node, part) => (node && typeof node === 'object' ? node[part] : undefined), tree);
   if (nested !== undefined) return nested;
-  return tree[key];
+  // A t(key, { count }) call resolves to a plural form such as key_one or
+  // key_other; every language has _other (Chinese has nothing else).
+  return tree[key] ?? tree[`${key}_other`];
 }
 
 const used = new Set();
