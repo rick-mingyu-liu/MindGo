@@ -82,6 +82,11 @@ export default function Register() {
   const [userEmail, setUserEmail] = useState('')
   const [registerError, setRegisterError] = useState('')
   const [language, setLanguage] = useState('en');
+  // The server renders the form before React attaches its submit handler. A
+  // click in that window would submit natively (a GET to this page, fields in
+  // the URL) or do nothing visible, so the button stays disabled until mounted.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -410,7 +415,7 @@ export default function Register() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading || !hydrated}>
                   {loading ? t('Creating account...') : t('Create account')}
                 </Button>
                 <p className="text-center text-xs leading-relaxed text-muted-foreground">
