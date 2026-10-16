@@ -146,6 +146,7 @@ Schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is applied wh
 
 ## Frontend architecture
 
+- **Vercel builds only when `frontend/` changed**: [frontend/vercel.json](frontend/vercel.json)'s `ignoreCommand` diffs `HEAD^..HEAD` within the root directory. The frontend build reads nothing outside `frontend/` today (the `license` field's `../LICENSE.md` is metadata); if that changes, widen the command or the build will be skipped.
 - **Next.js 15 Pages Router** (`pages/`) with React 18. Add screens as files under `pages/`. Dependency security decisions and remaining advisories are recorded in [frontend/DEPENDENCIES.md](frontend/DEPENDENCIES.md).
 - **API client**: [frontend/utils/api.ts](frontend/utils/api.ts) is a shared axios instance. A request interceptor attaches the JWT from `localStorage`; a response interceptor handles errors globally — `401` triggers `logout()`, and `403/404/500`/generic errors surface a SweetAlert2 dialog. `/auth/*` endpoints are exempted so components can handle those errors themselves. AI connections handles its own non-401 4xx errors from `/access-tokens`, and the agent caller handles `/agent` errors; a 401 still logs out. Import this instance rather than calling axios directly.
 - **AI connections**: [frontend/components/AiConnections.tsx](frontend/components/AiConnections.tsx) is embedded in Settings. It lists token metadata and the deployment's MCP endpoint; a newly created secret lives only in component state and is discarded on dismissal or unmount, never put in localStorage.

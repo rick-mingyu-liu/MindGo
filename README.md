@@ -551,6 +551,8 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
 The backend runs on **Render** (`termpocket-api`, Starter instance, Virginia — next to the database), the frontend on **Vercel** (`NEXT_PUBLIC_API_URL=https://termpocket-api.onrender.com`), the database on **Neon** (AWS `us-east-1`).
 
+Vercel skips a build when nothing under `frontend/` changed ([`frontend/vercel.json`](frontend/vercel.json) `ignoreCommand`: `git diff --quiet HEAD^ HEAD -- .`, run from the project's root directory, `frontend`), so backend- and docs-only commits create no preview or production deployment. Each deployment stores the ~44 MB OCR model and runtime that `ocr-assets` copies into `public/`, which is what fills the free plan's 10 GB of deployment storage. To change anything the frontend build reads from outside `frontend/`, widen the command first.
+
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
 **Migration 014 (drop `watchlist` and `ai_plans`):** Deploy order: the Vercel frontend first (the previous build's Settings clear-all calls `DELETE /investments/watchlist/clear-all`, which now 404s), then the Render backend, then apply 014. Deploy the backend that no longer reads those tables before you apply `014_drop_watchlist_ai_plans.sql` through the direct endpoint. The order matters: the previous release queries `ai_plans` in its hourly maintenance job and its `/ai/plans` routes, and would error against a database without it. The migration is idempotent and prints only row counts.
