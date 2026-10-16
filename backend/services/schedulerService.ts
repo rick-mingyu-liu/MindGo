@@ -20,12 +20,14 @@ const MAX_TIMER_DELAY = 2_147_483_647;
 interface MaintenanceResult {
   unverifiedAccounts: number | null;
   agentData?: number | null;
+  /** Rows deleted by a demo refresh; 0 when the data was fresh or there is no demo account. */
+  demoRefresh?: number | null;
 }
 
 /**
  * Owns the two kinds of recurring work: a node-cron job for weekly reports, and
- * self-rearming timers for the hourly maintenance sweep and the opt-in demo
- * refresh.
+ * a self-rearming timer for the hourly maintenance sweep (which also carries
+ * the opt-in demo refresh).
  *
  * The two are not interchangeable, which is what the old `stop()` got wrong —
  * see the comment there.
@@ -68,9 +70,11 @@ class SchedulerService {
    * - The first run is one full interval after scheduling, never at startup,
    *   and missed runs are not replayed: after a suspended process wakes, it
    *   runs once and starts a fresh interval.
-   * - Node clamps delays beyond ~24.9 days to 1ms. The opt-in 30-day demo
-   *   refresh waits in bounded chunks rather than becoming a rapid deletion
-   *   loop.
+   * - Node clamps delays beyond ~24.9 days to 1ms. An interval that long waits
+   *   in bounded chunks rather than becoming a rapid loop. (Nothing schedules
+   *   one today: the demo refresh used to be a 30-day interval, and since the
+   *   clock restarted on every deploy it never ran. It is now a staleness
+   *   check inside the hourly maintenance run.)
    *
    * A task that returns a number is reporting rows deleted, logged here; one
    * that returns nothing does its own logging (maintenance reports each
@@ -131,12 +135,13 @@ class SchedulerService {
 
   /**
    * One maintenance sweep: the unverified-account deletion, then agent
-   * housekeeping when that feature is enabled.
+   * housekeeping when that feature is enabled, then the demo refresh when
+   * that is enabled and the demo data is stale.
    *
-   * Each is attempted whatever happened to the other, so a failing account
-   * cleanup never leaves expired agent data in place, or the reverse. A call
-   * made while a sweep is still running joins that sweep instead of starting a
-   * second one.
+   * Each is attempted whatever happened to the others, so a failing account
+   * cleanup never leaves expired agent data in place or a stale demo, and the
+   * reverse. A call made while a sweep is still running joins that sweep
+   * instead of starting a second one.
    */
   runMaintenance(): Promise<MaintenanceResult> {
     if (!this.maintenanceRun) {
@@ -145,6 +150,12 @@ class SchedulerService {
         // Agent tables are queried only after the feature/migration is enabled.
         // Share the existing hourly wake-up; never add a keep-alive interval.
         ...(config.agent.enabled ? {agentData: await attempt('agentCleanup', cleanupAgentData)} : {}),
+        // Staleness, not a timer: one SELECT per run decides, so a deploy
+        // never resets when the next refresh is due. Rides this existing
+        // hourly wake-up for the same Neon reason as above.
+        ...(config.demo.refreshEnabled
+          ? {demoRefresh: await attempt('demoRefresh', () => demoAccountService.refreshDemoAccountIfStale())}
+          : {}),
       }))().finally(() => {
         this.maintenanceRun = null;
       });
@@ -194,34 +205,27 @@ class SchedulerService {
     logger.info('Weekly reports scheduled');
   }
 
-  // Schedule the hourly maintenance sweep, and the demo refresh if enabled
+  // Schedule the hourly maintenance sweep
   scheduleCleanupTasks(): void {
     this.scheduleInterval('maintenance', config.cron.maintenance, async () => {
       await this.runMaintenance();
     });
 
-    // The demo refresh is opt-in. It deletes every row of the demo account
-    // before rewriting them, and it identifies that account by `is_demo`
-    // rather than by an email address anyone could register — see
-    // demoAccountService. It never creates the account, so on a database with
-    // nothing flagged it is a no-op that says so.
-    if (config.demo.refreshEnabled) {
-      this.scheduleInterval(
-        'demoRefresh',
-        config.cron.demoRefresh,
-        () => demoAccountService.refreshDemoAccountOnSchedule()
-      );
-      logger.audit(`Demo refresh scheduled: every ${config.cron.demoRefresh}ms`);
-    } else {
-      this.cancel('demoRefresh');
-    }
+    // The demo refresh is opt-in and runs inside the sweep above. It deletes
+    // every row of the demo account before rewriting them, and it identifies
+    // that account by `is_demo` rather than by an email address anyone could
+    // register — see demoAccountService. It never creates the account, so on a
+    // database with nothing flagged it is a no-op that says so once.
+    const demo = config.demo.refreshEnabled
+      ? `, demoRefresh when the newest demo transaction is over ${config.demo.staleDays} day(s) old`
+      : '';
 
     // Audit rather than info: with the zero-row runs silent in production, a
     // log with no [AUDIT] deletion lines in it is ambiguous between "nothing
     // needed deleting" and "the jobs were never mounted". This one line at boot
     // separates the two.
     logger.audit(
-      `Retention jobs scheduled: maintenance (accountCleanup) every ${config.cron.maintenance}ms, ` +
+      `Retention jobs scheduled: maintenance (accountCleanup${demo}) every ${config.cron.maintenance}ms, ` +
       'first run one interval from now'
     );
   }

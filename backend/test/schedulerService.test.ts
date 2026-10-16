@@ -7,6 +7,7 @@ import config = require('../config');
 import type { ScheduledTask } from 'node-cron';
 import { spawnSync } from 'node:child_process';
 import * as agentStore from '../services/agent/store';
+import * as demoAccountService from '../services/demoAccountService';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
@@ -24,7 +25,7 @@ import * as agentStore from '../services/agent/store';
 // Lets the awaits inside the interval callback settle after a tick.
 const drain = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
-describe('long refresh intervals', () => {
+describe('long intervals', () => {
   const month = 2_592_000_000;
   const maximumDelay = 2_147_483_647;
 
@@ -46,8 +47,8 @@ describe('long refresh intervals', () => {
     const result = spawnSync(process.execPath, ['-e', `
       const scheduler = require(${JSON.stringify(require.resolve('../services/schedulerService'))});
       let runs = 0;
-      scheduler.scheduleInterval('demoRefresh', 2592000000, async () => { runs++; return 0; });
-      const entry = scheduler.jobs.get('demoRefresh');
+      scheduler.scheduleInterval('longJob', 2592000000, async () => { runs++; return 0; });
+      const entry = scheduler.jobs.get('longJob');
       const referenced = entry.job.hasRef();
       setTimeout(() => {
         scheduler.stop();
@@ -60,7 +61,7 @@ describe('long refresh intervals', () => {
 
   test('waits the full month across timer boundaries and repeats', async () => {
     let runs = 0;
-    scheduler.scheduleInterval('demoRefresh', month, async () => { runs++; return 0; });
+    scheduler.scheduleInterval('longJob', month, async () => { runs++; return 0; });
     for (let cycle = 1; cycle <= 2; cycle++) {
       mock.timers.tick(maximumDelay);
       await drain();
@@ -76,7 +77,7 @@ describe('long refresh intervals', () => {
 
   test('shutdown cancels a later chunk', async () => {
     let runs = 0;
-    scheduler.scheduleInterval('demoRefresh', month, async () => { runs++; return 0; });
+    scheduler.scheduleInterval('longJob', month, async () => { runs++; return 0; });
     mock.timers.tick(maximumDelay);
     await drain();
     scheduler.stop();
@@ -90,7 +91,7 @@ describe('long refresh intervals', () => {
     let runs = 0;
     const errors: string[] = [];
     mock.method(logger, 'error', (message: string) => errors.push(message));
-    scheduler.scheduleInterval('demoRefresh', month, async () => {
+    scheduler.scheduleInterval('longJob', month, async () => {
       runs++;
       throw new Error('unavailable');
     });
@@ -100,13 +101,13 @@ describe('long refresh intervals', () => {
       await drain();
     }
     assert.equal(runs, 2);
-    assert.deepEqual(errors, ['demoRefresh failed', 'demoRefresh failed']);
+    assert.deepEqual(errors, ['longJob failed', 'longJob failed']);
   });
 
   test('shutdown during an active refresh prevents rearming', async () => {
     let finish: (value: number) => void = () => {};
     let runs = 0;
-    scheduler.scheduleInterval('demoRefresh', month, () => {
+    scheduler.scheduleInterval('longJob', month, () => {
       runs++;
       return new Promise<number>((resolve) => { finish = resolve; });
     });
@@ -637,68 +638,235 @@ describe('hourly maintenance', () => {
   });
 });
 
-describe('the demo refresh is opt-in', () => {
+describe('the demo refresh rides the hourly maintenance run', () => {
   /**
-   * It deletes every row of the demo account before rewriting them. A
-   * destructive job that mounts itself by default in whatever environment
-   * happens to load this config is not something to opt out of.
+   * It used to be its own 30-day interval. scheduleInterval's first run is one
+   * interval after scheduling and the clock restarts with the process, so on a
+   * host that redeploys several times a day it never ran and the demo went
+   * stale. Now each maintenance run asks one question — how long ago was the
+   * last refresh? — and refreshes only when the answer is too long.
+   *
+   * db.query stands in for PostgreSQL: it answers the staleness SELECT by
+   * computing MIN(created_at) over a fake set of demo rows against the mocked
+   * clock, as the real statement does (test/demoFreshnessDb.test.ts runs the
+   * real one). The refresh's own transaction runs on a fake client from
+   * getPool(), so `connects` counts refreshes, and its COMMIT replaces the
+   * fake rows with rows created now.
    */
-  const config: typeof import('../config') = require('../config');
-  let saved: boolean;
+  const hour = config.cron.maintenance;
+  const day = 24 * hour;
+  const today = '2026-10-15';
+  let sql: string[];
+  let params: unknown[][];
+  let clientSql: string[];
+  let errors: string[];
+  let audits: string[];
+  let connects: number;
+  // The demo account's transactions, as their created_at in ms; null = no demo user.
+  let demo: { id: number; createdAt: number[] } | null;
+  let refreshFails: boolean;
+  let usersFails: boolean;
+  let savedDemo: boolean;
+  let savedAgent: boolean;
+
+  const refreshedDaysAgo = (days: number, rows = 3): number[] =>
+    Array.from({ length: rows }, () => Date.now() - days * day);
 
   beforeEach(() => {
-    saved = config.demo.refreshEnabled;
-    mock.method(logger, 'audit', () => {});
+    savedDemo = config.demo.refreshEnabled;
+    savedAgent = config.agent.enabled;
+    config.demo.refreshEnabled = true;
+    config.agent.enabled = false;
+    scheduler.jobs.clear();
+    demoAccountService.resetAbsenceReport();
+    mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.parse(`${today}T12:00:00.000Z`) });
+    sql = [];
+    params = [];
+    clientSql = [];
+    errors = [];
+    audits = [];
+    connects = 0;
+    demo = { id: 42, createdAt: refreshedDaysAgo(30) };
+    refreshFails = false;
+    usersFails = false;
     mock.method(logger, 'info', () => {});
+    mock.method(logger, 'audit', (message: string) => audits.push(message));
+    mock.method(logger, 'error', (message: string) => errors.push(message));
+    mock.method(db, 'query', async (text: string, values?: unknown[]) => {
+      sql.push(text.replace(/\s+/g, ' ').trim());
+      params.push(values ?? []);
+      if (usersFails && text.startsWith('DELETE FROM users')) throw new Error('connection terminated');
+      if (/MIN\(t\.created_at\)/.test(text)) {
+        if (!demo) return { rows: [], rowCount: 0 };
+        const limitDays = Number(values?.[0]);
+        const oldest = demo.createdAt.length ? Math.min(...demo.createdAt) : null;
+        const stale = oldest === null || oldest < Date.now() - limitDays * day;
+        return { rows: [{ id: demo.id, refreshed_at: oldest === null ? null : new Date(oldest).toISOString(), stale }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const client = {
+      query: async (text: string) => {
+        clientSql.push(text.replace(/\s+/g, ' ').trim());
+        if (/SELECT id FROM users WHERE is_demo/.test(text)) {
+          return { rows: demo ? [{ id: demo.id }] : [], rowCount: demo ? 1 : 0 };
+        }
+        if (/^\s*DELETE FROM/.test(text)) return { rows: [], rowCount: 3 };
+        // The rewrite: every row is replaced by one created now.
+        if (text === 'COMMIT' && demo) demo.createdAt = refreshedDaysAgo(0, 5);
+        return { rows: [], rowCount: 0 };
+      },
+      release: () => {},
+    };
+    mock.method(db, 'getPool', () => ({
+      connect: async () => {
+        connects++;
+        if (refreshFails) throw new Error('connection terminated');
+        return client;
+      },
+    }));
   });
 
   afterEach(() => {
-    config.demo.refreshEnabled = saved;
     scheduler.stop();
+    config.demo.refreshEnabled = savedDemo;
+    config.agent.enabled = savedAgent;
+    mock.timers.reset();
     mock.restoreAll();
   });
 
-  test('is not mounted when DEMO_REFRESH_ENABLED is unset', () => {
+  const demoQueries = (): string[] => sql.filter((text) => /is_demo|transactions/.test(text));
+  const deletesFromUsers = (): number => sql.filter((text) => text.startsWith('DELETE FROM users')).length;
+
+  test('is still one hourly job, and the boot line says the refresh is in it', () => {
+    scheduler.scheduleCleanupTasks();
+    assert.deepEqual([...scheduler.jobs.keys()], ['maintenance']);
+    assert.equal(audits.length, 1);
+    assert.match(audits[0]!, /demoRefresh/);
+    assert.match(audits[0]!, new RegExp(`${config.demo.staleDays} day`));
+  });
+
+  test('flag off: no demo query at all', async () => {
     config.demo.refreshEnabled = false;
-    scheduler.scheduleCleanupTasks();
-    assert.equal(scheduler.jobs.has('demoRefresh'), false,
-      'a destructive job mounted itself without being asked');
+    const result = await scheduler.runMaintenance();
+    assert.deepEqual(demoQueries(), []);
+    assert.equal(connects, 0);
+    assert.equal('demoRefresh' in result, false);
+    assert.equal(deletesFromUsers(), 1);
   });
 
-  test('is mounted when it is turned on', () => {
-    config.demo.refreshEnabled = true;
-    scheduler.scheduleCleanupTasks();
-    assert.equal(scheduler.jobs.has('demoRefresh'), true);
+  test('stale: refreshed once, and the deletion is audited', async () => {
+    const result = await scheduler.runMaintenance();
+    assert.equal(connects, 1);
+    assert.ok(clientSql.includes('COMMIT'));
+    assert.equal(result.demoRefresh, 6);
+    assert.ok(audits.some((line) => /demoRefresh: deleted 6 row\(s\)/.test(line)), audits.join(' | '));
   });
 
-  test('mounting it is audited, like the retention jobs', () => {
-    const audits: string[] = [];
-    mock.restoreAll();
-    mock.method(logger, 'audit', (msg: string) => audits.push(msg));
-    mock.method(logger, 'info', () => {});
-    config.demo.refreshEnabled = true;
-
-    scheduler.scheduleCleanupTasks();
-
-    assert.ok(audits.some((line) => /Demo refresh scheduled/.test(line)),
-      'nothing in the production log says the job is running');
+  test('the staleness check is one SELECT, scoped by is_demo and never by email, with the limit in days', async () => {
+    await scheduler.runMaintenance();
+    const [check, ...rest] = demoQueries();
+    assert.equal(rest.length, 0);
+    assert.match(check!, /^SELECT /);
+    assert.match(check!, /WHERE u\.is_demo = TRUE/);
+    assert.doesNotMatch(check!, /email/i);
+    assert.deepEqual(params[sql.indexOf(check!)], [config.demo.staleDays]);
   });
 
-  test('rescheduling with it turned off removes an earlier one', () => {
-    config.demo.refreshEnabled = true;
-    scheduler.scheduleCleanupTasks();
-    config.demo.refreshEnabled = false;
-    scheduler.scheduleCleanupTasks();
-    assert.equal(scheduler.jobs.has('demoRefresh'), false);
+  test('a demo account with no transactions is stale', async () => {
+    demo = { id: 42, createdAt: [] };
+    await scheduler.runMaintenance();
+    assert.equal(connects, 1);
   });
 
-  test('the retention jobs are unaffected either way', () => {
-    for (const enabled of [false, true]) {
-      config.demo.refreshEnabled = enabled;
-      scheduler.scheduleCleanupTasks();
-      assert.ok(scheduler.jobs.has('maintenance'));
-      scheduler.stop();
+  test('fresh: no refresh, and nothing beyond the one SELECT', async () => {
+    demo = { id: 42, createdAt: refreshedDaysAgo(config.demo.staleDays - 1) };
+    const result = await scheduler.runMaintenance();
+    assert.equal(connects, 0);
+    assert.equal(result.demoRefresh, 0);
+    const others = sql.filter((text) => !text.startsWith('DELETE FROM users'));
+    assert.equal(others.length, 1);
+    assert.match(others[0]!, /^SELECT /);
+  });
+
+  test('a visitor row added today does not postpone a refresh that is due', async () => {
+    // The demo login is public. A row dated (and created) today must not count
+    // as a refresh, or anyone adding one regularly would block it for ever.
+    demo = { id: 42, createdAt: [...refreshedDaysAgo(config.demo.staleDays + 1), Date.now()] };
+    await scheduler.runMaintenance();
+    assert.equal(connects, 1);
+  });
+
+  test('no demo user: no write, and the error is logged once per process', async () => {
+    demo = null;
+    for (let run = 0; run < 3; run++) {
+      const result = await scheduler.runMaintenance();
+      assert.equal(result.demoRefresh, 0);
     }
+    assert.equal(connects, 0);
+    assert.ok(!sql.some((text) => /^(INSERT|UPDATE|DELETE FROM (transactions|savings_goals))/.test(text)));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0]!, /is_demo/);
+    assert.match(errors[0]!, /db:seed/);
+  });
+
+  test('a failed refresh does not stop the account cleanup, and is reported like the others', async () => {
+    refreshFails = true;
+    const result = await scheduler.runMaintenance();
+    assert.equal(deletesFromUsers(), 1);
+    assert.deepEqual(errors, ['demoRefresh failed']);
+    assert.deepEqual(result, { unverifiedAccounts: 0, demoRefresh: null });
+  });
+
+  test('failed cleanups do not stop the refresh', async () => {
+    usersFails = true;
+    config.agent.enabled = true;
+    mock.method(agentStore, 'cleanupAgentData', async () => { throw new Error('connection terminated'); });
+    const result = await scheduler.runMaintenance();
+    assert.equal(connects, 1);
+    assert.deepEqual(errors, ['accountCleanup failed', 'agentCleanup failed']);
+    assert.deepEqual(result, { unverifiedAccounts: null, agentData: null, demoRefresh: 6 });
+  });
+
+  test('runs within an hour of any boot, and a fresh rewrite is not refreshed again the next hour', async () => {
+    // A redeploy restarts the clock; with a staleness check that costs at most
+    // an hour, not the whole interval.
+    scheduler.scheduleCleanupTasks();
+    scheduler.stop();
+    scheduler.scheduleCleanupTasks();
+    mock.timers.tick(hour);
+    await drain();
+    await drain();
+    assert.equal(connects, 1);
+
+    mock.timers.tick(hour);
+    await drain();
+    await drain();
+    assert.equal(connects, 1);
+    assert.equal(sql.filter((text) => /is_demo/.test(text)).length, 2);
+  });
+});
+
+describe('DEMO_REFRESH_STALE_DAYS', () => {
+  // Read once at load, so each value is checked in a fresh process.
+  const staleDaysWith = (value: string | undefined): number => {
+    const env = { ...process.env };
+    if (value === undefined) delete env.DEMO_REFRESH_STALE_DAYS;
+    else env.DEMO_REFRESH_STALE_DAYS = value;
+    const result = spawnSync(process.execPath, ['-e',
+      `process.stdout.write(String(require(${JSON.stringify(require.resolve('../config'))}).demo.staleDays))`,
+    ], { encoding: 'utf8', env, timeout: 5000 });
+    assert.equal(result.status, 0, result.stderr);
+    return Number(result.stdout);
+  };
+
+  test('defaults to 14, honours a larger value, and is never below 7', () => {
+    assert.equal(staleDaysWith(undefined), 14);
+    assert.equal(staleDaysWith('30'), 30);
+    assert.equal(staleDaysWith('7'), 7);
+    assert.equal(staleDaysWith('3'), 7);
+    assert.equal(staleDaysWith('1'), 7);
+    assert.equal(staleDaysWith('0'), 14); // not a positive integer: the default
   });
 });
 

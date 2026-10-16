@@ -1,5 +1,6 @@
-import { getPool } from '../db/connection';
+import { getPool, query } from '../db/connection';
 import { buildDemoData } from '../db/demoData';
+import config = require('../config');
 import logger = require('../utils/logger');
 import type { PoolClient } from 'pg';
 
@@ -156,8 +157,8 @@ async function refreshDemoAccount({ create = false, now = new Date() }: RefreshO
 }
 
 /**
- * The scheduled form. Returns the number of rows deleted, which is what
- * `scheduleInterval` logs and audits — and the deletion is the half worth
+ * The scheduled form. Returns the number of rows deleted, which is what the
+ * maintenance run logs and audits — and the deletion is the half worth
  * auditing, per decision D. The insert detail goes to the dev channel.
  */
 async function refreshDemoAccountOnSchedule(now: Date = new Date()): Promise<number> {
@@ -178,9 +179,100 @@ async function refreshDemoAccountOnSchedule(now: Date = new Date()): Promise<num
   return result.deleted;
 }
 
+type DemoFreshness =
+  | { state: 'absent' }
+  | { state: 'fresh' | 'stale'; userId: number; refreshedAt: string | null };
+
+/**
+ * The staleness check, exported so the database-backed test runs the exact
+ * statement. `$1` is the limit in days.
+ *
+ * It measures the age of the last refresh, not of the newest transaction. The
+ * demo login is public, so anything about the data a visitor can add (a row
+ * dated today, a row dated next year) would let them postpone the refresh
+ * indefinitely. The refresh inserts every row in one statement, so they share
+ * a `created_at`; rows a visitor adds afterwards are created later, and an
+ * edit does not change `created_at`. So `MIN(created_at)` is the time of the
+ * last refresh for as long as any refreshed row survives. A visitor can move
+ * it only by deleting every refreshed row, and even then only to the time of
+ * their own oldest row, which ages like any other.
+ *
+ * `created_at` is a zone-less TIMESTAMP written in UTC (db/connection.ts runs
+ * every session in UTC), so it is compared with `now()` taken in UTC, in SQL,
+ * on the database's clock. No local-time arithmetic anywhere.
+ *
+ * Resolved by `is_demo`, never by email, like the refresh itself. No row means
+ * there is no demo account; a demo account with no transactions is stale.
+ */
+const DEMO_FRESHNESS_SQL = `
+  SELECT u.id,
+         to_char(MIN(t.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS refreshed_at,
+         COALESCE(MIN(t.created_at) < (now() AT TIME ZONE 'UTC') - make_interval(days => $1::int), TRUE) AS stale
+    FROM users u
+    LEFT JOIN transactions t ON t.user_id = u.id
+   WHERE u.is_demo = TRUE
+   GROUP BY u.id`;
+
+/** How stale the demo account is, in one read. See DEMO_FRESHNESS_SQL. */
+async function demoAccountFreshness(staleDays: number = config.demo.staleDays): Promise<DemoFreshness> {
+  const result = await query<{ id: number; refreshed_at: string | null; stale: boolean }>(
+    DEMO_FRESHNESS_SQL,
+    [staleDays]
+  );
+  const row = result.rows[0];
+  if (!row) return { state: 'absent' };
+  return { state: row.stale ? 'stale' : 'fresh', userId: row.id, refreshedAt: row.refreshed_at };
+}
+
+// Whether the missing-account error has been logged since this process started
+// (or since the account was last seen). The check runs hourly; one line per
+// process says it, twenty-four a day would bury everything else.
+let absenceReported = false;
+
+/**
+ * The hourly maintenance form: refreshes the demo account only when its data
+ * is stale, and returns the rows deleted (0 when nothing was refreshed).
+ *
+ * Throws on failure, like the refresh. With no demo account it writes nothing
+ * and logs that once per process.
+ */
+async function refreshDemoAccountIfStale(now: Date = new Date()): Promise<number> {
+  const freshness = await demoAccountFreshness();
+
+  if (freshness.state === 'absent') {
+    if (!absenceReported) {
+      absenceReported = true;
+      // error, not warn: warn prints nothing in production.
+      logger.error(
+        'demoRefresh: no user has is_demo = TRUE, so nothing was refreshed. ' +
+        'Run `npm run db:seed` once to create the demo account.'
+      );
+    }
+    return 0;
+  }
+  absenceReported = false;
+
+  if (freshness.state === 'fresh') return 0;
+
+  logger.info(
+    `demoRefresh: last refreshed ${freshness.refreshedAt ?? 'never (no transactions)'}, ` +
+    `limit ${config.demo.staleDays} day(s); refreshing`
+  );
+  return refreshDemoAccountOnSchedule(now);
+}
+
+/** Test hook: forget that the missing account was already reported. */
+function resetAbsenceReport(): void {
+  absenceReported = false;
+}
+
 export {
   refreshDemoAccount,
   refreshDemoAccountOnSchedule,
+  refreshDemoAccountIfStale,
+  demoAccountFreshness,
+  resetAbsenceReport,
+  DEMO_FRESHNESS_SQL,
   DEMO_EMAIL,
   DEMO_PASSWORD,
   DEMO_PASSWORD_HASH,
