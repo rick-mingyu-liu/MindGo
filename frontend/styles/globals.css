@@ -201,6 +201,10 @@
   .aurora-particles {
     /* Only set position if needed for stacking context */
     position: relative;
+    /* aurora-pulse scales ::after to 1.05, which overhangs this box by 2.5%
+       on every side: 9 px of horizontal scroll at a 375 px viewport. clip,
+       unlike hidden, does not make this a scroll container. */
+    overflow: clip;
   }
 
   .aurora-particles::after {
