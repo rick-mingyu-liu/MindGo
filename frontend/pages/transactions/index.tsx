@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { Plus, ArrowLeft, Filter, Search, Calendar, DollarSign, Edit, Trash2, ScanText } from 'lucide-react'
@@ -30,6 +30,18 @@ interface Transaction {
 
 const PAGE_SIZE = 200
 
+// The currency the user chose in Settings, read from localStorage each time
+// it is needed. The page re-reads it on mount and on every refresh (initial
+// load, deletion); a change made in Settings applies when this page is next
+// opened, since the two are never on screen together.
+const currentCurrency = (): string => {
+  try {
+    return JSON.parse(localStorage.getItem('userPreferences') ?? '{}').currency || 'CAD'
+  } catch {
+    return 'CAD'
+  }
+}
+
 export default function Transactions() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -42,17 +54,6 @@ export default function Transactions() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const { t, i18n } = useTranslation('common');
 
-  // The currency the user chose in Settings, read from localStorage each time
-  // it is needed. The page re-reads it on mount and on every refresh (initial
-  // load, deletion); a change made in Settings applies when this page is next
-  // opened, since the two are never on screen together.
-  const currentCurrency = (): string => {
-    try {
-      return JSON.parse(localStorage.getItem('userPreferences') ?? '{}').currency || 'CAD'
-    } catch {
-      return 'CAD'
-    }
-  }
   const defaultCurrency = typeof window !== 'undefined' ? currentCurrency() : 'CAD'
 
   // Bumped by every reset/refresh. A response from an older generation (a slow
@@ -60,10 +61,19 @@ export default function Transactions() {
   // was in flight during one) is dropped rather than applied.
   const generation = useRef(0)
 
+  // The latest `t`, read when a fetch reports an error. Holding it in a ref
+  // keeps fetchTransactions stable: `t` changes identity when the language
+  // does (the preference effect below can do that on mount), and a dependency
+  // on it would refetch the list for a change of language.
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
+
   // Without `before` this replaces the list (first load, deletion); with the
   // previous response's nextCursor it appends. The de-dupe on append is only a
   // belt: keyset paging already keeps pages from overlapping.
-  const fetchTransactions = async (before: string | null = null) => {
+  const fetchTransactions = useCallback(async (before: string | null = null) => {
     const append = before !== null
     if (!append) generation.current += 1
     const mine = generation.current
@@ -91,8 +101,8 @@ export default function Transactions() {
       console.error('Error fetching transactions:', error)
       Swal.fire({
         icon: 'error',
-        title: t('Failed to load transactions'),
-        text: t('There was an error fetching transactions. Please try again later.')
+        title: tRef.current('Failed to load transactions'),
+        text: tRef.current('There was an error fetching transactions. Please try again later.')
       })
     } finally {
       // Each request clears only the flag it set, and only if still current.
@@ -101,7 +111,7 @@ export default function Transactions() {
         else setLoading(false)
       }
     }
-  }
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -111,7 +121,7 @@ export default function Transactions() {
     }
 
     fetchTransactions()
-  }, [router])
+  }, [router, fetchTransactions])
 
   useEffect(() => {
     // A language chosen in Settings wins; 'system' leaves the page's locale alone.
