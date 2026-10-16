@@ -164,7 +164,8 @@ function openTurn(input: AgentInput, onProgress?: (event: {toolCalls: number}) =
   // For the run row: a refused call is counted above but never executed, so executions stop at the cap.
   const usageSoFar = (): RunUsage => ({inputTokens:used.inputTokens,outputTokens:used.outputTokens,toolCalls:Math.min(toolCalls,config.agent.maxToolCalls)});
   const stop = (code: string) => {
-    terminalError ??= new AgentError(code, code === 'agent_timeout' ? 504 : 409, usageSoFar());
+    // A limit is a 429 wherever it trips, as in finish() and the SDK's error_max_turns.
+    terminalError ??= new AgentError(code, code === 'agent_timeout' ? 504 : code === 'agent_limit_exceeded' ? 429 : 409, usageSoFar());
     controller.abort(); onStop(); rejectAbort(terminalError);
   };
   // Which limit tripped, with counts only: never message, tool or record content.

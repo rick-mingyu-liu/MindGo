@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  binaryCandidates, classifyDatabase, configChecks, exitCode, formatLine, formatReport, gatherFacts, secretsOf, skippedDatabase,
+  binaryCandidates, classifyDatabase, directClientCheck, configChecks, exitCode, formatLine, formatReport, gatherFacts, secretsOf, skippedDatabase,
   type Check, type Db, type DbFacts, type PreflightSettings,
 } from '../scripts/agentPreflight';
 
@@ -252,4 +252,13 @@ test('binary candidates follow the SDK: glibc first on Linux unless musl is dete
   assert.deepEqual(binaryCandidates('linux', 'x64', true), ['@anthropic-ai/claude-agent-sdk-linux-x64-musl/claude', '@anthropic-ai/claude-agent-sdk-linux-x64/claude']);
   assert.deepEqual(binaryCandidates('darwin', 'arm64', false), ['@anthropic-ai/claude-agent-sdk-darwin-arm64/claude']);
   assert.deepEqual(binaryCandidates('win32', 'x64', false), ['@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe']);
+});
+
+test('the direct client is required only under AGENT_RUNTIME=direct', () => {
+  const missing = (): string => { throw Object.assign(new Error('Cannot find module'), { code: 'MODULE_NOT_FOUND' }); };
+  assert.equal(directClientCheck('direct', missing).status, 'FAIL');
+  assert.equal(directClientCheck('sdk', missing).status, 'WARN');
+  assert.equal(directClientCheck('direct', () => '/x/index.js').status, 'PASS');
+  // The real install, as Render's npm ci leaves it.
+  assert.equal(directClientCheck('direct').status, 'PASS');
 });

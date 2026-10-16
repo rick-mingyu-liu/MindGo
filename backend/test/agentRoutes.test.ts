@@ -123,11 +123,16 @@ test('the route deadline keeps the counts the runtime reported',async()=>{
   const result=await post();assert.equal(result.status,504);
   assert.deepEqual(failed,['agent_timeout',{inputTokens:9000,outputTokens:300,toolCalls:2}]);assert.equal(financialWrites,0);
 });
-test('process concurrency limit releases its slot after cancellation',async()=>{
+test('a full process answers agent_busy to the slot\'s own user, agent_server_busy to others, and releases the slot after cancellation',async()=>{
   config.agent.maxConcurrentRuns=1;
   let announce:()=>void=()=>{};const entered=new Promise<void>(resolve=>{announce=resolve;});
   mock.method(runtime,'runAgent',async(input:runtime.AgentInput)=>{announce();return new Promise<runtime.AgentResult>((_resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new AgentError('agent_cancelled',409)),{once:true}));});
-  const pending=post().then(res=>res);await entered;assert.equal((await post()).status,429);
+  const pending=post().then(res=>res);await entered;
+  // The slot is this user's own turn: the same answer beginTurn gives, not "server busy".
+  const own=await post();assert.equal(own.status,409);assert.equal(own.body.code,'agent_busy');
+  const other=jwt.sign({ userId: 78, email: 'other@example.invalid' }, secret);
+  const full=await request(app).post(`/agent/conversations/${conversationId}/messages`).auth(other,{type:'bearer'}).send(body);
+  assert.equal(full.status,429);assert.equal(full.body.code,'agent_server_busy');
   await request(app).post(`/agent/conversations/${conversationId}/runs/${requestId}/cancel`).auth(token,{type:'bearer'});await pending;
   mock.method(runtime,'runAgent',async()=>({text:'Ready',usage:{inputTokens:1,outputTokens:1},toolCalls:0}));assert.equal((await post()).status,200);
 });

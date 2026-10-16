@@ -6,6 +6,7 @@ import type { TransactionRow } from '../types/db';
 import { decodeCursor, encodeCursor } from '../utils/transactionCursor';
 import { toDay } from '../utils/dates';
 import { errorSummary } from '../utils/errorSummary';
+import * as retentionService from '../services/retentionService';
 
 /** A transactions row, plus its amount converted to the caller's requested currency. */
 interface TransactionWithConversion extends TransactionRow {
@@ -406,79 +407,66 @@ const transactionController = {
     }
   },
 
-  // Auto-delete old transactions
-  async autoDeleteOldTransactions(req: Request, res: Response) {
+  /**
+   * Settings -> Automatic deletion. The stored setting, the window it draws
+   * today, and whether the feature is available at all (migration 016) or
+   * refused (the demo account). It used to return a hard-coded "off, 4 months"
+   * whatever had been saved, because nothing was.
+   */
+  async getRetentionSettings(req: Request, res: Response) {
+    res.set('Cache-Control', 'no-store');
     try {
-      // This deletes rows and cannot be undone, so the validator runs before
-      // anything else -- see the note on autoDeleteValidation in the route file.
+      res.json(await retentionService.getRetention(req.user.userId));
+    } catch (error) {
+      console.error('Get retention settings error:', { userId: req.user.userId, ...errorSummary(error) });
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
+
+  /**
+   * Stores the setting. `retentionTerms` is one of the offered choices or null
+   * (off), validated in the route. The previous version answered "updated
+   * successfully" and stored nothing.
+   */
+  async updateRetentionSettings(req: Request, res: Response) {
+    res.set('Cache-Control', 'no-store');
+    try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
-
-      const months = (req.query.months as string | undefined) ?? 4;
-      const cutoffDate = new Date();
-      cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(String(months)));
-
-      const result = await query(
-        'DELETE FROM transactions WHERE user_id = $1 AND date < $2',
-        [req.user.userId, cutoffDate.toISOString().split('T')[0]]
-      );
-
-      res.json({
-        message: `Transactions older than ${months} months deleted successfully`,
-        deletedCount: result.rowCount,
-        cutoffDate: cutoffDate.toISOString().split('T')[0]
-      });
-
+      const terms = req.body.retentionTerms as number | null;
+      res.json(await retentionService.setRetention(req.user.userId, terms));
     } catch (error) {
-      console.error('Auto-delete old transactions error:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  // Get data retention settings
-  async getDataRetentionSettings(_req: Request, res: Response) {
-    try {
-      // For now, return default settings
-      // In a real app, you'd store these in a user_preferences table
-      res.json({
-        autoDeleteEnabled: false,
-        retentionMonths: 4,
-        lastCleanup: null
-      });
-
-    } catch (error) {
-      console.error('Get data retention settings error:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  // Update data retention settings
-  async updateDataRetentionSettings(req: Request, res: Response) {
-    try {
-      const { autoDeleteEnabled, retentionMonths } = req.body;
-
-      // Validate retention months
-      if (retentionMonths < 1 || retentionMonths > 60) {
-        return res.status(400).json({ error: 'Retention months must be between 1 and 60' });
+      if (error instanceof retentionService.RetentionUnavailableError) {
+        return res.status(503).json({ error: error.message, code: error.code });
       }
-
-      // In a real app, you'd save these to a user_preferences table
-      // For now, just return success
-      res.json({
-        message: 'Data retention settings updated successfully',
-        settings: {
-          autoDeleteEnabled: autoDeleteEnabled || false,
-          retentionMonths: retentionMonths || 4
-        }
-      });
-
-    } catch (error) {
-      console.error('Update data retention settings error:', error);
+      if (error instanceof retentionService.RetentionDemoError) {
+        return res.status(403).json({ error: error.message, code: error.code });
+      }
+      console.error('Update retention settings error:', { userId: req.user.userId, ...errorSummary(error) });
       res.status(500).json({ error: 'Server error' });
     }
-  }
+  },
+
+  /**
+   * What keeping `?terms=N` would delete today: the cutoff, the first kept
+   * term and a count. Deletes nothing; Settings shows it before turning the
+   * option on.
+   */
+  async previewRetention(req: Request, res: Response) {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      res.json(await retentionService.previewRetention(req.user.userId, Number(req.query.terms)));
+    } catch (error) {
+      console.error('Preview retention error:', { userId: req.user.userId, ...errorSummary(error) });
+      res.status(500).json({ error: 'Server error' });
+    }
+  },
 };
 
 export = transactionController;
