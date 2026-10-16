@@ -55,7 +55,9 @@ const config = {
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // Comma-separated, so a new domain and the old one can both work while
+    // links already sent point at the old one. `cors` matches each exactly.
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean),
     credentials: true,
   },
 
@@ -65,6 +67,13 @@ const config = {
   email: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
+    // The Sunday report mails every opted-in address in whatever database this
+    // process points at. A local backend on the Neon dev branch, which holds
+    // copies of real users' addresses, sent them a report too. So it runs only
+    // in production unless WEEKLY_REPORT_ENABLED says otherwise ('true' or
+    // 'false'; anything else, including unset, means "production only").
+    weeklyReportsEnabled: process.env.WEEKLY_REPORT_ENABLED === 'true'
+      || (process.env.WEEKLY_REPORT_ENABLED !== 'false' && process.env.NODE_ENV === 'production'),
   },
 
   apiKeys: {

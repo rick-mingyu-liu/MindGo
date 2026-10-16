@@ -352,7 +352,7 @@
     {
       "id": "en-plan-without-cash",
       "language": "en",
-      "message": "My co-op pays 2,400 on the 15th of each month from January to April, and rent is 950 on the 1st. Can I afford a 1,200 trip on February 14?",
+      "message": "My co-op pays 2,400 on the 15th of each month from January to April 2027, and rent is 950 on the 1st. Can I afford a 1,200 trip on February 14, 2027?",
       "note": "No cash on hand: calculate_scenario answers status incomplete, so nothing may be called affordable. Patterns skip 'whether/if you can afford'.",
       "expect": {
         "tools": { "include": ["calculate_scenario"], "exclude": ["propose_transactions", "propose_goal"] },
@@ -372,7 +372,7 @@
     {
       "id": "zh-plan-without-cash",
       "language": "zh",
-      "message": "我一月到四月每月15号有2400的实习工资，每月1号交房租950。二月14号去旅行要花1200，我负担得起吗？",
+      "message": "我2027年一月到四月每月15号有2400的实习工资，每月1号交房租950。2027年二月14号去旅行要花1200，我负担得起吗？",
       "expect": {
         "tools": { "include": ["calculate_scenario"], "exclude": ["propose_transactions", "propose_goal"] },
         "maxToolCalls": 4,
@@ -380,7 +380,7 @@
         "goalProposal": null,
         "reply": {
           "mustContainAny": [["现金", "余额", "存款"]],
-          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问|[“\"「‘]|(?:不能|无法|没法|没办法)(?:说|告诉你|判断|确定|保证)你?)负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
+          "mustNotMatch": ["(?<!是否|能否|能不能|可否|你问|[“\"「‘]|(?:不能|无法|没法|没办法)[^。！？，、；\\n]{0,12})负担得起", "(?<!是否|能否|能不能|可否)买得起", "完全(?:可以|没问题)"]
         }
       }
     },
@@ -409,6 +409,22 @@
         "draft": { "count": 0 },
         "goalProposal": null,
         "reply": { "mustNotMatch": ["you(?:'ll| will) (?:definitely|easily|comfortably) (?:save|reach|hit)", "you(?:'ll| will) be (?:fine|safe|okay|ok)\\b"] }
+      }
+    },
+    {
+      "id": "en-plan-biweekly-payday-count",
+      "language": "en",
+      "message": "My first co-op paycheque of $1,250 lands on Friday, October 16, 2026, and then every two weeks after that. How many paydays do I get before December 31, 2026, and how much is that in total?",
+      "note": "Six paydays (Oct 16, Oct 30, Nov 13, Nov 27, Dec 11, Dec 25), 7,500.00 in total. Pocky once said 8 payments for a biweekly schedule; the count must come from calculate_scenario's event_counts. An income-only question, so no baseline is needed.",
+      "expect": {
+        "tools": { "include": ["calculate_scenario"], "exclude": ["propose_transactions", "propose_goal"] },
+        "maxToolCalls": 4,
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": {
+          "mustMatch": ["\\b(?:6|six)\\b", "7,?500"],
+          "mustNotMatch": ["\\b(?:[4578]|four|five|seven|eight)\\s+(?:bi-?weekly\\s+)?(?:paydays|payments|paycheques|paychecks|pay\\s+periods)\\b"]
+        }
       }
     },
     {
