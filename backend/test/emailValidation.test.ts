@@ -134,9 +134,10 @@ describe('email validation', () => {
       assert.equal((await validateEmail('a@nowhere.example')).reason, 'Email domain cannot receive mail');
     });
 
-    test('rejects an undeliverable mailbox', async () => {
+    test('accepts a failed SMTP probe (e.g. a university domain)', async () => {
+      // Institutional mail refuses probes; the verification email is the proof.
       reply({ smtp_check: false });
-      assert.equal((await validateEmail('a@nowhere.example')).reason, 'Email address is not deliverable');
+      assert.deepEqual(await validateEmail('student@uwaterloo.ca'), { valid: true, source: 'mailboxlayer' });
     });
 
     test('waives MX and SMTP for major providers', async () => {

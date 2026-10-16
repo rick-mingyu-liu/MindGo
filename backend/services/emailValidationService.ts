@@ -22,6 +22,11 @@
  * returned `{ valid: false }`, so an outage rejected every address, and a
  * quota-exhausted response (200, `success: false`, no `format_valid`) was read
  * as "Invalid email format" and rejected too.
+ *
+ * A failed SMTP probe (`smtp_check: false`) is not a rejection: institutional
+ * mail servers routinely refuse probes, and registration already requires
+ * clicking an emailed link, which proves deliverability. Only a bad format, a
+ * disposable domain or a domain with no MX record is refused.
  */
 import axios from 'axios';
 import config = require('../config');
@@ -116,15 +121,16 @@ function interpretMailboxLayer(data: MailboxLayerResponse, email: string): Valid
   if (data.disposable) {
     return { valid: false, reason: 'Disposable email addresses are not allowed', source: 'mailboxlayer' };
   }
-  if ((!data.mx_found || !data.smtp_check) && MAJOR_DOMAINS.has(domainOf(email) ?? '')) {
+  if (!data.mx_found && MAJOR_DOMAINS.has(domainOf(email) ?? '')) {
     return { valid: true, source: 'mailboxlayer' };
   }
   if (!data.mx_found) {
     return { valid: false, reason: 'Email domain cannot receive mail', source: 'mailboxlayer' };
   }
-  if (!data.smtp_check) {
-    return { valid: false, reason: 'Email address is not deliverable', source: 'mailboxlayer' };
-  }
+  // smtp_check is deliberately not a rejection: university and company mail
+  // (Microsoft 365, Google Workspace, Proofpoint/Mimecast) refuses or
+  // greylists probes from unknown hosts. The emailed verification link is the
+  // real deliverability proof; the verdict is still logged by the caller.
   return { valid: true, source: 'mailboxlayer' };
 }
 
