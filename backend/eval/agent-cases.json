@@ -574,10 +574,10 @@
       "language": "auto",
       "history": [
         { "role": "user", "content": "昨天买菜三十八块五" },
-        { "role": "assistant", "content": "已准备好一笔38.50 CAD的买菜支出（2026-10-13），请检查后点击确认保存。" }
+        { "role": "assistant", "content": "已保存 38.50 CAD 的买菜支出（2026-10-13）。" }
       ],
       "message": "Also 6.50 for coffee at Tim Hortons today",
-      "note": "The history is Chinese; the current message is English, so the reply must be English. The earlier row is not pending, so only the coffee is drafted.",
+      "note": "The history is Chinese; the current message is English, so the reply must be English. The earlier row was already saved and is not pending, so only the coffee is drafted.",
       "expect": {
         "tools": { "include": ["propose_transactions"], "exclude": ["propose_goal"] },
         "maxToolCalls": 2,

@@ -375,7 +375,8 @@ for (const kind of kinds) {
     assert.match(system, /no Markdown/);
     assert.match(system, /Never invent an expense amount/);
     assert.match(system, /its monthly_expenses as one expense event repeating every month/);
-    assert.match(system, /Never run or report a projection without expenses/);
+    assert.match(system, /affordability, savings or a balance, never run or report a projection without expenses/);
+    assert.match(system, /a question only about income, such as how much pay arrives by a date, needs no expenses or baseline/);
     assert.match(system, /never add the baseline's monthly_income as well/);
     assert.match(system, /When the user states some expenses, such as rent, project only the stated ones/);
   });
@@ -540,14 +541,18 @@ test('sdk: the tool hook allows each application tool and denies others', async 
   }
 });
 
-test('reply language: a message\'s language is decided by its own words, Han characters counting half a word', () => {
+test('reply language: a message\'s language is decided by its own words, each Han character and Latin word counting one', () => {
   assert.equal(languageOf('I spent 14.75 on lunch at Lazeez today and 3.35 on the bus'), 'en');
   assert.equal(languageOf('昨天买菜三十八块五'), 'zh');
   // Mixed text goes to the language most of its words are in.
   assert.equal(languageOf('今天lunch花了15块'), 'zh');
   assert.equal(languageOf('I spent 15 on 午饭 today'), 'en');
-  assert.equal(languageOf('Uber Eats 外卖'), 'en');
-  // A tie (one Latin word, two Han characters) goes to Chinese.
+  assert.equal(languageOf('Spent 50 on 火锅 today'), 'en');
+  // Code-switched Chinese: brand and item names are Latin, the sentence is Chinese.
+  assert.equal(languageOf("今天Uber Eats点了McDonald's 25刀"), 'zh');
+  assert.equal(languageOf('在Costco买了groceries 50 CAD'), 'zh');
+  // Ties (two Latin words, two Han characters) go to Chinese.
+  assert.equal(languageOf('Uber Eats 外卖'), 'zh');
   assert.equal(languageOf('Uber 打车'), 'zh');
   for (const wordless of ['', '14.75', '$3.35!', '  ']) assert.equal(languageOf(wordless), undefined);
 });
