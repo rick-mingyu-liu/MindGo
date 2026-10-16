@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Target, CalendarRange, ScanText, Coins, AlertCircle, AlertTriangle } from 'lucide-react'
@@ -302,6 +303,10 @@ export default function Login() {
               </div>
             </CardContent>
           </Card>
+          <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground">
+            <Link href="/terms" className="underline-offset-2 hover:text-foreground hover:underline">{t('Terms of Service')}</Link>
+            <Link href="/privacy" className="underline-offset-2 hover:text-foreground hover:underline">{t('Privacy Policy')}</Link>
+          </div>
         </div>
       </div>
 
