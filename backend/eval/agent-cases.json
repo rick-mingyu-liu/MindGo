@@ -412,6 +412,22 @@
       }
     },
     {
+      "id": "en-plan-biweekly-payday-count",
+      "language": "en",
+      "message": "My first co-op paycheque of $1,250 lands on Friday, October 16, 2026, and then every two weeks after that. How many paydays do I get before December 31, 2026, and how much is that in total?",
+      "note": "Six paydays (Oct 16, Oct 30, Nov 13, Nov 27, Dec 11, Dec 25), 7,500.00 in total. Pocky once said 8 payments for a biweekly schedule; the count must come from calculate_scenario's event_counts. An income-only question, so no baseline is needed.",
+      "expect": {
+        "tools": { "include": ["calculate_scenario"], "exclude": ["propose_transactions", "propose_goal"] },
+        "maxToolCalls": 4,
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": {
+          "mustMatch": ["\\b(?:6|six)\\b", "7,?500"],
+          "mustNotMatch": ["\\b(?:[4578]|four|five|seven|eight)\\s+(?:bi-?weekly\\s+)?(?:paydays|payments|paycheques|paychecks|pay\\s+periods)\\b"]
+        }
+      }
+    },
+    {
       "id": "en-habits-whole-year",
       "language": "en",
       "message": "Analyze my spending habits.",

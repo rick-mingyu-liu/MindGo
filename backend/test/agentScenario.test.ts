@@ -230,3 +230,40 @@ describe('projection', () => {
     assert.deepEqual(results[2], results[0]);
   });
 });
+
+describe('event_counts', () => {
+  test('per input event: occurrences inside the window, first and last date, matching the totals and balances', async () => {
+    const events = [
+      // Biweekly pay anchored before the window: Sep 4, 18, Oct 2 are before it; Oct 16 ... Dec 25 inside.
+      event({ label: 'Co-op pay', kind: 'income', amount: '2400', date: '2026-09-04', repeat: { every: 'two_weeks', until_exclusive: '2027-06-01' } }),
+      // Weekly from before the window: Oct 7 is before it; Oct 14 ... Dec 30 inside (12).
+      event({ label: 'Groceries', amount: '60', date: '2026-10-07', repeat: { every: 'week', until_exclusive: '2027-01-01' } }),
+      // until_exclusive cuts a weekly repeat mid-window: Oct 15, 22, 29 only.
+      event({ label: 'Gym', amount: '10', date: '2026-10-15', repeat: { every: 'week', until_exclusive: '2026-11-05' } }),
+      // until_exclusive on an occurrence date excludes that date: Oct 16, 30, Nov 13 (not Nov 27).
+      event({ label: 'Tutoring', kind: 'income', amount: '100', date: '2026-10-02', repeat: { every: 'two_weeks', until_exclusive: '2026-11-27' } }),
+      event({ label: 'Too late', amount: '1', date: '2027-01-01' }),
+    ];
+    const out = await run({ ...base, starting_cash: { amount: '0', as_of: base.start }, events });
+    assert.deepEqual(out.event_counts, [
+      { index: 0, label: 'Co-op pay', kind: 'income', occurrences: 6, first_date: '2026-10-16', last_date: '2026-12-25' },
+      { index: 1, label: 'Groceries', kind: 'expense', occurrences: 12, first_date: '2026-10-14', last_date: '2026-12-30' },
+      { index: 2, label: 'Gym', kind: 'expense', occurrences: 3, first_date: '2026-10-15', last_date: '2026-10-29' },
+      { index: 3, label: 'Tutoring', kind: 'income', occurrences: 3, first_date: '2026-10-16', last_date: '2026-11-13' },
+      { index: 4, label: 'Too late', kind: 'expense', occurrences: 0, first_date: null, last_date: null },
+    ]);
+    // The counts are the applications the balances used: 6*2400 + 3*100 - 12*60 - 3*10.
+    assert.equal(out.occurrences, out.event_counts.reduce((n, e) => n + e.occurrences, 0));
+    assert.equal(out.totals.income, '14700.00');
+    assert.equal(out.totals.expenses, '750.00');
+    assert.equal(out.by_month.at(-1)!.closing_balance, '13950.00');
+  });
+
+  test('monthly repeats count month-end clamped dates, and the cutoff excludes its own day', async () => {
+    const out = await run({ currency: 'CAD', start: '2027-01-15', end_exclusive: '2027-05-01', starting_cash: { amount: '100', as_of: '2027-01-15' },
+      events: [event({ date: '2027-01-31', amount: '10', repeat: { every: 'month', until_exclusive: '2027-04-30' } })] });
+    assert.deepEqual(out.event_counts, [{ index: 0, label: 'Rent', kind: 'expense', occurrences: 3, first_date: '2027-01-31', last_date: '2027-03-31' }]);
+    assert.deepEqual(out.by_month.map(m => m.expenses), ['10.00', '10.00', '10.00', '0.00']);
+    assert.deepEqual(out.lowest, { balance: '70.00', date: '2027-03-31' });
+  });
+});
