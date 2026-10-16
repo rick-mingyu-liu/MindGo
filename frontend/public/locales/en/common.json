@@ -602,5 +602,25 @@
     "confirmButton": "Turn on and delete",
     "loadError": "Could not load the automatic deletion setting.",
     "previewError": "Could not check what would be deleted. Please try again."
+  },
+  "deleteAccount": {
+    "deleteHeading": "Delete account",
+    "deleteSummary": "Permanently delete your account and everything in it. You will be signed out and cannot sign in again with this account.",
+    "button": "Delete account",
+    "deleteTitle": "Delete your account?",
+    "body": "This permanently deletes your account and cannot be undone. Deleted:",
+    "item1": "your profile: name, email address, password, language and email preferences, and the automatic deletion setting;",
+    "item2": "all of your transactions and savings goals;",
+    "item3": "all of your Pocky conversations, with their messages, drafts, goal proposals, undo receipts and usage records;",
+    "item4": "your AI connection tokens, which stop working at once, and your screenshot import counts.",
+    "note": "Copies already sent to service providers (for example, Pocky messages sent to the model provider) are not deleted by this. You can register again later with the same address, as a new, empty account.",
+    "passwordLabel": "Enter your password to confirm",
+    "confirm": "Delete my account",
+    "deleting": "Deleting...",
+    "wrongPassword": "That password is incorrect.",
+    "demoRefused": "The demo account is shared and cannot be deleted.",
+    "rateLimited": "Too many attempts. Please wait a few minutes and try again.",
+    "error": "Could not delete your account. Please try again.",
+    "done": "Your account has been deleted."
   }
 }

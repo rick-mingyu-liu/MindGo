@@ -15,9 +15,10 @@ import {
   LogOut,
   BookOpen,
   History,
+  UserX,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { api, logout, retentionAPI, RetentionSetting, RetentionWindow } from '@/utils/api'
+import { api, accountAPI, logout, retentionAPI, RetentionSetting, RetentionWindow } from '@/utils/api'
 import { formatDay } from '@/lib/date'
 import { agentAPI, agentUnavailable } from '@/utils/agentApi'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -75,6 +76,11 @@ export default function Settings() {
   const [clearing, setClearing] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [ackDialogOpen, setAckDialogOpen] = useState(false)
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  // Shown inside the dialog: wrong password, demo account, rate limit.
+  const [accountError, setAccountError] = useState<string | null>(null)
   // null until the server says, like the weekly report switch.
   const [retention, setRetention] = useState<RetentionSetting | null>(null)
   const [retentionBusy, setRetentionBusy] = useState(false)
@@ -200,6 +206,36 @@ export default function Settings() {
       toast.error(t('Could not clear all data. Some of it may already be deleted; please try again.'))
     } finally {
       setClearing(false)
+    }
+  }
+
+  const openAccountDialog = (open: boolean) => {
+    if (deletingAccount) return
+    setAccountDialogOpen(open)
+    setAccountPassword('')
+    setAccountError(null)
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deletingAccount || !accountPassword) return
+    setDeletingAccount(true)
+    setAccountError(null)
+    try {
+      await accountAPI.delete(accountPassword)
+      setAccountPassword('')
+      toast.success(t('deleteAccount.done'))
+      // Clears the stored login and goes to the login page.
+      logout()
+    } catch (error) {
+      const response = (error as { response?: { status?: number, data?: { code?: string } } }).response
+      const code = response?.data?.code
+      setAccountError(t(
+        code === 'account_password_incorrect' ? 'deleteAccount.wrongPassword'
+          : code === 'account_demo' ? 'deleteAccount.demoRefused'
+            : response?.status === 429 ? 'deleteAccount.rateLimited'
+              : 'deleteAccount.error'
+      ))
+      setDeletingAccount(false)
     }
   }
 
@@ -446,6 +482,18 @@ export default function Settings() {
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('Clear All Data')}
                 </Button>
+                <div className="space-y-4 border-t border-destructive/20 pt-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">{t('deleteAccount.deleteHeading')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('deleteAccount.deleteSummary')}
+                    </p>
+                  </div>
+                  <Button variant="destructive" onClick={() => openAccountDialog(true)} disabled={deletingAccount}>
+                    <UserX className="mr-2 h-4 w-4" />
+                    {t('deleteAccount.button')}
+                  </Button>
+                </div>
               </div>
             </details>
           </div>
@@ -470,6 +518,54 @@ export default function Settings() {
             </DialogClose>
             <Button variant="destructive" onClick={handleClearData} disabled={clearing || deleteConfirmation !== 'DELETE'}>
               {clearing ? t('Clearing...') : t('Yes, Delete Everything')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={accountDialogOpen} onOpenChange={openAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {t('deleteAccount.deleteTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('deleteAccount.body')}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            <li>{t('deleteAccount.item1')}</li>
+            <li>{t('deleteAccount.item2')}</li>
+            <li>{t('deleteAccount.item3')}</li>
+            <li>{t('deleteAccount.item4')}</li>
+          </ul>
+          <p className="text-sm text-muted-foreground">{t('deleteAccount.note')}</p>
+          <form
+            className="space-y-2"
+            onSubmit={(event) => { event.preventDefault(); handleDeleteAccount() }}
+          >
+            <Label htmlFor="delete-account-password">{t('deleteAccount.passwordLabel')}</Label>
+            <Input
+              id="delete-account-password"
+              type="password"
+              autoComplete="current-password"
+              value={accountPassword}
+              onChange={(event) => { setAccountPassword(event.target.value); setAccountError(null) }}
+              disabled={deletingAccount}
+              aria-invalid={accountError !== null}
+              aria-describedby={accountError ? 'delete-account-error' : undefined}
+            />
+            {accountError && (
+              <p id="delete-account-error" role="alert" className="text-sm font-medium text-destructive">{accountError}</p>
+            )}
+          </form>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deletingAccount}>{t('Cancel')}</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deletingAccount || !accountPassword}>
+              {deletingAccount ? t('deleteAccount.deleting') : t('deleteAccount.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

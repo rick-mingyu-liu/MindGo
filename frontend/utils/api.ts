@@ -69,6 +69,12 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // Settings -> Delete account shows a wrong password, the demo refusal and
+    // the rate limit inside its own dialog. A 401 still logs out.
+    if (error.config?.url === '/auth/account' && response?.status !== 401) {
+      return Promise.reject(error)
+    }
+
     // The edit page reads one transaction and says "not found" itself, so a
     // missing, foreign or malformed id must not also raise the generic dialog.
     const ownsTransactionLookup = error.config?.method === 'get'
@@ -154,6 +160,11 @@ export const retentionAPI = {
   // Deletes nothing: what turning it on would delete today.
   preview: (terms: number) => api.get<RetentionWindow & { count: number }>('/transactions/retention-preview', { params: { terms } }),
   set: (retentionTerms: number | null) => api.put<RetentionSetting>('/transactions/retention-settings', { retentionTerms }),
+}
+
+export const accountAPI = {
+  // Deletes the account and everything in it; the password is checked again.
+  delete: (password: string) => api.delete<{ deleted: true }>('/auth/account', { data: { password } }),
 }
 
 export { api }
