@@ -317,7 +317,7 @@ npm run dev              # runs ocr-assets first
 npm run build            # runs ocr-assets first
 npm start
 npm run lint
-npm run check:locales    # fails on duplicate or unresolved keys
+npm run check:locales    # every locale namespace: fails on duplicate keys or keys missing from one locale; warns on unresolved keys
 npm run ocr-assets       # fetch + checksum the OCR model, copy ONNX Runtime
 
 # eval
