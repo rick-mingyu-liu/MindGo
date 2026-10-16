@@ -6,6 +6,7 @@ import { query } from '../db/connection';
 import { sendWeeklyReport, generateWeeklyReport } from './emailService';
 import * as cleanupService from './cleanupService';
 import * as demoAccountService from './demoAccountService';
+import * as retentionService from './retentionService';
 import { cleanupAgentData } from './agent/store';
 
 // name -> { job, kind }. `kind` is what tells stop() and getStatus() which
@@ -22,6 +23,8 @@ interface MaintenanceResult {
   agentData?: number | null;
   /** Rows deleted by a demo refresh; 0 when the data was fresh or there is no demo account. */
   demoRefresh?: number | null;
+  /** Transactions deleted under users' automatic-deletion settings. */
+  transactionRetention: number | null;
 }
 
 /**
@@ -136,7 +139,8 @@ class SchedulerService {
   /**
    * One maintenance sweep: the unverified-account deletion, then agent
    * housekeeping when that feature is enabled, then the demo refresh when
-   * that is enabled and the demo data is stale.
+   * that is enabled and the demo data is stale, then automatic deletion of
+   * old transactions for the users who turned it on (retentionService).
    *
    * Each is attempted whatever happened to the others, so a failing account
    * cleanup never leaves expired agent data in place or a stale demo, and the
@@ -156,6 +160,10 @@ class SchedulerService {
         ...(config.demo.refreshEnabled
           ? {demoRefresh: await attempt('demoRefresh', () => demoAccountService.refreshDemoAccountIfStale())}
           : {}),
+        // Per-user opt-in, off for everyone by default. With nobody opted in
+        // this is one SELECT on users; without migration 016, one catalog
+        // probe until it is applied. Same hourly wake-up, no new timer.
+        transactionRetention: await attempt('transactionRetention', () => retentionService.deleteExpiredTransactions()),
       }))().finally(() => {
         this.maintenanceRun = null;
       });
@@ -225,7 +233,7 @@ class SchedulerService {
     // needed deleting" and "the jobs were never mounted". This one line at boot
     // separates the two.
     logger.audit(
-      `Retention jobs scheduled: maintenance (accountCleanup${demo}) every ${config.cron.maintenance}ms, ` +
+      `Retention jobs scheduled: maintenance (accountCleanup${demo}, transactionRetention) every ${config.cron.maintenance}ms, ` +
       'first run one interval from now'
     );
   }

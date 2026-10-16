@@ -579,5 +579,26 @@
     "sdkLegal": "Anthropic 法律协议",
     "sdkAcknowledgement": "记账助手使用 Anthropic 的 Claude Agent SDK。其许可声明保留 Anthropic 的权利，并指向适用的 Anthropic 法律协议；详见所链接的声明与条款。",
     "providerAcknowledgement": "配置后提供对话记账的 AI 处理服务"
+  },
+  "retention": {
+    "heading": "自动删除",
+    "summary": "按完整学期自动删除较早的交易记录。",
+    "label": "保留以下范围内的交易",
+    "off": "关闭：保留全部",
+    "keep3": "最近 3 个学期（1 年）",
+    "keep6": "最近 6 个学期（2 年）",
+    "keep9": "最近 9 个学期（3 年）",
+    "keep12": "最近 12 个学期（4 年）",
+    "offHint": "已关闭，不会自动删除任何记录。",
+    "onHint": "日期早于 {{date}} 的交易会被自动删除。{{term}}及之后的学期（包括当前学期）会被保留。",
+    "scope": "只删除交易记录。储蓄目标、Pocky 对话和 AI 连接不受影响。",
+    "notAvailable": "自动删除暂不可用。",
+    "demo": "演示账户不能使用自动删除。",
+    "confirmTitle": "永久删除较早的交易？",
+    "confirmBody": "保留最近 {{terms}} 个学期将永久删除所有日期早于 {{date}} 的交易（即{{term}}之前的全部记录）。此后，每个学期移出保留范围时，其交易也会被删除。此操作无法撤销。",
+    "confirmCount": "现在将被删除的交易：{{count}} 笔。删除会在大约一小时内开始。",
+    "confirmButton": "开启并删除",
+    "loadError": "无法加载自动删除设置。",
+    "previewError": "无法确认将被删除的内容，请重试。"
   }
 }

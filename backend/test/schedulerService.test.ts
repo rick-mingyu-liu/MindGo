@@ -8,6 +8,7 @@ import type { ScheduledTask } from 'node-cron';
 import { spawnSync } from 'node:child_process';
 import * as agentStore from '../services/agent/store';
 import * as demoAccountService from '../services/demoAccountService';
+import * as retentionService from '../services/retentionService';
 
 /**
  * Tests for the interval plumbing, not for what the cleanups delete — that is
@@ -455,6 +456,9 @@ describe('hourly maintenance', () => {
     mock.method(logger, 'info', () => {});
     mock.method(logger, 'audit', () => {});
     mock.method(logger, 'error', (message: string) => errors.push(message));
+    // The transaction retention step has its own describe below; here it
+    // stands aside so the query counts stay about the account cleanup.
+    mock.method(retentionService, 'deleteExpiredTransactions', async () => 0);
   });
 
   afterEach(() => {
@@ -524,9 +528,10 @@ describe('hourly maintenance', () => {
         assert.equal(deletesFrom('users'), 1, `users skipped when ${failing} failed`);
         assert.deepEqual(errors, [failing === 'agent' ? 'agentCleanup failed' : 'accountCleanup failed']);
         assert.deepEqual(result, failing === 'agent'
-          ? { unverifiedAccounts: 1, agentData: null }
-          : { unverifiedAccounts: null, agentData: 1 });
+          ? { unverifiedAccounts: 1, agentData: null, transactionRetention: 0 }
+          : { unverifiedAccounts: null, agentData: 1, transactionRetention: 0 });
         mock.restoreAll();
+        mock.method(retentionService, 'deleteExpiredTransactions', async () => 0);
         mock.method(logger, 'info', () => {});
         mock.method(logger, 'audit', () => {});
         mock.method(logger, 'error', (message: string) => errors.push(message));
@@ -718,6 +723,7 @@ describe('the demo refresh rides the hourly maintenance run', () => {
       },
       release: () => {},
     };
+    mock.method(retentionService, 'deleteExpiredTransactions', async () => 0);
     mock.method(db, 'getPool', () => ({
       connect: async () => {
         connects++;
@@ -815,7 +821,7 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     const result = await scheduler.runMaintenance();
     assert.equal(deletesFromUsers(), 1);
     assert.deepEqual(errors, ['demoRefresh failed']);
-    assert.deepEqual(result, { unverifiedAccounts: 0, demoRefresh: null });
+    assert.deepEqual(result, { unverifiedAccounts: 0, demoRefresh: null, transactionRetention: 0 });
   });
 
   test('failed cleanups do not stop the refresh', async () => {
@@ -825,7 +831,7 @@ describe('the demo refresh rides the hourly maintenance run', () => {
     const result = await scheduler.runMaintenance();
     assert.equal(connects, 1);
     assert.deepEqual(errors, ['accountCleanup failed', 'agentCleanup failed']);
-    assert.deepEqual(result, { unverifiedAccounts: null, agentData: null, demoRefresh: 6 });
+    assert.deepEqual(result, { unverifiedAccounts: null, agentData: null, demoRefresh: 6, transactionRetention: 0 });
   });
 
   test('runs within an hour of any boot, and a fresh rewrite is not refreshed again the next hour', async () => {

@@ -85,6 +85,6 @@ Work: before launch, add a usage panel (database size and agent turns per day) t
 
 - [ ] The privacy policy: write it from a template, or have it reviewed. Whether the Pocky notice should name DeepSeek; this plan recommends yes for a public launch.
 - [ ] The spending cap: a monthly amount, and a daily turn cap per account.
-- [ ] The retention setting: implement it or remove it.
+- [x] The retention setting: implemented — stored per user (migration 016), enforced by the hourly job through `utils/terms.ts`.
 - [ ] The domain name and email provider.
 - [ ] How long idle conversations are kept (proposed: 12 months).

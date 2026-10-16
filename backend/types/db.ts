@@ -24,6 +24,8 @@ export interface UserRow {
   email_notifications_enabled: boolean;
   weekly_reports_enabled: boolean;
   is_demo: boolean;
+  /** Terms of transactions kept (migration 016); null is off. */
+  transaction_retention_terms: number | null;
 }
 
 export type TransactionType = 'income' | 'expense';

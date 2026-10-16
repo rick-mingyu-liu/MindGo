@@ -18,7 +18,11 @@ CREATE TABLE IF NOT EXISTS users (
     -- Marks the demo account. The scheduled refresh deletes and rewrites every
     -- row belonging to its target, so it matches on this rather than on an
     -- email address anyone could register. Only a deliberate seed sets it.
-    is_demo BOOLEAN NOT NULL DEFAULT FALSE
+    is_demo BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Automatic deletion (migration 016): keep only the last N terms of
+    -- transactions, the current one included. NULL is off, the default for
+    -- everyone; the hourly sweep deletes nothing for a NULL row.
+    transaction_retention_terms SMALLINT CHECK (transaction_retention_terms BETWEEN 3 AND 12)
 );
 
 -- At most one demo account: the refresh resolves its target with a bare
