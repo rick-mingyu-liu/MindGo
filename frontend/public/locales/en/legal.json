@@ -90,7 +90,7 @@
       {
         "h": "Your choices and requests",
         "p": [
-          "You can see and change your records in the app at any time. You can also ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Email [TODO: privacy@<domain>] from the address on your account. We may need to confirm that the request comes from you.",
+          "You can see and change your records in the app at any time. You can also ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Email privacy@termpocket.com from the address on your account. We may need to confirm that the request comes from you.",
           "If you are not satisfied with our answer, you can contact the Office of the Privacy Commissioner of Canada."
         ]
       },
@@ -121,7 +121,7 @@
       {
         "h": "Contact",
         "p": [
-          "Questions or requests: [TODO: privacy@<domain>]."
+          "Questions or requests: privacy@termpocket.com."
         ]
       }
     ]
@@ -212,7 +212,7 @@
       {
         "h": "Contact",
         "p": [
-          "Questions about these terms: [TODO: privacy@<domain>]."
+          "Questions about these terms: support@termpocket.com."
         ]
       }
     ]
