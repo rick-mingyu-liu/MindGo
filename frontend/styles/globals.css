@@ -40,6 +40,9 @@
     --radius: 0.5rem;
   }
   .dark {
+    /* Native controls (date picker icon, <select> menus, scrollbars) follow
+       the app's theme rather than staying light-scheme on a dark page. */
+    color-scheme: dark;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
