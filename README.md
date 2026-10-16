@@ -6,6 +6,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-lightgrey.svg)](LICENSE.md)
 
 TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
 
@@ -30,6 +31,7 @@ The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not slee
 - [API](#api)
 - [Deployment](#deployment)
 - [Stack](#stack) · [Database](#database) · [Known gaps](#known-gaps)
+- [License](#license) · [Contributing](#contributing)
 
 ---
 
@@ -215,7 +217,7 @@ The alternation is the point: a study term is tuition and rent against part-time
 
 `npm run db:seed` is **re-runnable** and is how the demo stays current — it replaces the demo user's rows rather than adding to them. Amounts vary month to month but come from a generator seeded on the term and category, so re-seeding on the same day is byte-identical.
 
-To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true` to mount a 30-day refresh job. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.ts`](backend/services/demoAccountService.ts). The refresh discards anything a visitor adds while trying the demo.
+To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true`. The hourly maintenance run then checks when the account was last refreshed (the earliest creation time among its transactions) and rewrites it when that is more than 14 days ago (`DEMO_REFRESH_STALE_DAYS`, minimum 7) or it has no transactions. A redeploy delays a due refresh by at most an hour, and rows a visitor adds or edits do not delay it at all. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.ts`](backend/services/demoAccountService.ts). The refresh discards anything a visitor adds while trying the demo.
 
 ---
 
@@ -549,6 +551,8 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
 The backend runs on **Render** (`termpocket-api`, Starter instance, Virginia — next to the database), the frontend on **Vercel** (`NEXT_PUBLIC_API_URL=https://termpocket-api.onrender.com`), the database on **Neon** (AWS `us-east-1`).
 
+Vercel skips a build when nothing under `frontend/` changed ([`frontend/vercel.json`](frontend/vercel.json) `ignoreCommand`: `git diff --quiet HEAD^ HEAD -- .`, run from the project's root directory, `frontend`), so backend- and docs-only commits create no preview or production deployment. Each deployment stores the ~44 MB OCR model and runtime that `ocr-assets` copies into `public/`, which is what fills the free plan's 10 GB of deployment storage. To change anything the frontend build reads from outside `frontend/`, widen the command first.
+
 The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
 
 **Migration 014 (drop `watchlist` and `ai_plans`):** Deploy order: the Vercel frontend first (the previous build's Settings clear-all calls `DELETE /investments/watchlist/clear-all`, which now 404s), then the Render backend, then apply 014. Deploy the backend that no longer reads those tables before you apply `014_drop_watchlist_ai_plans.sql` through the direct endpoint. The order matters: the previous release queries `ai_plans` in its hourly maintenance job and its `/ai/plans` routes, and would error against a database without it. The migration is idempotent and prints only row counts.
@@ -575,7 +579,7 @@ AGENT_ENABLED=true npm run agent:eval -- --json --min-pass 0.9
 
 `DEEPSEEK_API_KEY` is read through the usual backend configuration (`.env` or environment); `DEEPSEEK_MODEL` defaults to `deepseek-flash`. The eval runs whichever runtime `AGENT_RUNTIME` selects and prints it in its header (`AGENT_ENABLED=true AGENT_RUNTIME=direct npm run agent:eval`). Enabling the flag for this command only does not enable the deployed app. No database or migrations are needed. The runner replaces database queries and exchange rates with [`backend/eval/agent-fixture.json`](backend/eval/agent-fixture.json), blocks pool access, and rejects SQL it does not recognize. It executes the real runtime, tool validation, investigation and planning code. Its only external service is DeepSeek; it never confirms a transaction or goal, writes financial data, or reads your accounts.
 
-The 47 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios, goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
+The 51 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), the reply language under the automatic setting, corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios (including expenses taken from recorded averages rather than invented), goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
 
 Each run reports successful/failed assertions, tool names, token usage and elapsed time. Failed reply assertions include a bounded excerpt; the key and raw provider errors are never printed. `--json` returns one report (use `npm run --silent agent:eval -- --json` to omit npm's banner). Exit status is 0 when every run passes, 1 for evaluation failures, and 2 for invalid arguments, fixture/case files or missing configuration. `--min-pass` deliberately relaxes the aggregate threshold; it does not hide individual failures. `--repeat` accepts 1–20; repeated `--case` flags and comma-separated IDs select cases.
 
@@ -664,6 +668,22 @@ The improvement backlog is retired; the reasoning for anything already fixed liv
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.
 - **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else.
 
+## License
+
+TermPocket is **source-available** under the [Functional Source License, Version 1.1, MIT Future License](LICENSE.md) (FSL-1.1-MIT).
+
+- **You may** read, run, modify and self-host it for your own use, for non-commercial education or research, or to build something that is not a competing product.
+- **You may not** offer it, or a modified version, as a commercial product or service that competes with TermPocket.
+- **Each version becomes MIT** on the second anniversary of its release, with no restrictions.
+
+The hosted app at [mind-go.vercel.app](https://mind-go.vercel.app/) is free to use.
+
+The license covers every version that includes `LICENSE.md`, starting October 2026. Earlier commits were published without a license; ask the maintainer if you need to use one of them.
+
+The TermPocket name and Pocky are not licensed for use as your own product's name or branding.
+
 ## Contributing
 
-Private project. For collaboration, contact the maintainer directly.
+Issues and pull requests are welcome. By submitting a contribution, you agree that it is licensed under the same terms as the project and that the maintainer may relicense it, including under a commercial license, as part of TermPocket.
+
+For larger changes, open an issue first so we can agree on the approach.

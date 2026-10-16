@@ -279,7 +279,7 @@ export default function Transactions() {
             <CardHeader>
               <CardTitle>{t('All Transactions')}</CardTitle>
               <CardDescription>
-                {filteredTransactions.length} {t('transaction', { count: filteredTransactions.length })} {t('found')}
+                {t('transactionsFound', { count: filteredTransactions.length })}
               </CardDescription>
             </CardHeader>
             <CardContent>

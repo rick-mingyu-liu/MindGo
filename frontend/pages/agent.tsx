@@ -314,7 +314,7 @@ export default function AgentPage() {
     : notice || (storage === null && !error ? 'agent.checking' : '')
 
   return <>
-    <Head><title>{t('agent.title')} - TermPocket</title></Head>
+    <Head><title>{`${t('agent.title')} - TermPocket`}</title></Head>
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-6">
         <Button variant="ghost" size="icon" asChild><Link href="/" aria-label={t('agent.back')}><ArrowLeft /></Link></Button>
