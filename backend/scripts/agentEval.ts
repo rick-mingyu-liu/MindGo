@@ -42,8 +42,12 @@ const MAX_REPEAT = 20;
 // Case file
 
 export interface ExpectedRow { id?: string; type?: 'expense' | 'income'; amount?: string; currency?: string; category?: string | string[]; date?: string }
-/** One argument condition: min for numbers, notBefore for day strings; an absent argument fails unless optional. */
-export interface ArgCondition { min?: number; notBefore?: string; optional?: true }
+/**
+ * One argument condition: min for numbers, notBefore for day strings, and
+ * monthlyExpensesMin for calculate_scenario's events (see monthlyExpenses);
+ * an absent argument fails unless optional.
+ */
+export interface ArgCondition { min?: number; notBefore?: string; monthlyExpensesMin?: number; optional?: true }
 /** A tool call whose arguments (as the handler received them) meet every condition. */
 export interface CallMatcher { tool: ToolName; args?: Record<string, ArgCondition> }
 export interface Expectations {
@@ -54,7 +58,7 @@ export interface Expectations {
   draft?: { count?: number; newRows?: number; unchanged?: boolean; rows?: ExpectedRow[] };
   /** null: no goal proposal may be produced. */
   goalProposal?: null | { action: 'create' | 'update'; goal_id?: number | null; after?: Partial<GoalFields> };
-  reply?: { mustContain?: string[]; mustContainAny?: string[][]; mustNotContain?: string[]; mustNotMatch?: string[] };
+  reply?: { mustContain?: string[]; mustContainAny?: string[][]; mustNotContain?: string[]; mustMatch?: string[]; mustNotMatch?: string[] };
 }
 export interface EvalCase {
   id: string;
@@ -73,8 +77,8 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every(s => typeof s === 'string' && s.length > 0);
 const unknownKeys = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).filter(k => !keys.includes(k));
 function validCondition(c: unknown): boolean {
-  if (!isObject(c) || unknownKeys(c, ['min', 'notBefore', 'optional']).length || (c.min === undefined && c.notBefore === undefined)) return false;
-  if (c.min !== undefined && (typeof c.min !== 'number' || !Number.isFinite(c.min))) return false;
+  if (!isObject(c) || unknownKeys(c, ['min', 'notBefore', 'monthlyExpensesMin', 'optional']).length || (c.min === undefined && c.notBefore === undefined && c.monthlyExpensesMin === undefined)) return false;
+  for (const k of ['min', 'monthlyExpensesMin'] as const) if (c[k] !== undefined && (typeof c[k] !== 'number' || !Number.isFinite(c[k]))) return false;
   if (c.notBefore !== undefined) { try { if (typeof c.notBefore !== 'string') return false; validateDay(c.notBefore); } catch { return false; } }
   return c.optional === undefined || c.optional === true;
 }
@@ -171,10 +175,13 @@ export function validateCaseFile(raw: unknown): CaseFile {
       const r = e.reply;
       if (!isObject(r)) problems.push(`${at}: reply`);
       else {
-        for (const k of unknownKeys(r, ['mustContain', 'mustContainAny', 'mustNotContain', 'mustNotMatch'])) problems.push(`${at}: reply.${k}`);
-        for (const k of ['mustContain', 'mustNotContain', 'mustNotMatch'] as const) if (r[k] !== undefined && !isStringArray(r[k])) problems.push(`${at}: reply.${k}`);
+        for (const k of unknownKeys(r, ['mustContain', 'mustContainAny', 'mustNotContain', 'mustMatch', 'mustNotMatch'])) problems.push(`${at}: reply.${k}`);
+        for (const k of ['mustContain', 'mustNotContain', 'mustMatch', 'mustNotMatch'] as const) if (r[k] !== undefined && !isStringArray(r[k])) problems.push(`${at}: reply.${k}`);
         if (r.mustContainAny !== undefined && (!Array.isArray(r.mustContainAny) || !r.mustContainAny.every(isStringArray))) problems.push(`${at}: reply.mustContainAny`);
-        if (isStringArray(r.mustNotMatch)) for (const p of r.mustNotMatch) { try { new RegExp(p, 'mi'); } catch { problems.push(`${at}: reply.mustNotMatch ${p}`); } }
+        for (const k of ['mustMatch', 'mustNotMatch'] as const) {
+          const patterns = r[k];
+          if (isStringArray(patterns)) for (const p of patterns) { try { new RegExp(p, 'mi'); } catch { problems.push(`${at}: reply.${k} ${p}`); } }
+        }
       }
     }
   });
@@ -383,6 +390,24 @@ const sameRows = (a: DraftRow[], b: DraftRow[]) => {
   return a.length === b.length && a.map(key).sort().join('\n') === b.map(key).sort().join('\n');
 };
 
+/**
+ * What calculate_scenario's events charge per month on a repeat: a monthly
+ * expense counts once, a two_weeks one 26/12 times and a weekly one 52/12
+ * times. One-off events and income do not count. Undefined when `events` is
+ * not an array of events with decimal amounts.
+ */
+export function monthlyExpenses(events: unknown): number | undefined {
+  if (!Array.isArray(events)) return undefined;
+  const perMonth = { month: 1, two_weeks: 26 / 12, week: 52 / 12 } as const;
+  let total = 0;
+  for (const event of events) {
+    if (!isObject(event) || typeof event.amount !== 'string' || !/^\d+(\.\d+)?$/.test(event.amount)) return undefined;
+    const every = isObject(event.repeat) ? event.repeat.every : undefined;
+    if (event.kind === 'expense' && (every === 'month' || every === 'two_weeks' || every === 'week')) total += Number(event.amount) * perMonth[every];
+  }
+  return Math.round(total * 100) / 100;
+}
+
 /** The first condition the call fails, as a reason, or null when it matches. */
 function callMismatch(call: ToolCall, m: CallMatcher): string | null {
   if (call.tool !== m.tool) return `not ${m.tool}`;
@@ -392,6 +417,10 @@ function callMismatch(call: ToolCall, m: CallMatcher): string | null {
     if (c.min !== undefined && !(typeof value === 'number' && value >= c.min)) return `${m.tool} ${name} ${JSON.stringify(value)}, at least ${c.min} expected`;
     // A string comparison orders days correctly only because the day schema forces YYYY-MM-DD.
     if (c.notBefore !== undefined && !(typeof value === 'string' && value >= c.notBefore)) return `${m.tool} ${name} ${JSON.stringify(value)}, not before ${c.notBefore} expected`;
+    if (c.monthlyExpensesMin !== undefined) {
+      const monthly = monthlyExpenses(value);
+      if (monthly === undefined || monthly < c.monthlyExpensesMin) return `${m.tool} ${name} repeat ${monthly ?? 'unreadable'} a month in expenses, at least ${c.monthlyExpensesMin} expected`;
+    }
   }
   return null;
 }
@@ -464,6 +493,9 @@ export function scoreRun(c: EvalCase, outcome: RunOutcome): string[] {
     for (const needle of e.reply.mustNotContain ?? []) {
       const at = findNeedle(reply, needle);
       if (at !== -1) failures.push(`reply contains "${needle}": ${excerpt(reply, at)}`);
+    }
+    for (const pattern of e.reply.mustMatch ?? []) {
+      if (!new RegExp(pattern, 'mi').test(result.text)) failures.push(`reply does not match /${pattern}/: ${excerpt(result.text)}`);
     }
     for (const pattern of e.reply.mustNotMatch ?? []) {
       const m = new RegExp(pattern, 'mi').exec(result.text);
