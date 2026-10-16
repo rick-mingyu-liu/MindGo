@@ -85,7 +85,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs lint plus tests f
 
 - Backend listens on `config.port` = `PORT` env or **3001** (README's mention of port 5000 is wrong).
 - Frontend calls `NEXT_PUBLIC_API_URL` or defaults to `http://localhost:3001` ([frontend/utils/api.ts](frontend/utils/api.ts)).
-- CORS origin defaults to `http://localhost:3000`.
+- CORS origin defaults to `http://localhost:3000`. `CORS_ORIGIN` takes one origin or a comma-separated list (`config.cors.origin`, `test/corsOrigins.test.ts`); production lists the custom domain and the old `mind-go.vercel.app`.
 
 ## Backend architecture
 
