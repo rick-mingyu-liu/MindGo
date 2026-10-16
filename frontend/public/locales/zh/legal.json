@@ -2,7 +2,7 @@
   "updated": "2026年10月16日",
   "privacy": {
     "intro": [
-      "TermPocket 是一款面向大学生的免费个人理财应用，由其开发者 Mingyu Liu（下称“我们”）运营。本页说明 TermPocket 存储哪些信息、信息会发送到哪里、保留多久，以及如何索取副本或要求删除。",
+      "TermPocket 是一款面向大学生的免费个人理财应用，由其开发者 [rick-mingyu-liu](https://github.com/rick-mingyu-liu)（下称“我们”）运营。本页说明 TermPocket 存储哪些信息、信息会发送到哪里、保留多久，以及如何索取副本或要求删除。",
       "简而言之：我们存储你在 TermPocket 中输入的内容，以便应用向你展示。我们不出售这些信息，不投放广告，也不连接你的银行。服务器位于美国；如果你使用助手 Pocky，你的消息以及它查询到的记录会由总部位于中国的 AI 服务商 DeepSeek 处理。"
     ],
     "sections": [
@@ -128,7 +128,7 @@
   },
   "terms": {
     "intro": [
-      "本条款适用于由开发者 Mingyu Liu（下称“我们”）运营的 TermPocket 托管服务，即网站和应用。创建账户或使用 TermPocket，即表示你同意本条款。如果你不同意，请不要使用 TermPocket。我们的隐私政策说明了我们如何处理你的信息。"
+      "本条款适用于由开发者 [rick-mingyu-liu](https://github.com/rick-mingyu-liu)（下称“我们”）运营的 TermPocket 托管服务，即网站和应用。创建账户或使用 TermPocket，即表示你同意本条款。如果你不同意，请不要使用 TermPocket。我们的隐私政策说明了我们如何处理你的信息。"
     ],
     "sections": [
       {
