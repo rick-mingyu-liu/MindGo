@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Link from 'next/link'
 import {
   ArrowLeft,
   Trash2,
@@ -328,7 +329,9 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+              <Link href="/terms" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{t('Terms of Service')}</Link>
+              <Link href="/privacy" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{t('Privacy Policy')}</Link>
               <Button variant="ghost" onClick={() => setAckDialogOpen(true)} className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
                 {t('Open Source Acknowledgements')}
