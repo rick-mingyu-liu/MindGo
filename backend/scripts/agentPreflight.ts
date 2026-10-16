@@ -284,6 +284,19 @@ function isMusl(): boolean {
   return report != null && report.header?.glibcVersionRuntime === undefined;
 }
 
+/**
+ * The direct runtime's HTTP client. It is imported lazily on the first turn, so
+ * a missing package would otherwise surface only as agent_provider_error.
+ */
+export function directClientCheck(runtime: PreflightSettings['agent']['runtime'], resolve: (id: string) => string = require.resolve): Check {
+  try {
+    resolve('@anthropic-ai/sdk');
+    return check('PASS', 'host.direct_client', `@anthropic-ai/sdk installed${runtime === 'direct' ? '' : ' (only AGENT_RUNTIME=direct needs it)'}`);
+  } catch (error) {
+    return check(runtime === 'direct' ? 'FAIL' : 'WARN', 'host.direct_client', `@anthropic-ai/sdk not installed (${describeError(error)})${runtime === 'direct' ? '; every turn would fail' : ' (only AGENT_RUNTIME=direct needs it)'}`);
+  }
+}
+
 async function hostChecks(s: PreflightSettings): Promise<Check[]> {
   const checks: Check[] = [];
   let scratch: string | undefined;
@@ -297,6 +310,7 @@ async function hostChecks(s: PreflightSettings): Promise<Check[]> {
   }
   const musl = isMusl();
   checks.push(check('PASS', 'host.platform', `${process.platform}-${process.arch}${process.platform === 'linux' ? (musl ? ' musl' : ' glibc') : ''}, Node ${process.versions.node}`));
+  checks.push(directClientCheck(s.agent.runtime));
 
   let binary: string | undefined;
   let packageName = '';

@@ -59,7 +59,9 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
   const conversationId=validateUuid(req.params.id);const userId=req.user.userId;
   const body=object(req.body,['requestId','content','currency','timezone','language']);
   const input={requestId:validateUuid(body.requestId),content:validateMessage(body.content),...validateSettings(body)};
-  if(slots>=config.agent.maxConcurrentRuns) throw new AgentError('agent_busy',429);
+  // Every slot in this process is taken by someone's turn: not the user's own
+  // running turn (that is agent_busy from beginTurn), so it gets its own code.
+  if(slots>=config.agent.maxConcurrentRuns) throw new AgentError('agent_server_busy',429);
   slots++;
   const controller=new AbortController();let started=false;let timedOut=false;
   const close=()=>{if(!res.writableEnded) controller.abort();};res.on('close',close);
