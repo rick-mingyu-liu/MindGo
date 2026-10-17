@@ -138,18 +138,55 @@
   "Failed to load transactions": "Failed to load transactions",
   "There was an error fetching transactions. Please try again later.": "There was an error fetching transactions. Please try again later.",
   "Your financial overview": "Your financial overview",
-  "Welcome to TermPocket! 🎉": "Welcome to TermPocket! 🎉",
-  "You've started your journey to financial freedom. Let's get you started with some basic steps:": "You've started your journey to financial freedom. Let's get you started with some basic steps:",
-  "Add your own transactions": "Add your own transactions",
-  "by clicking \"Add Transaction\"": "by clicking \"Add Transaction\"",
-  "Create savings goals": "Create savings goals",
-  "to track your financial targets": "to track your financial targets",
-  "Receive your weekly financial report": "Receive your weekly financial report",
-  "to highlight your financial performance": "to highlight your financial performance",
-  "Manage your settings": "Manage your settings",
-  "to customize your experience": "to customize your experience",
+  "onboarding": {
+    "progress": "Step {{current}} of {{total}}",
+    "goTo": "Go to step {{n}}",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip tour",
+    "welcome": {
+      "title": "Your money, term by term",
+      "body": "TermPocket sorts your income and spending into school terms (Winter, Spring and Fall), so every study or co-op term gets its own picture."
+    },
+    "add": {
+      "title": "Add what you earn and spend",
+      "body": "Type a transaction in, or import a screenshot from your banking app, a receipt, Uber or WeChat Pay. The image is read on your device and never uploaded."
+    },
+    "pocky": {
+      "title": "Ask Pocky",
+      "body": "Tell Pocky what you spent and it drafts the entries. Nothing is saved until you confirm. You can also ask about your spending, or plan toward a goal."
+    },
+    "goals": {
+      "title": "Save toward a goal",
+      "body": "Set a target and a date. When last month left money over, TermPocket suggests adding some of it to your goal."
+    },
+    "done": {
+      "title": "You're all set",
+      "body": "Start with one transaction, or let Pocky do the typing.",
+      "bodyNoPocky": "Start with your first transaction. Your dashboard fills in as you go."
+    },
+    "actions": {
+      "add": "Add a transaction",
+      "pocky": "Try Pocky",
+      "explore": "Explore the dashboard"
+    },
+    "art": {
+      "message": "Lunch $12.50, bus $3.25",
+      "confirm": "Confirm",
+      "goal": "Laptop fund"
+    },
+    "card": {
+      "title": "Getting started",
+      "body": "A one-minute tour of how TermPocket works.",
+      "tour": "Take the tour"
+    },
+    "settings": {
+      "title": "Getting started tour",
+      "hint": "Replay the short tour of TermPocket's main features.",
+      "replay": "Show tour again"
+    }
+  },
   "Add Your First Transaction": "Add Your First Transaction",
-  "Create a Goal": "Create a Goal",
   "Avg Income": "Avg Income",
   "Avg Expenses": "Avg Expenses",
   "Avg Net": "Avg Net",

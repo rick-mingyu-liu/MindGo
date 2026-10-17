@@ -141,18 +141,55 @@
   "Failed to load transactions": "加载交易失败",
   "There was an error fetching transactions. Please try again later.": "获取交易时发生错误，请稍后再试。",
   "Your financial overview": "您的财务概览",
-  "Welcome to TermPocket! 🎉": "欢迎来到 TermPocket！🎉",
-  "You've started your journey to financial freedom. Let's get you started with some basic steps:": "您已开始迈向财务自由之路。让我们从以下几个基本步骤开始：",
-  "Add your own transactions": "添加您自己的交易",
-  "by clicking \"Add Transaction\"": "点击“添加交易”",
-  "Create savings goals": "创建储蓄目标",
-  "to track your financial targets": "以跟踪您的财务目标",
-  "Receive your weekly financial report": "接收每周财务报告",
-  "to highlight your financial performance": "突出您的财务表现",
-  "Manage your settings": "管理您的设置",
-  "to customize your experience": "自定义您的体验",
+  "onboarding": {
+    "progress": "第 {{current}} 步，共 {{total}} 步",
+    "goTo": "前往第 {{n}} 步",
+    "next": "下一步",
+    "back": "上一步",
+    "skip": "跳过导览",
+    "welcome": {
+      "title": "按学期管理您的钱",
+      "body": "TermPocket 按学期（冬季、春季、秋季）整理您的收入和支出，每个上课学期或带薪实习学期都有自己的一本账。"
+    },
+    "add": {
+      "title": "记下收入和支出",
+      "body": "手动添加一笔交易，或导入银行 App、收据、Uber 或微信支付的截图。图片只在您的设备上识别，不会上传。"
+    },
+    "pocky": {
+      "title": "问问 Pocky",
+      "body": "告诉 Pocky 您花了什么，它会帮您起草记录，在您确认之前不会保存任何内容。您也可以问它消费情况，或让它帮您规划储蓄目标。"
+    },
+    "goals": {
+      "title": "为目标存钱",
+      "body": "设定目标金额和日期。上个月有结余时，TermPocket 会建议您把其中一部分存入目标。"
+    },
+    "done": {
+      "title": "一切就绪",
+      "body": "先记一笔交易，或者让 Pocky 替您记。",
+      "bodyNoPocky": "先记下第一笔交易，仪表盘会随之丰富起来。"
+    },
+    "actions": {
+      "add": "添加一笔交易",
+      "pocky": "试试 Pocky",
+      "explore": "浏览仪表盘"
+    },
+    "art": {
+      "message": "午饭 $12.50，公交 $3.25",
+      "confirm": "确认",
+      "goal": "笔记本电脑基金"
+    },
+    "card": {
+      "title": "快速上手",
+      "body": "用一分钟了解 TermPocket 怎么用。",
+      "tour": "开始导览"
+    },
+    "settings": {
+      "title": "新手导览",
+      "hint": "重新查看 TermPocket 主要功能的简短导览。",
+      "replay": "再看一遍导览"
+    }
+  },
   "Add Your First Transaction": "添加您的第一笔交易",
-  "Create a Goal": "创建目标",
   "Avg Income": "平均收入",
   "Avg Expenses": "平均支出",
   "Avg Net": "平均净收入",
