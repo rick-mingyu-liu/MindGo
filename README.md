@@ -70,7 +70,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 - **Savings goals**: targets with progress bars and days remaining, plus a monthly suggestion when last month left money over.
 - **Transactions**: income and expenses across 18 categories in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in.
 - **English and 中文**: every user-facing string, in both languages.
-- **Weekly email report**: the past seven days plus a four-month rollup, every Sunday at 7 p.m. Toronto time, or on demand from the dashboard.
+- **Weekly email report**: the past seven days and the current term so far in CAD, spending by category, goal progress, and in the first report of each month last month's leftover. Every Sunday at 7 p.m. Toronto time; turn it off in Settings.
 - **Read-only MCP access**: connect your own AI client with a personal access token (Settings → AI connections). [Details](#mcp--read-only-for-a-personal-agent).
 - **Automatic deletion of old terms**: opt-in, off by default; Settings shows how many transactions would go and asks first.
 - **Delete account**: Settings → Danger zone removes the account and everything belonging to it.
@@ -82,7 +82,7 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 | **Conversation recording** | When enabled by the deployment, describe actual income and spending in English, Chinese or both, correct the pending draft, then review and explicitly confirm selected rows. Conversations resume across visits; an unchanged saved batch can be undone for ten minutes. [Details below](#conversation-recording). |
 | **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
 | **Savings goals** | Create and edit targets with progress bars and days remaining. |
-| **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
+| **Weekly report emails** | The past seven days and the current term so far in CAD, top spending categories, goal progress and, in the first report of each month, last month's leftover. **Every Sunday at 7 p.m. Toronto time**; `POST /auth/test-email` sends one now. |
 | **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, automatic deletion of old transactions (off by default; turning it on shows how many would be deleted and asks first), and read-only AI connections. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
 | **English and 中文** | Every user-facing string, in both languages. |
 
