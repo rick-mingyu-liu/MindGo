@@ -1,6 +1,6 @@
 # TermPocket — status and plan
 
-As of 2026-10-15. Update this file when a step below completes; git history keeps the earlier versions.
+As of 2026-10-17. Update this file when a step below completes; git history keeps the earlier versions.
 
 ## Summary
 
@@ -8,7 +8,8 @@ Pocky, TermPocket's bilingual assistant, can now record, investigate and plan. I
 
 - **Built:** recording transactions by chat with button-only saving, read-only questions about your own spending, and planning (cash projections, savings-goal proposals). The stock watchlist and the old one-shot AI plans are removed.
 - **Production:** Render Starter instance with `AGENT_ENABLED=true` and the DeepSeek key; Neon has all three agent migrations: 013 (conversations), 014 (legacy `watchlist` and `ai_plans` dropped) and 015 (goal proposals). The runbook is the README section "Deploying Pocky to production", and `npm run agent:preflight` checks each step.
-- **Next:** a fictional smoke test in the app (draft, confirm, undo), then use Pocky for a week. Pocky memory follows, shaped by what real use shows.
+- **Since 2026-10-15:** TermPocket has its own domain (https://www.termpocket.com) and sends mail from it through Resend. Privacy policy and terms are drafted and linked, account deletion and a stored, enforced retention setting exist, and Pocky runs on the in-process runtime. See "Merged 2026-10-15 to 2026-10-17".
+- **Next:** the remaining owner checks before a public post (see "Next"), a week of real use of Pocky, then Pocky memory, shaped by what real use shows.
 
 ## What is merged
 
@@ -35,8 +36,11 @@ On 2026-10-15 the Render service was checked with its CLI: it was on the Free pl
 
 | Item | State |
 | --- | --- |
-| Frontend (Vercel) and backend (Render) | Both deploy from `main`. Render's live deploy is `231d230` (the #89 merge) on `termpocket-api`; Vercel's production build calls `https://termpocket-api.onrender.com` (checked in the served JavaScript, 2026-10-15) |
-| Render service | `termpocket-api` (https://termpocket-api.onrender.com), Starter (0.5 CPU, 512 MB), region **Virginia** since 2026-10-15, next to Neon; one instance, build `npm ci --include=dev`. The Oregon service `mindgo.onrender.com` is suspended, kept for rollback. One SDK turn measured about 240 MB for its child process, so `AGENT_MAX_CONCURRENT_RUNS` defaults to 1 (#88); the direct runtime (#89, `AGENT_RUNTIME=direct`) measured about 105 MB for the whole process |
+| Frontend (Vercel) and backend (Render) | Both auto-deploy from `main`. Vercel's production build calls `https://termpocket-api.onrender.com` (checked in the served JavaScript, 2026-10-15) |
+| Domain | termpocket.com (Namecheap). The site is https://www.termpocket.com on Vercel; the apex redirects to www; `mind-go.vercel.app` 307-redirects to www and keeps the path and query. The API stays at https://termpocket-api.onrender.com (an `api.` subdomain is optional). `CORS_ORIGIN` is a comma-separated list (#120) with www, the apex and the old Vercel URL; `FRONTEND_URL=https://www.termpocket.com` on Render |
+| Email | Sent through Resend SMTP (#122 made `EMAIL_HOST`, `EMAIL_PORT` and `EMAIL_FROM` configurable): Render has `EMAIL_HOST=smtp.resend.com`, `EMAIL_PORT=465`, `EMAIL_USER=resend`, `EMAIL_FROM=TermPocket <noreply@termpocket.com>`. The domain is verified in Resend (DKIM, a `send` CNAME to Resend's return path for SPF and MX, DMARC `p=none`); the owner tested that mail delivers. Namecheap forwards `privacy@`, `support@` and `noreply@` to the owner's Gmail |
+| Render service | `termpocket-api` (https://termpocket-api.onrender.com), Starter (0.5 CPU, 512 MB), region **Virginia** since 2026-10-15, next to Neon; one instance, build `npm ci --include=dev`. The Oregon service `mindgo.onrender.com` is suspended, kept for rollback. One SDK turn measured about 240 MB for its child process, so `AGENT_MAX_CONCURRENT_RUNS` defaults to 1 (#88); the direct runtime (#89, `AGENT_RUNTIME=direct`) measured about 105 MB for the whole process. Production has run `AGENT_RUNTIME=direct` since 2026-10-15 per the description of #102; the Render Shell preflight output has not been pasted into the repo (owner check) |
+| Migration 016 (retention) | Merged in #103 and additive. This repo does not record that it was applied to Neon `production`: owner check (until it is, Settings shows automatic deletion as unavailable and nothing is deleted) |
 | Neon PostgreSQL and source audit | PostgreSQL 17.11; 0 incompatible transaction source values; read-only preflight |
 | Migration 013 (conversations) | Applied 2026-10-15: 6/6 agent tables, source check allows `agent` |
 | Migration 014 (drop `watchlist`, `ai_plans`) | Applied 2026-10-15: 23 watchlist rows and 0 AI plans dropped, by the owner's decision |
@@ -44,7 +48,49 @@ On 2026-10-15 the Render service was checked with its CLI: it was on the Free pl
 | `AGENT_ENABLED`, `DEEPSEEK_API_KEY` on Render | Set 2026-10-15. The `--live` preflight turn (1 tool call, 1 drafted row, 8,109 in / 201 out tokens, 3.8 s) confirms the key works |
 | Render host checks | `/tmp` writable, linux-x64 glibc, Node 22.23.3, SDK binary launches, DeepSeek reachable (preflight in the Render Shell) |
 
+The owner's work machine's Zscaler proxy blocks termpocket.com as a "Newly Registered Domain". That is the proxy, not the site.
+
 Turning Pocky on is the runbook in the README. In short: deploy, run the preflight in the Render Shell, apply 013, 014 and 015 through Neon's direct endpoint, set the two variables, run the preflight with `--live`, then smoke-test in the app with fictional input.
+
+## Merged 2026-10-15 to 2026-10-17
+
+Pull requests merged after the table above, grouped by theme. Each passed CI before merge.
+
+| Theme | PRs |
+| --- | --- |
+| Pocky runtime and limits | Direct in-process runtime ([#89](https://github.com/rick-mingyu-liu/TermPocket/pull/89), hardened in #93 and #99); concurrency cap (#88) and `agent_busy` for the user's own turn (#100); per-user cap of 60 turns a day and all-users cap of 600 (#90); planning limit and habits fixes (#84, #87); test flake (#91) |
+| Pocky evaluation | Explicit year in a plan case (#112); scenario occurrence counts (#113) |
+| Pocky and product features | Enter to send in Pocky, safe with IME composition (#128); in-app MCP setup dialog (#129, sized for small screens in #132); goal top-up suggestion card on Goals (#130) and dashboard badge (#131); first-run onboarding tour with a "Show tour again" button in Settings (#135); 200 transactions per page (#83) |
+| Data and accounts | Retention setting stored and enforced, migration 016 (#103); account deletion from Settings (#114); demo refresh driven by staleness (#95) |
+| Email | Configurable SMTP (#122); redesigned emails with a shared layout, HTML escaping of user-typed values (this fixed an injection in the verification email's first name), CAD conversion, term-so-far and goals with progress bars (#124); leftover-to-goal section in the first weekly report of each month (#134); weekly report gate (#105). A failed MailboxLayer SMTP probe no longer rejects a registration (#126): university mail refused probes |
+| Domain and hosting | `CORS_ORIGIN` as a list (#120); Render in Virginia (#92); Vercel skips unchanged builds (#98); FSL license (#96) |
+| Legal and contact | Privacy policy and terms drafts (#101, #104); contact addresses in the legal pages and the login "Contact Us" (#121); GitHub-linked operator name (#123); wording: run from Canada, DeepSeek and China mentioned once, Resend rather than Gmail, "snowfluke" in acknowledgements (#127); governing law Ontario with users' own consumer protections (#133); 13+ with parent or guardian permission under the age of majority, and Quebec: the person in charge of personal information named (Mingyu Liu, `privacy@`), complaint rights to the OPC and the CAI, withdrawing consent (#136) |
+| i18n | Eight pages used `getServerSideProps` and got an empty translation store on Vercel (a raw `legalConsent` key on /register, Chinese pages in English); they now use `getStaticProps` and `localePath` (#125), verified on production; `check:locales` covers all namespaces (#107) |
+| QA and security fixes | Token URLs redacted from logs (#108); analytics strips the query string (#106); QA findings (#97, #109, #110, #111, #115, #116, #118, #119) |
+| Docs | Phase 2 plan (#82, #85); Pocky live (#81); Render region (#80, #92) |
+
+Not done on the legal side: a French version (Quebec's Charter of the French language), a written privacy impact assessment for transfers outside Quebec (the policy deliberately makes no claim of one), and review by someone qualified. "Pocky" is a Glico trademark, flagged as a naming risk; the owner has not decided.
+
+Decision on goals: the owner chose a "suggested top-up" (#130, #131, #134) and dropped automatic linking of savings transactions to goals as too much.
+
+## Open PRs
+
+| PR | State |
+| --- | --- |
+| [#94](https://github.com/rick-mingyu-liu/TermPocket/pull/94) | Dictated-style English evaluation cases and a bare "dollars" meaning the conversation currency. Awaiting owner review |
+| [#102](https://github.com/rick-mingyu-liu/TermPocket/pull/102) | Draft: remove the SDK runtime. Gated until about 2026-10-22, after a week of direct in production, a pasted Render Shell preflight, and no open PR touching `runtime.ts` |
+| [#86](https://github.com/rick-mingyu-liu/TermPocket/pull/86) | Draft: English voice dictation design and spike |
+
+## Next
+
+Owner checks before a public post (none can be verified from the repo):
+
+- A DeepSeek provider-side spending limit or prepaid balance. The app-side caps are done (#90).
+- `DEMO_REFRESH_ENABLED=true` on Render.
+- Whether migration 016 is applied to Neon `production`.
+- Screenshot import timed on a mid-range phone.
+- Optional review of the privacy policy and terms by a lawyer or a clinic; when to do the French version and the Quebec impact assessment.
+- The name "Pocky".
 
 ## Evidence and limitations
 
@@ -99,8 +145,8 @@ Launch preparation and hardening can proceed in parallel. Verify both gates befo
 
 | Step | Work | Gate before the next step |
 | --- | --- | --- |
-| 1. Go live | Done except the in-app smoke test: Render on Starter, migrations 013–015 applied, agent enabled, `--live` preflight passes. A planning question hit `agent_limit_exceeded` in the first real use; a fix is in progress | A fictional lunch can be drafted, confirmed and undone in the app, and a planning question completes |
-| 2. Harden (alongside 1) | Evaluation set and dependency upgrades are merged; the remaining work is the frontend build-tool advisories (Tailwind 4 or upstream fixes) | One live evaluation run reviewed (done); no high-severity advisories (open: 7 high in the frontend toolchain) |
+| 1. Go live | Render on Starter, migrations 013–015 applied, agent enabled, `--live` preflight passes. The planning limit found in the first real use was fixed (#84, #87). The in-app smoke test is not recorded here: owner check | A fictional lunch can be drafted, confirmed and undone in the app, and a planning question completes |
+| 2. Harden (alongside 1) | Evaluation set and dependency upgrades are merged; the remaining frontend advisories are build-time only and left open until a Tailwind 4 migration after launch (owner decision, 2026-10-17) | One live evaluation run reviewed (done); the open advisories are accepted, not cleared |
 | 3. Real use | Record real spending with Pocky for a week; note what it gets wrong | Real failures listed and added to the evaluation set |
 | 4. Memory | Remembered facts (rent, co-op pay, reserve) with Remember and Forget, saved plans, per-account currency, timezone and reply language | Deleting a fact removes it from everything Pocky sees, and the evaluation set still passes |
 | 5. Later | Dashboard summaries computed in SQL (unblocks an All time view), a frontend test runner, renaming leftover MindGo infrastructure | — |
@@ -111,4 +157,6 @@ Decisions needed from the owner:
 - [x] Migrations 013 and 015 applied on 2026-10-15.
 - [x] Migration 014 applied on 2026-10-15 (the owner confirmed both features are gone for good).
 - [x] `AGENT_ENABLED=true` and the DeepSeek key are set on Render.
-- [ ] Decide whether DeepSeek usage needs a monthly spending cap beyond the built-in per-user limits.
+- [x] Domain and email provider: termpocket.com, Resend (2026-10-16).
+- [x] Dependabot: the 2 open alerts (`braces` high, `postcss-selector-parser` moderate) are build-time only, via Tailwind 3 and `eslint-config-next`, and no patched `braces` release exists. On 2026-10-17 the owner decided to leave them open and revisit with a Tailwind 4 migration after launch ([`frontend/DEPENDENCIES.md`](frontend/DEPENDENCIES.md)).
+- [ ] DeepSeek spending: the app-side caps exist (60 turns a day per user, 600 across all users). A provider-side limit or prepaid balance is an owner check.
