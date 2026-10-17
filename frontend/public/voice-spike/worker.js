@@ -8,10 +8,13 @@ import { AutoProcessor, AutoTokenizer, WhisperForConditionalGeneration, Tensor, 
 
 env.allowLocalModels = false
 
-// Amounts written as dollars and cents. transformers.js 4.3.1 ignores
+// Amounts kept as words, lowercase, no punctuation (round 2's best, "w2":
+// 58/60 amount-usable). Round 1's digits prompt, "Pizza at Domino's $18.25.
+// Parking $7.50 yesterday. Paid $1,200 rent. Sobeys $43.06 today.", made
+// Whisper squash "twenty three forty" into 2340. transformers.js 4.3.1 ignores
 // generate({prompt_ids}), so the prompt goes in as decoder input. Merchants
 // here are deliberately not ones the spike phrases use.
-const PROMPT = "Pizza at Domino's $18.25. Parking $7.50 yesterday. Paid $1,200 rent. Sobeys $43.06 today."
+const PROMPT = "pizza at dominos eighteen twenty five parking seven fifty yesterday paid twelve hundred rent sobeys forty three oh six today"
 
 let loaded = null
 
@@ -42,8 +45,10 @@ async function load({ model, device, quant }) {
   return { loadMs: Math.round(performance.now() - started), bytes }
 }
 
-async function transcribe({ audio, primed }) {
-  const { processor, tokenizer, net, prompt, start } = loaded
+// promptText (round 2) overrides PROMPT for one clip, so the harness can compare prompts without reloading.
+async function transcribe({ audio, primed, promptText }) {
+  const { processor, tokenizer, net, start } = loaded
+  const prompt = promptText ? [tokenizer.convert_tokens_to_ids('<|startofprev|>'), ...tokenizer.encode(' ' + promptText, { add_special_tokens: false })] : loaded.prompt
   const t0 = performance.now()
   const { input_features } = await processor(audio)
   const ids = primed ? [...prompt, ...start] : start

@@ -64,7 +64,7 @@ export default function VoiceSpike() {
   }
 
   // For automated runs (the spike's browser harness): load, then transcribe a 16 kHz clip.
-  useEffect(() => { (window as unknown as { __voiceSpike: unknown }).__voiceSpike = { load: (m: typeof model, d: typeof device, quant?: string) => ask({ type: 'load', model: m, device: d, quant }), transcribe: (a: Float32Array, p: boolean) => ask({ type: 'transcribe', audio: a, primed: p }) } })
+  useEffect(() => { (window as unknown as { __voiceSpike: unknown }).__voiceSpike = { load: (m: typeof model, d: typeof device, quant?: string) => ask({ type: 'load', model: m, device: d, quant }), transcribe: (a: Float32Array, p: boolean, promptText?: string) => ask({ type: 'transcribe', audio: a, primed: p, promptText }) } })
 
   const record = async () => {
     if (recording) { recorder.current?.stop(); return }

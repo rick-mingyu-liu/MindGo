@@ -1,6 +1,6 @@
 # Voice dictation — design and handoff
 
-Status: **spike run on a laptop, 2026-10-15; result is no-go on accuracy as measured, phone and iOS pending** (see [Spike results](#spike-results-2026-10-15)). Draft PR #86. This file is written so that another session can pick the work up cold. Read [`CLAUDE.md`](../CLAUDE.md) (Conversation recording, On-device OCR) and [`PHASE-2.md`](PHASE-2.md) section C first.
+Status: **round 1 (2026-10-15) was no-go on amounts; round 2 (2026-10-17) passes the 18/20 bar on synthetic voices with a words-style Whisper prompt plus a "dictated" flag for Pocky. The owner's voice, the phone and iOS are pending** (see [Spike results](#spike-results-2026-10-15) and [Spike round 2](#spike-round-2-2026-10-17)). Draft PR #86. This file is written so that another session can pick the work up cold. Read [`CLAUDE.md`](../CLAUDE.md) (Conversation recording, On-device OCR) and [`PHASE-2.md`](PHASE-2.md) section C first.
 
 ## What we are building
 
@@ -126,6 +126,83 @@ This needs a real device. Open `/voice-spike` on the PR's Vercel preview on an i
 3. **Compare the phone keyboard's dictation** with the same phrases. If it formats `$9.50` correctly, the interim (no feature) may be the answer.
 
 Building the mic button anyway would mean relying on the user to catch `950` in the textarea and in the draft.
+
+## Spike round 2 (2026-10-17)
+
+The owner approved two experiments after round 1: **A**, a Whisper prompt that keeps amounts as words, and **B**, an optional "dictated" flag on the turn endpoint that makes Pocky ask about squashed numbers. Branch `spike/voice-round2` (draft PR into `feat/voice-dictation`), with `main` merged in.
+
+**Verdict: A meets the 18/20 bar on synthetic voices.** The best prompt, `w2`, gets **58/60** clips with a usable amount: **18, 20 and 20** of 20 per voice. Round 1's best got 49/60. B makes Pocky ask about the squashed numbers that are left, and doesn't make it ask about clear amounts. It's a safety net, though, not a guarantee: it held in 26 of 28 flagged runs. **Recommendation: do both.** Ship the `w2` prompt as the transcriber's prompt, and send `input: "voice"` with dictated turns. The caveats from round 1 still apply. These were macOS voices, not the owner's, and the phone and iOS Safari are still unmeasured. The next step is the owner's voice on `/voice-spike`, which now uses `w2` by default.
+
+### Method
+
+- **Same 60 clips as round 1.** The 20 fictional phrases below, each spoken by macOS `say` with Samantha (en-US), Daniel (en-GB) and Karen (en-AU), converted to 16 kHz mono WAV. Model: `base.en`, 8-bit, WASM, Transformers.js 4.3.1.
+- **Run in the browser.** The spike page `/voice-spike` ran under `next dev` in headless Chrome 155, driven by Playwright through `window.__voiceSpike.load/transcribe`. The worker now takes an optional `promptText` per clip, so all five prompts ran on one loaded model. The prompt goes in as `decoder_input_ids`, as in round 1. Round 1's digits prompt reproduced its 49/60 here; round 1 scored in Node.
+- **Scoring.** An amount counts as usable when it has the right digits with the right decimal (round 1's rule, which also accepts `62 18`), or when the words unambiguously say it: `twenty three forty`, `nine fifty`, `84 dollars and twenty cents`. "dollars", "and" and "cents" are ignored when comparing words. Squashed digits (`2340`, `1699`) and wrong numbers fail. The "strict" column also fails split digits such as `42 17`.
+
+Phrases (unchanged from round 1): lunch fifteen dollars · uber twenty three forty · groceries at no frills sixty two eighteen yesterday · paid rent one thousand one hundred fifty dollars · coffee at tim hortons four seventy five · bus pass one twenty eight yesterday · got paid two thousand four hundred eighty from my co-op · textbook from the bookstore ninety nine ninety nine · netflix sixteen ninety nine · dinner at the keg eighty four dollars and twenty cents last night · haircut thirty five dollars · phone bill sixty five dollars · shoppers drug mart twelve forty nine today · twenty five us dollars on steam · gas at petro canada fifty one thirty · spent nine fifty on bubble tea yesterday · amazon order forty two seventeen · tuition deposit five hundred dollars · movie tickets at cineplex thirty two fifty · refund from best buy eighty nine ninety nine.
+
+### A. Prompts: clips with a usable amount (of 60; per voice of 20)
+
+| Variant | Prompt (decoder input) | Amount usable | Samantha / Daniel / Karen | Strict | Merchant | Date | "US" kept |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `r1-digits` (round 1's best) | `Pizza at Domino's $18.25. Parking $7.50 yesterday. Paid $1,200 rent. Sobeys $43.06 today.` | 49 | 18 / 15 / 16 | 47 | 55 | 60 | 0/3 |
+| `w1-words` | `Pizza at Domino's eighteen twenty five. Parking seven fifty yesterday. Paid twelve hundred rent. Sobeys forty three oh six today.` | 56 | 19 / 19 / 18 | 53 | 55 | 60 | 1/3 |
+| **`w2-words-lower`** | `pizza at dominos eighteen twenty five parking seven fifty yesterday paid twelve hundred rent sobeys forty three oh six today` | **58** | **18 / 20 / 20** | 56 | **57** | 60 | **3/3** |
+| `w3-words-more` | w1 plus `Sandwich eleven dollars. Gym membership thirty nine ninety nine. Train ticket two forty.` | 57 | 19 / 20 / 18 | 55 | 56 | 60 | 1/3 |
+| `wd-words-dollars` | `Pizza at Domino's eighteen dollars twenty five. Parking seven dollars fifty yesterday. Paid twelve hundred dollars rent. Sobeys forty three dollars and six cents today.` | 52 | 18 / 19 / 15 | 51 | 56 | 60 | 0/3 |
+
+- **The lowercase prompt without punctuation works best.** Whisper copies the prompt's style, so its transcripts read the way the speaker said them: `uber twenty three forty`, `spent nine fifty on bubble tea yesterday`, `twenty five us dollars on steam`. It's the only variant that kept "us" in all 3 clips. The digits prompt wrote `$25`, which loses the currency.
+- **`w2`'s two misses:** `uber 2340` and `netflix 1699` (both Samantha). "netflix sixteen ninety nine" is the most persistent failure: every punctuated variant squashed it for at least two voices. Two more clips came out as split digits, `amazon order 42 17` (Samantha and Karen). Round 1's rule counts those, so under the strict rule `w2` gets 17 / 20 / 19.
+- **Not always unambiguous even in words:** "bus pass one twenty eight" could mean 1.28 or 128 under any prompt. It's scored as usable because that's what was said.
+- **Mishearings with `w2`:** "you but" for uber (Daniel), "god paid … from michael art" for "got paid … from my co-op" (Daniel), "best by", "drug mark". Dates were right in 60/60 for every variant.
+- **Adding "dollars" to the prompt (`wd`) hurts.** Whisper then writes digits again (`Uber 2340`, `Cineplex 3250`, `Bus Pass 128`).
+- **Latency is unchanged.** On the 10.1 s clip `w2` took 2.36–2.41 s (3 runs), against 2.36–2.39 s for the digits prompt. Clips of 2–5 s averaged 2.1 s for every variant. The prompt is about 25 tokens, so it's too short to change the time.
+
+### A. Pocky on the real `w2` transcripts
+
+Nine cases (`voice-words-*` in `backend/eval/agent-cases.json`) use `w2` output verbatim. Direct runtime, `deepseek-flash`, typed path (no flag):
+
+| Transcript | Result |
+| --- | --- |
+| `coffee at tim hortons four seventy five` · `shoppers drug mark twelve forty nine today` · `gas at petro canada fifty one thirty` · `netflix sixteen ninety nine` · `textbook from the bookstore ninety nine ninety nine` · `movie tickets at cineplex thirty two fifty` · `god paid two thousand four hundred eighty from michael art` | Right amount, type and date, 2/2 each (14/14) |
+| `amazon order forty two seventeen` | Drafted 42.17 in 3 of 6 runs and asked in the other 3 ("order forty two" reads like an order number). Never a wrong amount. The case now asserts that the reply names 42.17 and never 4217. |
+| `amazon order 42 17` | Asked, 2/2. Same assertion as above. |
+
+With the flag added, the same nine cases (1 run each) got 8/9. The miss was `amazon order 42 17`, where Pocky asked a muddled question ("$4.20 or $42.00 … and $17.00?") but drafted nothing.
+
+### B. The dictated flag
+
+**What changed (prototype, this branch only):**
+
+- **Route.** `POST /agent/conversations/:id/messages` accepts an optional `input`: `'typed'` (the default) or `'voice'`. Anything else is a 400 `agent_invalid_input` before admission.
+- **Envelope.** `'voice'` sets `AgentInput.dictated`, which adds `context.input = "dictated"` to the envelope. A typed turn's envelope is unchanged.
+- **System prompt.** One added paragraph: when the input is dictated, a 3- or 4-digit amount with no decimal point, no thousands comma and not ending in 00 may be dollars and cents run together, and a `$` doesn't settle it because Whisper adds one. Pocky doesn't draft that row, and asks which amount was meant, quoting both readings. Amounts in words, with a decimal or comma, ending in 00, or of one or two digits are clear. Without the flag, Pocky ignores the rule and never mentions dictation. That last sentence was added after a typed control run replied "Because this was dictated, I read 1249 as 1249.00".
+- **Eval harness.** Cases take `"input": "voice"` and pass it to the runtime as `dictated`.
+- **Tests.** `agentEval.test.ts` (validation and pass-through), `agentRoutes.test.ts` (default, `typed`, `voice`, and five invalid values) and `agentRuntime.test.ts` (envelope and system prompt, on both runtimes).
+
+**Pocky's results** (direct runtime, real squashed transcripts from round 1):
+
+| Case (flag on) | Expectation | Prompt draft 1 (2 runs) | Final prompt (2 runs) |
+| --- | --- | --- | --- |
+| `Uber 2340.` | Ask, no draft | 2/2 | 2/2 |
+| `Spent $950 on bubble tea yesterday.` | Ask, no draft | 2/2 | 1/2 (drafted 950.00 once, with a note) |
+| `Shoppers drug mark 1249 today.` | Ask, no draft | 2/2 | 2/2 |
+| `Dinner at the keg $84.20 last night.` | Draft 84.20 | 2/2 | 2/2 |
+| `paid rent $1,150.` | Draft 1150.00 | 2/2 | 2/2 |
+| `Tuition deposit $500.` | Draft 500.00 | 2/2 | 1/2 (asked once) |
+| `Spent nine fifty on bubble tea yesterday.` | Draft 9.50 | 2/2 | 2/2 |
+
+That's 26/28 over both versions of the prompt sentence. As a control, the three squashed transcripts were also run **without** the flag. Pocky drafted `950.00` for bubble tea in 4 of 4 runs and `1249.00` for Shoppers in 2 of 4. The flag is what turns those into questions.
+
+### Cost
+
+DeepSeek `deepseek-flash`, direct runtime, 73 eval runs in total: **524,620 input and 8,698 output tokens**. Every run sent the roughly 4.3k-token system prompt, and most made one tool round trip. The billed amount is on the DeepSeek dashboard. At deepseek-flash's list rates this is cents, well under the $0.50 budget. The full suite was not run.
+
+### What's left before building
+
+1. **The owner's voice**, using the 20 phrases on `/voice-spike` with the default (`w2`) prompt. Pass is at least 18/20.
+2. **Phone and iOS Safari**, unchanged from round 1 §3 and §5.
+3. **If building:** the mic button's composer sends `input: "voice"` when the textarea's text came from the transcriber, even if the user edited it afterwards. B's rule only asks about numbers, so an edited transcript costs at most one extra question. Move the paragraph and the `input` field from this prototype into the real change, with the tests. Mind the runtime rework under way elsewhere: the change to `runtime.ts` is two lines, the envelope field and the prompt paragraph.
 
 ## Build (2–3 days), if the spike passes
 
