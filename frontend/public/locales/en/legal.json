@@ -52,7 +52,7 @@
           "If you connect an AI service of your own with a personal access token, that service receives the totals and savings goals it asks for (goal names, amounts and dates) and handles them under its own terms."
         ],
         "after": [
-          "These providers store and process information outside Canada, in the United States (and, for Pocky, China). Before sending information outside Quebec and Canada, we assessed the protections these providers offer."
+          "These providers store and process information outside Canada, in the United States (and, for Pocky, China)."
         ]
       },
       {
@@ -110,7 +110,7 @@
       {
         "h": "Who TermPocket is for",
         "p": [
-          "TermPocket is intended for university students and other adults. It is not meant for children under 13. If we learn that we hold an under-13 user’s information without a parent’s permission, we delete it; parents can contact privacy@termpocket.com."
+          "TermPocket is intended for students and anyone tracking their own money, including teenagers 13 and older with a parent’s or guardian’s permission where required. It is not meant for children under 13. If we learn that we hold an under-13 user’s information without a parent’s permission, we delete it; parents can contact privacy@termpocket.com."
         ]
       },
       {
