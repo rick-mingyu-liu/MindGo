@@ -425,7 +425,7 @@
   "Type DELETE to confirm": "Type DELETE to confirm",
   "TermPocket is built with these open source projects. Thank you to their maintainers and contributors.": "TermPocket is built with these open source projects. Thank you to their maintainers and contributors.",
   "Browser OCR": "Browser OCR",
-  "Screenshot recognition uses ppu-paddle-ocr and ONNX Runtime in your browser, with PaddleOCR models distributed by snowfluke. The model link identifies the version shipped by TermPocket.": "Screenshot recognition uses ppu-paddle-ocr and ONNX Runtime in your browser, with PaddleOCR models distributed by snowfluke. The model link identifies the version shipped by TermPocket.",
+  "Screenshot recognition runs in your browser with ppu-paddle-ocr and ONNX Runtime, using PaddleOCR models converted for ppu-paddle-ocr and published on Hugging Face (snowfluke/ppu-paddle-ocr-models). The model link identifies the exact version TermPocket ships.": "Screenshot recognition runs in your browser with ppu-paddle-ocr and ONNX Runtime, using PaddleOCR models converted for ppu-paddle-ocr and published on Hugging Face (snowfluke/ppu-paddle-ocr-models). The model link identifies the exact version TermPocket ships.",
   "External services": "External services",
   "These API services are listed separately from the open source libraries above.": "These API services are listed separately from the open source libraries above.",
   "Currency exchange rates": "Currency exchange rates",
