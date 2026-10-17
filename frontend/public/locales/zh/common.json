@@ -468,6 +468,7 @@
     "failedHint": "本次处理未完成。重新发送消息即可再次尝试。",
     "compose": "输入消息",
     "placeholder": "描述收支，询问已有记录，或更正待确认账目……",
+    "enterHint": "Enter 发送 · Shift+Enter 换行",
     "send": "发送",
     "deleteConversation": "删除对话",
     "deleteWarning": "这将永久删除本次对话及待确认草稿。已保存的账目仍会保留。删除对话无法撤销。",
