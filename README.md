@@ -1,20 +1,28 @@
-# TermPocket
-
-**Your money, term by term.**
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/termpocket-icon-dark.svg">
+    <img src="frontend/public/brand/termpocket-icon.svg" alt="TermPocket" width="96">
+  </picture>
+</p>
+<h1 align="center">TermPocket</h1>
+<p align="center">Your money, term by term.</p>
+<p align="center">
+  <a href="https://www.termpocket.com">Live app</a> ·
+  <a href="https://www.termpocket.com/privacy">Privacy</a> ·
+  <a href="https://www.termpocket.com/terms">Terms</a>
+</p>
 
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
-[![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
+[![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](eval/)
 [![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-lightgrey.svg)](LICENSE.md)
 
-TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
+Personal finance for students, organised by school term. Record spending by chatting with Pocky (English or 中文), import bank, Uber and WeChat Pay screenshots read entirely on-device, and track savings goals.
 
-A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. TermPocket tracks income, expenses and savings goals against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
+TermPocket is built around the **Waterloo term** (Winter Jan–Apr, Spring May–Aug, Fall Sep–Dec), not the calendar month. A study term and a co-op term are both four months, and that is the unit students actually budget in: a co-op term earns, a study term spends down. (The repository, deployments and databases are still named MindGo.)
 
-**Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
-
-The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not sleep.
+**Try it:** **[www.termpocket.com](https://www.termpocket.com)** — sign in as `john.doe@example.com` / `password123`. The API ([termpocket-api.onrender.com](https://termpocket-api.onrender.com)) runs on Render's Starter instance (0.5 CPU, 512 MB), which does not sleep.
 
 ---
 
@@ -56,8 +64,19 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 
 ## Features
 
-| | |
-|---|---|
+- **Term-based dashboard**: This term / Last term / This year / Last year, category breakdown and a month-by-month income-vs-expenses chart. See [Why terms](#why-terms).
+- **On-device screenshot import**: bank lists, receipts, Uber trips, Uber Eats orders and WeChat Pay. The image never leaves your browser and nothing is saved until you confirm. [Details](#screenshot-import).
+- **Pocky, the conversation assistant**: record income and spending by chatting in English, Chinese or both, with button-only confirmation and ten-minute undo; ask questions about your own recorded spending; plan with deterministic projections and goal proposals you confirm with a button. Messages go to DeepSeek. Off unless the deployment enables it. [Details](#conversation-recording).
+- **Savings goals**: targets with progress bars and days remaining, plus a monthly suggestion when last month left money over.
+- **Transactions**: income and expenses across 18 categories in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in.
+- **English and 中文**: every user-facing string, in both languages.
+- **Weekly email report**: the past seven days plus a four-month rollup, every Sunday at 7 p.m. Toronto time, or on demand from the dashboard.
+- **Read-only MCP access**: connect your own AI client with a personal access token (Settings → AI connections). [Details](#mcp--read-only-for-a-personal-agent).
+- **Automatic deletion of old terms**: opt-in, off by default; Settings shows how many transactions would go and asks first.
+- **Delete account**: Settings → Danger zone removes the account and everything belonging to it.
+- **Settings**: theme, display currency, language and the weekly report switch. Every control saves the moment it changes.
+
+---|---|
 | **Transactions** | Income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in, and every total is shown in the display currency you choose. |
 | **Screenshot import** | Drop in screenshots from a bank app, a receipt photo, Uber, Uber Eats or WeChat Pay. The text is read **in your browser**, every row is checked and flagged, and nothing is saved until you confirm. [Details below](#screenshot-import). |
 | **Conversation recording** | When enabled by the deployment, describe actual income and spending in English, Chinese or both, correct the pending draft, then review and explicitly confirm selected rows. Conversations resume across visits; an unchanged saved batch can be undone for ten minutes. [Details below](#conversation-recording). |
@@ -120,7 +139,7 @@ The [`eval/`](eval/) benchmark runs the same model the browser runs and scores e
 | Synthetic (48 images: bank lists and receipts) | 188 / 188 | 0 |
 | Real screenshots (7, kept private and never committed) | 27 / 27 | 0 |
 
-The recorded OCR output is replayed through the parser in CI, so a parser change that would introduce a silent error fails the build. Design, rules and measurements: [`docs/superpowers/specs/2026-09-16-ocr-import-design.md`](docs/superpowers/specs/2026-09-16-ocr-import-design.md).
+The recorded OCR output is replayed through the parser in CI, so a parser change that would introduce a silent error fails the build.
 
 ---
 
@@ -136,7 +155,7 @@ Messages persist in TermPocket's database until their conversation is deleted. E
 
 The feature is off by default. `AGENT_ENABLED=true` enables migrated agent storage; a configured `DEEPSEEK_API_KEY` additionally enables new model turns. If the key is removed while storage remains enabled, history, draft editing/confirmation, undo and deletion remain available. With `AGENT_ENABLED=false`, agent routes and agent maintenance make no agent database queries; existing stored history remains until storage is enabled and deleted or cleaned up under the rules below.
 
-Limits: one active turn per user, four active model requests per backend process, 20 new turns per user per rolling hour, 60 per user per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY`) and 600 across all users per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY_ALL_USERS`), which bounds the DeepSeek bill in turns (set a spending limit at DeepSeek too), 100 conversations per user and 200 messages per conversation. A request accepts 4,000 characters, uses at most 30 recent messages / 24,000 history characters, proposes at most 12 rows, and has a 90-second deadline with at most eight tool attempts. Cancellation stops the local request promptly; PostgreSQL checks prevent a late response from restoring a cancelled or deleted conversation. Use Refresh or the same request's recovery action after an uncertain response; the UI does not poll.
+Limits: one active turn per user, `AGENT_MAX_CONCURRENT_RUNS` active model requests per backend process (default 1), 20 new turns per user per rolling hour, 60 per user per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY`) and 600 across all users per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY_ALL_USERS`), which bounds the DeepSeek bill in turns (set a spending limit at DeepSeek too), 100 conversations per user and 200 messages per conversation. A request accepts 4,000 characters, uses at most 30 recent messages / 24,000 history characters, proposes at most 12 rows, and has a 90-second deadline with at most eight tool attempts. Cancellation stops the local request promptly; PostgreSQL checks prevent a late response from restoring a cancelled or deleted conversation. Use Refresh or the same request's recovery action after an uncertain response; the UI does not poll.
 
 ---
 
@@ -146,7 +165,7 @@ Limits: one active turn per user, four active model requests per backend process
 
 ```bash
 git clone <repository-url>
-cd MindGo
+cd <repository-folder>
 (cd backend && npm install)   # also builds: `prepare` runs tsc into dist/
 (cd frontend && npm install)
 ```
@@ -158,12 +177,13 @@ cd MindGo
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/mindgo
 JWT_SECRET=<at least 32 characters>
+CORS_ORIGIN=http://localhost:3000   # one origin, or several separated by commas
 
 # Optional. Each one degrades gracefully when absent.
 MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
-EMAIL_USER=              # weekly reports (Gmail)
-EMAIL_PASS=
-EMAIL_HOST=             # optional SMTP server (e.g. smtp.resend.com); unset = Gmail
+EMAIL_USER=              # weekly reports (SMTP login; Gmail by default)
+EMAIL_PASS=              # Gmail app password, or the Resend API key
+EMAIL_HOST=             # optional SMTP server (e.g. smtp.resend.com, used in production); unset = Gmail
 EMAIL_PORT=             # optional, default 465
 EMAIL_FROM=             # optional From header, e.g. TermPocket <noreply@termpocket.com>
 WEEKLY_REPORT_ENABLED=   # unset: weekly reports only under NODE_ENV=production
@@ -283,7 +303,6 @@ eval/                           screenshot-import benchmark (separate npm projec
 ├── exportFixtures.mjs          records OCR output for the backend tests
 └── private/                    real screenshots — gitignored, never committed
 
-docs/superpowers/specs/         design specs for screenshot import and the TypeScript backend
 ```
 
 **Request flow:** route → auth middleware → validation → controller → service/db.
@@ -548,7 +567,7 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
   Create a new token in Settings.
 - **Claude Code shows `✘ Failed to connect` with no OAuth prompt.** This is expected when the header is set: Claude Code doesn't fall back to OAuth. Fix the token, then run `claude mcp get termpocket`.
-- **The first request is slow.** On a sleeping host, the first request waits for the server to wake.
+- **The first request is slow.** On a host that sleeps, the first request waits for the server to wake. The hosted API does not sleep, but Neon may need a moment to resume.
 - **`429` from Settings.** Creating and revoking tokens shares a per-user budget of 20 requests per 15 minutes (`RATE_LIMIT_ACCESS_TOKEN_MAX`).
 
 ---
@@ -650,7 +669,7 @@ The order constraints: **frontend, then backend, then 014** (the previous fronte
 
 **Conversation runtime** — [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) `0.3.300` (`AGENT_RUNTIME=sdk`) or the [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript) `0.131.0` (`AGENT_RUNTIME=direct`), Zod `4.6.7`, and DeepSeek's Anthropic-compatible API. The SDK's package-specific license applies; see its bundled `LICENSE.md`.
 
-**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail; [DeepSeek](https://api-docs.deepseek.com/guides/anthropic_api/) for optional conversation recording.
+**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; a configurable SMTP server for mail (Resend in production, Gmail by default); [DeepSeek](https://api-docs.deepseek.com/guides/anthropic_api/) for optional conversation recording.
 
 ## Database
 
@@ -687,7 +706,7 @@ TermPocket is **source-available** under the [Functional Source License, Version
 - **You may not** offer it, or a modified version, as a commercial product or service that competes with TermPocket.
 - **Each version becomes MIT** on the second anniversary of its release, with no restrictions.
 
-The hosted app at [mind-go.vercel.app](https://mind-go.vercel.app/) is free to use.
+The hosted app at [www.termpocket.com](https://www.termpocket.com) is free to use.
 
 The license covers every version that includes `LICENSE.md`, starting October 2026. Earlier commits were published without a license; ask the maintainer if you need to use one of them.
 
