@@ -84,14 +84,15 @@
         "h": "Deleting your data",
         "p": [
           "Settings → Danger zone → Clear All Data deletes all of your transactions, all of your savings goals and all of your Pocky conversations (with their messages, drafts and goal proposals). It does not delete your account itself (name, email address, password hash and preferences), your AI connection tokens (revoke those in Settings → AI connections), the import counts, or the short-lived records described above, which expire on their own.",
-          "There is no button to delete the account itself yet. To delete your account and everything linked to it, email us at the address below."
+          "Settings → Danger zone → Delete account deletes your account itself and everything linked to it, at once: your name, email address, password hash and preferences, your transactions, savings goals, Pocky conversations (with their messages, drafts, goal proposals, undo receipts and usage records), AI connection tokens and import counts. It asks for your password first. The shared demo account cannot be deleted."
         ]
       },
       {
         "h": "Your choices and requests",
         "p": [
-          "You can see and change your records in the app at any time. You can also ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account. Email privacy@termpocket.com from the address on your account. We may need to confirm that the request comes from you.",
-          "If you are not satisfied with our answer, you can contact the Office of the Privacy Commissioner of Canada."
+          "You can see and change your records in the app at any time, and you can delete your account yourself in Settings (see “Deleting your data”). You can also ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account, by emailing privacy@termpocket.com from the address on your account. We may need to confirm that the request comes from you.",
+          "You can withdraw your consent at any time by no longer using Pocky or by deleting your account.",
+          "If you are not satisfied with our answer, you can complain to the [Office of the Privacy Commissioner of Canada](https://www.priv.gc.ca) or, if you live in Quebec, the [Commission d’accès à l’information du Québec](https://www.cai.gouv.qc.ca)."
         ]
       },
       {
@@ -109,7 +110,7 @@
       {
         "h": "Who TermPocket is for",
         "p": [
-          "TermPocket is intended for university students and other adults. It is not directed at children."
+          "TermPocket is intended for students and anyone tracking their own money, including teenagers 13 and older with a parent’s or guardian’s permission where required. It is not meant for children under 13. If we learn that we hold an under-13 user’s information without a parent’s permission, we delete it; parents can contact privacy@termpocket.com."
         ]
       },
       {
@@ -121,7 +122,8 @@
       {
         "h": "Contact",
         "p": [
-          "Questions or requests: privacy@termpocket.com."
+          "Mingyu Liu, the developer, is responsible for protecting personal information at TermPocket (the person in charge of the protection of personal information under Quebec law). Contact: privacy@termpocket.com.",
+          "Other questions or requests: privacy@termpocket.com."
         ]
       }
     ]
@@ -131,6 +133,12 @@
       "These terms apply to the hosted TermPocket service, the website and app run by its developer, [rick-mingyu-liu](https://github.com/rick-mingyu-liu) (“we”, “us”). By creating an account or using TermPocket, you agree to them. If you do not agree, please do not use TermPocket. Our Privacy Policy explains how we handle your information."
     ],
     "sections": [
+      {
+        "h": "Who can use TermPocket",
+        "p": [
+          "You must be 13 or older to use TermPocket. If you are under the age of majority where you live, you need a parent’s or guardian’s permission, and they agree to these terms on your behalf."
+        ]
+      },
       {
         "h": "The service",
         "p": [

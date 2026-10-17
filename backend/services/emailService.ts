@@ -30,6 +30,7 @@ const transporter = nodemailer.createTransport(transportOptions(config.email));
 
 const verificationMinutes = Math.round(config.emailVerification.tokenExpiry / 60000);
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** `'2026-10-09'` -> `'Oct 9'`, or `'Oct 9, 2026'` with the year. From the string, never a Date. */
@@ -60,6 +61,22 @@ const reportWeek = (now: Date): { today: string; start: string; end: string; lab
   const today = todayIn(config.cron.timezone, now);
   const start = addDays(today, -6);
   return { today, start, end: addDays(today, 1), label: weekLabel(start, today) };
+};
+
+/**
+ * The first weekly report of a month is the one whose "today" (Toronto) is on
+ * days 1-7: a Sunday there is the month's first Sunday exactly once.
+ */
+const isFirstReportOfMonth = (today: string): boolean => Number(today.slice(8, 10)) <= 7;
+
+/** The whole month before `today`'s: `[start, end)` day strings and its English name. Integer arithmetic, no Date. */
+const previousMonthOf = (today: string): { start: string; end: string; name: string } => {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const key = (y: number, m: number): string => `${y}-${String(m).padStart(2, '0')}-01`;
+  return { start: key(prevYear, prevMonth), end: key(year, month), name: MONTH_NAMES[prevMonth - 1] ?? '' };
 };
 
 export const weeklyReportSubject = (now: Date = new Date()): string => `Your TermPocket week: ${reportWeek(now).label}`;
@@ -306,6 +323,13 @@ export const generateWeeklyReport = async (userId: number, now: Date = new Date(
     amount: money(Number(t.amount), t.currency || REPORT_CURRENCY),
   }));
   const goals = goalsRes.rows.map((g) => goalLine(g, week.today));
+  // Last month's leftover, only in the month's first report and only if some goal could use it.
+  let leftover: { amount: number; month: string } | null = null;
+  if (isFirstReportOfMonth(week.today) && goalsRes.rows.some((g) => Number(g.target_amount) > 0 && Number(g.current_amount ?? 0) < Number(g.target_amount))) {
+    const previous = previousMonthOf(week.today);
+    const { net } = totalsOf(await groupedBetween(userId, previous.start, previous.end));
+    if (net > 0) leftover = { amount: net, month: previous.name };
+  }
   const shownGoals = goals.slice(0, MAX_GOALS);
   const moreGoals = goals.length - shownGoals.length;
   const pctOf = (amount: number): number => (weekTotals.spending > 0 ? Math.round((amount / weekTotals.spending) * 100) : 0);
@@ -348,6 +372,13 @@ export const generateWeeklyReport = async (userId: number, now: Date = new Date(
     if (moreGoals > 0) sections.push(paragraph(escapeHtml(`And ${moreGoals} more in TermPocket.`), true));
   }
 
+  const leftoverLine = leftover ? `You had ${money(leftover.amount)} left over in ${leftover.month}. Put some toward a goal?` : '';
+  if (leftover) {
+    sections.push(heading('Last month\'s leftover'));
+    sections.push(paragraph(escapeHtml(leftoverLine)));
+    sections.push(button(appUrl('/goals'), 'Add to a goal'));
+  }
+
   sections.push(button(dashboard, 'Open your dashboard'));
 
   const html = layout({
@@ -384,6 +415,7 @@ export const generateWeeklyReport = async (userId: number, now: Date = new Date(
     }
     if (moreGoals > 0) text.push(`And ${moreGoals} more in TermPocket.`);
   }
+  if (leftover) text.push('', 'LAST MONTH\'S LEFTOVER', leftoverLine, `Add to a goal: ${appUrl('/goals')}`);
   text.push('', `Open your dashboard: ${dashboard}`, '', textFooter(WEEKLY_FOOTER_TEXT));
 
   return { text: text.join('\n'), html };
