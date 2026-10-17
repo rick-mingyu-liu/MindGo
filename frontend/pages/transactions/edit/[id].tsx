@@ -349,7 +349,11 @@ export default function EditTransaction() {
   )
 } 
 
-export async function getServerSideProps({ locale }: { locale: string }) {
+export async function getStaticPaths() {
+  return { paths: [], fallback: 'blocking' as const }
+}
+
+export async function getStaticProps({ locale }: { locale: string }) {
   return {
     props: {
       ...(await serverSideTranslations(locale, ['common'])),

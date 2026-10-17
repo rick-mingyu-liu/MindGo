@@ -428,7 +428,7 @@ export default function Login() {
                 {t('Questions, feedback or ideas? We would love to hear from you.')}
               </p>
               <a
-                href="mailto:rickmyliu@gmail.com"
+                href="mailto:support@termpocket.com"
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               >
                 {t('Contact Us')}
@@ -442,7 +442,7 @@ export default function Login() {
   )
 }
 
-export async function getServerSideProps({ locale }: { locale: string }) {
+export async function getStaticProps({ locale }: { locale: string }) {
   return {
     props: {
       ...(await serverSideTranslations(locale, ['common'])),

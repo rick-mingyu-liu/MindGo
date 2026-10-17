@@ -1,351 +1,390 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { query } from '../db/connection';
-import { getExchangeRate } from './exchangeRateService';
-import { toDay, formatDay } from '../utils/dates';
+import { groupedBetween, REPORT_CURRENCY, type ConvertedGroup } from './moneyFacts';
+import { termOf, boundsOf, labelOf, addDays, daysBetween } from '../utils/terms';
+import { toDay } from '../utils/dates';
 import config = require('../config');
-import type { TransactionRow } from '../types/db';
+import type { SavingsGoalRow, TransactionRow } from '../types/db';
+import { escapeHtml, appUrl, clip, button, bar, heading, paragraph, layout, textFooter, styles } from './emailLayout';
 
-// The dashboard defaults to CAD, so the report reads in the same currency.
-const REPORT_CURRENCY = 'CAD';
+interface EmailConfig {
+  user?: string | undefined;
+  pass?: string | undefined;
+  host?: string | undefined;
+  port: number;
+  from?: string | undefined;
+}
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // Change if using another provider
-  auth: {
-    user: config.email.user,
-    pass: config.email.pass,
-  },
-});
+// EMAIL_HOST set: that SMTP server (implicit TLS on 465, STARTTLS otherwise).
+// Unset: Gmail, exactly as before.
+export const transportOptions = (email: EmailConfig): SMTPTransport.Options => {
+  const auth = { user: email.user, pass: email.pass };
+  if (!email.host) return { service: 'gmail', auth };
+  return { host: email.host, port: email.port, secure: email.port === 465, auth };
+};
 
-export const sendWeeklyReport = async (to: string, content: string, htmlContent: string): Promise<void> => {
+export const fromAddress = (email: EmailConfig): string => email.from ?? `"TermPocket" <${email.user}>`;
+
+const transporter = nodemailer.createTransport(transportOptions(config.email));
+
+const verificationMinutes = Math.round(config.emailVerification.tokenExpiry / 60000);
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `'2026-10-09'` -> `'Oct 9'`, or `'Oct 9, 2026'` with the year. From the string, never a Date. */
+const shortDay = (day: string, withYear: boolean = false): string => {
+  const [year, month, date] = day.split('-');
+  return `${MONTHS[Number(month) - 1] ?? ''} ${Number(date)}${withYear ? `, ${year}` : ''}`;
+};
+
+/** `Oct 9 – 15`, `Sep 28 – Oct 4`: the week as the subject and greeting say it. */
+const weekLabel = (start: string, last: string): string =>
+  start.slice(0, 7) === last.slice(0, 7)
+    ? `${shortDay(start)} – ${Number(last.slice(8, 10))}`
+    : `${shortDay(start)} – ${shortDay(last)}`;
+
+/**
+ * Today's day where the user lives. Users have no timezone column, so it is
+ * the scheduler's (America/Toronto): the report goes out Sunday 7 p.m. there,
+ * when the host's UTC clock may already say Monday.
+ */
+const todayIn = (timeZone: string, now: Date): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
+
+/** The report's week: the seven days ending today, half-open like every other window. */
+const reportWeek = (now: Date): { today: string; start: string; end: string; label: string } => {
+  const today = todayIn(config.cron.timezone, now);
+  const start = addDays(today, -6);
+  return { today, start, end: addDays(today, 1), label: weekLabel(start, today) };
+};
+
+export const weeklyReportSubject = (now: Date = new Date()): string => `Your TermPocket week: ${reportWeek(now).label}`;
+
+export const sendWeeklyReport = async (to: string, content: string, htmlContent: string, subject: string = weeklyReportSubject()): Promise<void> => {
   await transporter.sendMail({
-    from: `"TermPocket" <${config.email.user}>`,
+    from: fromAddress(config.email),
     to,
-    subject: 'Your Weekly Financial Report',
+    subject,
     text: content,
     html: htmlContent,
   });
 };
 
-export const sendEmailVerification = async (to: string, firstName: string, verificationToken: string): Promise<void> => {
-  const frontendUrl = config.frontendUrl;
-  const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
-  // Not the URL: it carries the token, and console.log prints in production.
-  console.log(`[EmailService] Using verification URL base: ${frontendUrl}/verify-email`);
+/** The verification email's parts, without sending: what sendEmailVerification mails. */
+export const verificationEmail = (firstName: string, verificationToken: string): { subject: string; text: string; html: string } => {
+  const verificationUrl = appUrl(`/verify-email?token=${encodeURIComponent(verificationToken)}`);
+  const name = clip(firstName, 60);
+  const greeting = name ? `Welcome to TermPocket, ${name}!` : 'Welcome to TermPocket!';
+  const ignore = `This link expires in ${verificationMinutes} minutes. If you didn't create a TermPocket account, you can safely ignore this email.`;
 
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #16a34a; margin: 0;">TermPocket</h1>
-        <p style="color: #6b7280; margin: 10px 0 0 0;">Your money, term by term.</p>
-      </div>
+  const body = [
+    `<h1 style="margin:0 0 16px 0;font-family:${styles.FONT};font-size:22px;line-height:28px;font-weight:700;color:${styles.INK};">${escapeHtml(greeting)}</h1>`,
+    paragraph('Confirm your email address to finish setting up your account and start tracking your money, term by term.'),
+    button(verificationUrl, 'Verify email address'),
+    paragraph('If the button doesn\'t work, copy and paste this link into your browser:', true),
+    paragraph(`<a href="${escapeHtml(verificationUrl)}" style="color:#16a34a;word-break:break-all;">${escapeHtml(verificationUrl)}</a>`, true),
+    paragraph(escapeHtml(ignore), true),
+  ].join('\n');
 
-      <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; border-left: 4px solid #16a34a;">
-        <h2 style="color: #111827; margin: 0 0 20px 0;">Welcome to TermPocket, ${firstName}!</h2>
+  const text = [
+    greeting,
+    '',
+    'Confirm your email address to finish setting up your account:',
+    '',
+    verificationUrl,
+    '',
+    ignore,
+    '',
+    textFooter(),
+  ].join('\n');
 
-        <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">
-          Thank you for creating your TermPocket account. To complete your registration and start managing your finances, please verify your email address by clicking the button below.
-        </p>
-
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${verificationUrl}"
-             style="background-color: #16a34a; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 500;">
-            Verify Email Address
-          </a>
-        </div>
-
-        <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
-          If the button doesn't work, you can copy and paste this link into your browser:
-        </p>
-        <p style="color: #6b7280; font-size: 14px; margin: 5px 0 0 0; word-break: break-all;">
-          <a href="${verificationUrl}" style="color: #16a34a;">${verificationUrl}</a>
-        </p>
-
-        <p style="color: #6b7280; font-size: 14px; margin: 20px 0 0 0;">
-          This verification link will expire in 30 minutes. If you didn't create a TermPocket account, you can safely ignore this email.
-        </p>
-      </div>
-
-      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-        <p style="color: #6b7280; font-size: 14px; margin: 0;">
-          © ${new Date().getFullYear()} TermPocket. All rights reserved.
-        </p>
-      </div>
-    </div>
-  `;
-
-  const textContent = `
-Welcome to TermPocket, ${firstName}!
-
-Thank you for creating your TermPocket account. To complete your registration and start managing your finances, please verify your email address by visiting the following link:
-
-${verificationUrl}
-
-This verification link will expire in 24 hours. If you didn't create a TermPocket account, you can safely ignore this email.
-
-Best regards,
-The TermPocket Team
-  `;
-
-  await transporter.sendMail({
-    from: `"TermPocket" <${config.email.user}>`,
-    to,
+  return {
     subject: 'Verify your TermPocket account',
-    text: textContent,
-    html: htmlContent,
+    text,
+    html: layout({ title: 'Verify your TermPocket account', preheader: 'Confirm your email address to finish signing up.', body }),
+  };
+};
+
+export const sendEmailVerification = async (to: string, firstName: string, verificationToken: string): Promise<void> => {
+  // Not the URL: it carries the token, and console.log prints in production.
+  console.log(`[EmailService] Using verification URL base: ${appUrl('/verify-email')}`);
+  const email = verificationEmail(firstName, verificationToken);
+  await transporter.sendMail({
+    from: fromAddress(config.email),
+    to,
+    subject: email.subject,
+    text: email.text,
+    html: email.html,
   });
 };
 
-// The columns the SELECT ... FROM savings_goals below names — narrower than
-// the full SavingsGoalRow in types/db.ts.
-interface GoalSummaryRow {
-  name: string;
-  current_amount: string | null;
-  target_amount: string;
-  target_date: string | null;
-}
+// ─── Weekly report ───────────────────────────────────────────────────────────
 
-// The columns the balance SELECT below names: currency plus its own computed
-// aggregate, not a table column.
-interface CurrencyBalanceRow {
-  currency: string | null;
-  balance: string;
-}
+const moneyFormats = new Map<string, Intl.NumberFormat>();
 
-export const generateWeeklyReport = async (userId: number): Promise<{ text: string; html: string }> => {
-  try {
-    // Get transactions from the past 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    // query() is generic, but it cannot infer a row shape from a SQL string,
-    // so the shape is named here; SELECT * matches every column of
-    // TransactionRow.
-    const transactions = await query(
-      `SELECT * FROM transactions
-       WHERE user_id = $1 AND date >= $2
-       ORDER BY date DESC, created_at DESC`,
-      [userId, toDay(sevenDaysAgo)]
-    ) as { rows: TransactionRow[] };
-
-    if (transactions.rows.length === 0) {
-      const emptyText = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\nNo transactions found in the past 7 days.\n\nKeep up the great work managing your finances! 💪`;
-      return { text: emptyText, html: `<div>${emptyText.replace(/\n/g, '<br>')}</div>` };
+/** `$1,234.56` for CAD; `US$12.00`, `CN¥88.00` for the others. */
+const money = (amount: number, currency: string = REPORT_CURRENCY): string => {
+  let format = moneyFormats.get(currency);
+  if (!format) {
+    try {
+      format = new Intl.NumberFormat('en-CA', { style: 'currency', currency });
+    } catch {
+      return `${amount.toFixed(2)} ${currency}`;
     }
-
-    // Organize transactions by type
-    const income = transactions.rows.filter(t => t.type === 'income');
-    const expenses = transactions.rows.filter(t => t.type === 'expense');
-
-    // Calculate totals
-    const totalIncome = income.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const totalExpenses = expenses.reduce((sum, t) => sum + parseFloat(t.amount), 0);
-    const netIncome = totalIncome - totalExpenses;
-
-    // Group by category
-    const incomeByCategory: Record<string, number> = {};
-    const expensesByCategory: Record<string, number> = {};
-
-    income.forEach(t => {
-      incomeByCategory[t.category] = (incomeByCategory[t.category] || 0) + parseFloat(t.amount);
-    });
-
-    expenses.forEach(t => {
-      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + parseFloat(t.amount);
-    });
-
-    // Helper for formatting columns (plain text)
-    function pad(str: string, len: number): string {
-      return (str + '').padEnd(len, ' ');
-    }
-    function money(val: string | number | null): string {
-      return '$' + parseFloat(String(val)).toFixed(2);
-    }
-
-    // Fetch user goals
-    // See the comment on the transactions query above: query()'s result is
-    // untyped, and this lists only the columns the SELECT names.
-    const goalsRes = await query('SELECT name, current_amount, target_amount, target_date FROM savings_goals WHERE user_id = $1', [userId]) as { rows: GoalSummaryRow[] };
-    const goals = goalsRes.rows;
-
-    // Current balance, derived from the transaction history. This used to read a
-    // users.net_worth column that nothing ever wrote, so every report claimed a
-    // balance of $0.00; the transactions are the real source of truth.
-    //
-    // Summed per currency and converted to CAD, the same target the dashboard
-    // defaults to — a straight SUM would add CNY to CAD as if they were the
-    // same unit.
-    const balanceRes = await query(
-      `SELECT currency,
-              COALESCE(SUM(CASE WHEN type = 'income'  THEN amount ELSE 0 END), 0)
-            - COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS balance
-         FROM transactions WHERE user_id = $1 GROUP BY currency`,
-      [userId]
-    ) as { rows: CurrencyBalanceRow[] };
-    let currentBalance = 0;
-    for (const row of balanceRes.rows) {
-      const amount = parseFloat(row.balance);
-      const currency = row.currency || REPORT_CURRENCY;
-      currentBalance += currency === REPORT_CURRENCY
-        ? amount
-        : amount * await getExchangeRate(currency, REPORT_CURRENCY);
-    }
-
-    // Fetch 4-month net income summary (dashboard style)
-    const fourMonthsAgo = new Date();
-    fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 3); // includes current month
-    const endOfThisMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
-    const rollingTx = await query(
-      `SELECT * FROM transactions WHERE user_id = $1 AND date >= $2 AND date < $3`,
-      [userId, toDay(fourMonthsAgo), toDay(endOfThisMonth)]
-    ) as { rows: TransactionRow[] };
-    let rollingIncome = 0, rollingExpenses = 0;
-    rollingTx.rows.forEach(t => {
-      if (t.type === 'income') rollingIncome += parseFloat(t.amount);
-      else if (t.type === 'expense') rollingExpenses += parseFloat(t.amount);
-    });
-    const rollingNetIncome = rollingIncome - rollingExpenses;
-
-    // --- Plain Text Content ---
-    let content = `📊 WEEKLY FINANCIAL REPORT\nPeriod: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}\n\n`;
-    // Dashboard-style 4-month summary
-    content += `==========================\n`;
-    content += `📅 LAST 4 MONTHS SUMMARY\n`;
-    content += `==========================\n`;
-    content += pad('Total Income:', 18) + money(rollingIncome) + '\n';
-    content += pad('Total Expenses:', 18) + money(rollingExpenses) + '\n';
-    content += pad('Net Income:', 18) + money(rollingNetIncome) + '\n\n';
-    // Summary
-    content += `==========================\n`;
-    content += `💰 WEEKLY SUMMARY\n`;
-    content += `==========================\n`;
-    content += pad('Total Income:', 18) + money(totalIncome) + '\n';
-    content += pad('Total Expenses:', 18) + money(totalExpenses) + '\n';
-    content += pad('Net Income:', 18) + money(netIncome) + '\n';
-    content += pad('Current Balance:', 18) + money(currentBalance) + '\n';
-    content += '\n';
-    // Goals Status
-    if (goals.length > 0) {
-      content += `==========================\n`;
-      content += `🎯 GOALS STATUS\n`;
-      content += `==========================\n`;
-      content += pad('Goal', 18) + pad('Current', 10) + pad('Target', 10) + pad('Date', 12) + pad('%', 6) + '\n';
-      content += '--------------------------------------------------------------\n';
-      goals.forEach(g => {
-        const percent = Number(g.target_amount) > 0 ? (100 * Number(g.current_amount) / Number(g.target_amount)) : 0;
-        content += pad(g.name, 18) + pad(money(g.current_amount), 10) + pad(money(g.target_amount), 10) + pad(formatDay(g.target_date), 12) + pad(percent.toFixed(1) + '%', 6) + '\n';
-      });
-      content += '\n';
-    }
-
-    // Income breakdown
-    if (income.length > 0) {
-      content += `==========================\n`;
-      content += `📈 INCOME BREAKDOWN\n`;
-      content += `==========================\n`;
-      content += pad('Category', 22) + pad('Amount', 12) + '\n';
-      content += '------------------------------\n';
-      Object.entries(incomeByCategory).forEach(([category, amount]) => {
-        content += pad(category, 22) + pad(money(amount), 12) + '\n';
-      });
-      content += '------------------------------\n';
-      content += pad('Total Income:', 22) + pad(money(totalIncome), 12) + '\n\n';
-    }
-
-    // Expense breakdown
-    if (expenses.length > 0) {
-      content += `==========================\n`;
-      content += `📉 EXPENSE BREAKDOWN\n`;
-      content += `==========================\n`;
-      content += pad('Category', 22) + pad('Amount', 12) + '\n';
-      content += '------------------------------\n';
-      Object.entries(expensesByCategory).forEach(([category, amount]) => {
-        content += pad(category, 22) + pad(money(amount), 12) + '\n';
-      });
-      content += '------------------------------\n';
-      content += pad('Total Expenses:', 22) + pad(money(totalExpenses), 12) + '\n\n';
-    }
-
-    // Recent transactions
-    content += `==========================\n`;
-    content += `📝 RECENT TRANSACTIONS\n`;
-    content += `==========================\n`;
-    content += pad('Date', 12) + pad('Type', 12) + pad('Description', 28) + pad('Amount', 10) + '\n';
-    content += '--------------------------------------------------------------\n';
-    transactions.rows.slice(0, 10).forEach(t => {
-      const date = formatDay(t.date);
-      const type = t.type === 'income' ? 'INCOME' : 'EXPENSE';
-      const desc = t.description.length > 25 ? t.description.slice(0, 22) + '...' : t.description;
-      content += pad(date, 12) + pad(type, 12) + pad(desc, 28) + pad(money(t.amount), 10) + '\n';
-    });
-    content += '\n';
-
-    // Footer
-    content += `Keep up the great work managing your finances! 💪\n\n`;
-    content += `— The TermPocket Team\n`;
-    content += `https://mindgo.io\n`;
-
-    // --- HTML Content ---
-    const html = `
-      <div style="font-family: Arial, sans-serif; color: #222; max-width: 600px; margin: auto;">
-        <h1 style="font-size: 2em; color: #2d3748; margin-bottom: 0.2em;">📊 WEEKLY FINANCIAL REPORT</h1>
-        <div style="font-size: 1.1em; margin-bottom: 1.5em;">Period: ${toDay(sevenDaysAgo)} to ${toDay(new Date())}</div>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📅 LAST 4 MONTHS SUMMARY</h2>
-        <table style="width: 100%; font-size: 1.1em; margin-bottom: 1.5em;">
-          <tr><td>Total Income:</td><td style="font-weight: bold;">${money(rollingIncome)}</td></tr>
-          <tr><td>Total Expenses:</td><td style="font-weight: bold;">${money(rollingExpenses)}</td></tr>
-          <tr><td>Net Income:</td><td style="font-weight: bold; color: ${rollingNetIncome >= 0 ? '#38a169' : '#e53e3e'};">${money(rollingNetIncome)}</td></tr>
-        </table>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">💰 WEEKLY SUMMARY</h2>
-        <table style="width: 100%; font-size: 1.1em; margin-bottom: 1.5em;">
-          <tr><td>Total Income:</td><td style="font-weight: bold;">${money(totalIncome)}</td></tr>
-          <tr><td>Total Expenses:</td><td style="font-weight: bold;">${money(totalExpenses)}</td></tr>
-          <tr><td>Net Income:</td><td style="font-weight: bold; color: ${netIncome >= 0 ? '#38a169' : '#e53e3e'};">${money(netIncome)}</td></tr>
-        </table>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📈 INCOME BREAKDOWN</h2>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
-          <tr style="background: #f7fafc;"><th align="left">Category</th><th align="right">Amount</th></tr>
-          ${Object.entries(incomeByCategory).map(([cat, amt]) => `<tr><td>${cat}</td><td align="right">${money(amt)}</td></tr>`).join('')}
-          <tr style="font-weight: bold;"><td>Total Income:</td><td align="right">${money(totalIncome)}</td></tr>
-        </table>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📉 EXPENSE BREAKDOWN</h2>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
-          <tr style="background: #f7fafc;"><th align="left">Category</th><th align="right">Amount</th></tr>
-          ${Object.entries(expensesByCategory).map(([cat, amt]) => `<tr><td>${cat}</td><td align="right">${money(amt)}</td></tr>`).join('')}
-          <tr style="font-weight: bold;"><td>Total Expenses:</td><td align="right">${money(totalExpenses)}</td></tr>
-        </table>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">📝 RECENT TRANSACTIONS</h2>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
-          <tr style="background: #f7fafc;"><th align="left">Date</th><th align="left">Type</th><th align="left">Description</th><th align="right">Amount</th></tr>
-          ${transactions.rows.slice(0, 10).map(t => {
-            const date = formatDay(t.date);
-            const type = t.type === 'income' ? 'INCOME' : 'EXPENSE';
-            const desc = t.description.length > 25 ? t.description.slice(0, 22) + '...' : t.description;
-            return `<tr><td>${date}</td><td>${type}</td><td>${desc}</td><td align="right">${money(t.amount)}</td></tr>`;
-          }).join('')}
-        </table>
-
-        <h2 style="color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 0.2em;">🎯 GOALS STATUS</h2>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5em;">
-          <tr style="background: #f7fafc;"><th align="left">Goal</th><th align="right">Current</th><th align="right">Target</th><th align="center">Date</th><th align="right">%</th></tr>
-          ${goals.map(g => {
-            const percent = Number(g.target_amount) > 0 ? (100 * Number(g.current_amount) / Number(g.target_amount)) : 0;
-            return `<tr><td>${g.name}</td><td align="right">${money(g.current_amount)}</td><td align="right">${money(g.target_amount)}</td><td align="center">${formatDay(g.target_date)}</td><td align="right">${percent.toFixed(1)}%</td></tr>`;
-          }).join('')}
-        </table>
-
-        <div style="margin-top: 2em; font-size: 1.1em;">Keep up the great work managing your finances! 💪</div>
-        <div style="margin-top: 2em; color: #888; font-size: 1em;">— The TermPocket Team<br><a href="https://mindgo.io" style="color: #3182ce; text-decoration: none;">https://mindgo.io</a></div>
-      </div>
-    `;
-
-    return { text: content, html };
-  } catch (error) {
-    console.error('Error generating weekly report:', error);
-    return { text: `📊 WEEKLY FINANCIAL REPORT\nUnable to generate weekly report at this time. Please try again later.`, html: `<div>Unable to generate weekly report at this time.</div>` };
+    moneyFormats.set(currency, format);
   }
+  return format.format(amount);
+};
+
+interface Totals {
+  income: number;
+  spending: number;
+  net: number;
+  /** Spending per category, largest first. */
+  categories: Array<{ category: string; amount: number }>;
+}
+
+/** Sums converted groups in integer cents, so ten 0.10s are exactly 1.00. */
+const totalsOf = (groups: ConvertedGroup[]): Totals => {
+  let income = 0;
+  let spending = 0;
+  const byCategory = new Map<string, number>();
+  for (const g of groups) {
+    const cents = Math.round(g.amount * 100);
+    if (g.type === 'income') income += cents;
+    else {
+      spending += cents;
+      byCategory.set(g.category, (byCategory.get(g.category) ?? 0) + cents);
+    }
+  }
+  return {
+    income: income / 100,
+    spending: spending / 100,
+    net: (income - spending) / 100,
+    categories: [...byCategory].sort((a, b) => b[1] - a[1]).map(([category, cents]) => ({ category, amount: cents / 100 })),
+  };
+};
+
+type RecentRow = Pick<TransactionRow, 'date' | 'type' | 'description' | 'category' | 'amount' | 'currency'>;
+type GoalRow = Pick<SavingsGoalRow, 'name' | 'current_amount' | 'target_amount' | 'target_date' | 'currency'>;
+
+interface GoalLine {
+  name: string;
+  saved: number;
+  target: number;
+  currency: string;
+  /** Floored, so 99.6% never reads as 100; null when there is no target to measure against. */
+  percent: number | null;
+  status: string;
+}
+
+const MAX_CATEGORIES = 5;
+const MAX_RECENT = 5;
+const MAX_GOALS = 5;
+
+const goalLine = (goal: GoalRow, today: string): GoalLine => {
+  const target = Number(goal.target_amount);
+  const saved = Number(goal.current_amount ?? 0);
+  const percent = target > 0 ? Math.min(100, Math.floor((saved / target) * 100)) : null;
+  const due = toDay(goal.target_date);
+  let status: string;
+  if (percent === null) status = 'No target amount set';
+  else if (saved >= target) status = 'Reached';
+  else if (!due) status = 'No target date';
+  else if (due < today) status = `Overdue since ${shortDay(due, true)}`;
+  else {
+    const days = daysBetween(today, due);
+    status = `Due ${shortDay(due, true)}${days <= 60 ? ` (${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`})` : ''}`;
+  }
+  return { name: clip(goal.name, 60), saved, target, currency: goal.currency || REPORT_CURRENCY, percent, status };
+};
+
+// One label/value row; `valueHtml` is already safe.
+const row = (labelHtml: string, valueHtml: string, strong: boolean = false): string =>
+  `<tr><td style="padding:6px 0;font-family:${styles.FONT};font-size:15px;line-height:22px;color:${styles.INK};">${labelHtml}</td>`
+  + `<td align="right" style="padding:6px 0;font-family:${styles.FONT};font-size:15px;line-height:22px;color:${styles.INK};white-space:nowrap;${strong ? 'font-weight:700;' : ''}">${valueHtml}</td></tr>`;
+
+const table = (rows: string): string =>
+  `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">${rows}</table>`;
+
+const muted = (html: string): string => `<span style="font-family:${styles.FONT};color:${styles.MUTED};font-size:13px;line-height:18px;">${html}</span>`;
+
+const netColour = (net: number): string => (net < 0 ? '#dc2626' : '#16a34a');
+
+const totalsTable = (t: Totals): string => table(
+  row('Income', escapeHtml(money(t.income)))
+  + row('Spending', escapeHtml(money(t.spending)))
+  + `<tr><td colspan="2" style="border-top:1px solid ${styles.LINE};font-size:1px;line-height:1px;">&nbsp;</td></tr>`
+  + row('<strong>Net</strong>', `<span style="color:${netColour(t.net)};">${escapeHtml(money(t.net))}</span>`, true)
+);
+
+const pad = (label: string, width: number = 12): string => label.padEnd(width, ' ');
+
+const totalsText = (t: Totals): string[] => [
+  `${pad('Income')}${money(t.income)}`,
+  `${pad('Spending')}${money(t.spending)}`,
+  `${pad('Net')}${money(t.net)}`,
+];
+
+const CONVERSION_LINE = 'All amounts in CAD. Other currencies are converted at current exchange rates.';
+const WEEKLY_FOOTER_TEXT = 'You get this every Sunday because weekly reports are on. Turn them off in Settings.';
+const weeklyFooterHtml = (): string =>
+  `You get this every Sunday because weekly reports are on. <a href="${escapeHtml(appUrl('/settings'))}" style="color:${styles.MUTED};text-decoration:underline;">Turn them off in Settings</a>.`;
+
+const greetingFor = (firstName: string): string => (firstName ? `Hi ${firstName},` : 'Hi there,');
+
+/**
+ * The Sunday email for one user, as `{ text, html }`. `now` is for tests and
+ * previews; both callers (the scheduler and POST /auth/test-email) omit it.
+ *
+ * Totals are converted to CAD per currency through moneyFacts.groupedBetween,
+ * like the dashboard and MCP. When a needed rate cannot be had it throws
+ * (RateUnavailableError) rather than mail a total that adds yuan to dollars:
+ * the scheduler logs that user's report as failed and moves on, and the test
+ * endpoint answers 500. Any other failure throws the same way; this no longer
+ * mails an "unable to generate" placeholder.
+ */
+export const generateWeeklyReport = async (userId: number, now: Date = new Date()): Promise<{ text: string; html: string }> => {
+  const week = reportWeek(now);
+  const userRes = await query<{ first_name: string }>('SELECT first_name FROM users WHERE id = $1', [userId]);
+  const firstName = clip(userRes.rows[0]?.first_name, 60);
+  const greeting = greetingFor(firstName);
+  const dashboard = appUrl();
+
+  const weekGroups = await groupedBetween(userId, week.start, week.end);
+
+  if (weekGroups.length === 0) {
+    const addUrl = appUrl('/transactions/new');
+    const lines = [
+      `Nothing recorded for ${week.label}.`,
+      'Quiet weeks happen. If you did spend or earn something, add it now and next week\'s report will have the full picture.',
+    ];
+    const body = [
+      paragraph(escapeHtml(greeting)),
+      paragraph(`<strong>${escapeHtml(lines[0])}</strong>`),
+      paragraph(escapeHtml(lines[1])),
+      button(addUrl, 'Add a transaction'),
+    ].join('\n');
+    const text = [greeting, '', ...lines.flatMap((l) => [l, '']), `Add a transaction: ${addUrl}`, '', textFooter(WEEKLY_FOOTER_TEXT)].join('\n');
+    return {
+      text,
+      html: layout({ title: `Your TermPocket week: ${week.label}`, preheader: `Nothing recorded for ${week.label}.`, body, footerNote: weeklyFooterHtml() }),
+    };
+  }
+
+  const termId = termOf(week.today);
+  const termLabel = labelOf(termId);
+  const termGroups = await groupedBetween(userId, boundsOf(termId).start, week.end);
+
+  const recentRes = await query<RecentRow>(
+    `SELECT date, type, description, category, amount, currency
+       FROM transactions
+      WHERE user_id = $1 AND date >= $2 AND date < $3
+      ORDER BY date DESC, id DESC
+      LIMIT ${MAX_RECENT}`,
+    [userId, week.start, week.end]
+  );
+  const goalsRes = await query<GoalRow>(
+    `SELECT name, current_amount, target_amount, target_date, currency
+       FROM savings_goals WHERE user_id = $1
+      ORDER BY target_date NULLS LAST, id`,
+    [userId]
+  );
+
+  const weekTotals = totalsOf(weekGroups);
+  const termTotals = totalsOf(termGroups);
+  const topCategories = weekTotals.categories.slice(0, MAX_CATEGORIES);
+  const recent = recentRes.rows.map((t) => ({
+    day: toDay(t.date) ?? '',
+    income: t.type === 'income',
+    description: clip(t.description, 48) || '(no description)',
+    category: clip(t.category, 40),
+    amount: money(Number(t.amount), t.currency || REPORT_CURRENCY),
+  }));
+  const goals = goalsRes.rows.map((g) => goalLine(g, week.today));
+  const shownGoals = goals.slice(0, MAX_GOALS);
+  const moreGoals = goals.length - shownGoals.length;
+  const pctOf = (amount: number): number => (weekTotals.spending > 0 ? Math.round((amount / weekTotals.spending) * 100) : 0);
+
+  // --- HTML ---
+  const sections: string[] = [
+    paragraph(escapeHtml(greeting)),
+    paragraph(`Here's your week in TermPocket, <strong style="white-space:nowrap;">${escapeHtml(week.label)}</strong>.`),
+    heading('This week'),
+    totalsTable(weekTotals),
+    heading(`${termLabel} so far`),
+    totalsTable(termTotals),
+    paragraph(escapeHtml(CONVERSION_LINE), true),
+  ];
+
+  if (topCategories.length > 0) {
+    sections.push(heading('Where your money went'));
+    sections.push(table(topCategories.map((c) =>
+      row(escapeHtml(clip(c.category, 40)), `${escapeHtml(money(c.amount))} ${muted(`${pctOf(c.amount)}%`)}`)
+      + `<tr><td colspan="2" style="padding:0 0 8px 0;">${bar(pctOf(c.amount))}</td></tr>`
+    ).join('')));
+  }
+
+  sections.push(heading('Recent transactions'));
+  sections.push(table(recent.map((t) =>
+    row(
+      `${escapeHtml(t.description)}<br>${muted(`${escapeHtml(shortDay(t.day))} · ${escapeHtml(t.category)}`)}`,
+      `<span style="color:${t.income ? '#16a34a' : styles.INK};">${t.income ? '+' : '−'}${escapeHtml(t.amount)}</span>`
+    )
+  ).join('')));
+
+  if (shownGoals.length > 0) {
+    sections.push(heading('Savings goals'));
+    sections.push(table(shownGoals.map((g) =>
+      // Amounts go on the status line, not beside the name, so a phone-width card never has to fit both.
+      row(`<strong>${escapeHtml(g.name)}</strong>`, g.percent === null ? '' : `${g.percent}%`)
+      + (g.percent === null ? '' : `<tr><td colspan="2" style="padding:2px 0 4px 0;">${bar(g.percent)}</td></tr>`)
+      + `<tr><td colspan="2" style="padding:0 0 10px 0;">${muted(escapeHtml(`${money(g.saved, g.currency)} of ${money(g.target, g.currency)} · ${g.status}`))}</td></tr>`
+    ).join('')));
+    if (moreGoals > 0) sections.push(paragraph(escapeHtml(`And ${moreGoals} more in TermPocket.`), true));
+  }
+
+  sections.push(button(dashboard, 'Open your dashboard'));
+
+  const html = layout({
+    title: `Your TermPocket week: ${week.label}`,
+    preheader: `This week: ${money(weekTotals.income)} in, ${money(weekTotals.spending)} out.`,
+    body: sections.join('\n'),
+    footerNote: weeklyFooterHtml(),
+  });
+
+  // --- Plain text ---
+  const text: string[] = [
+    greeting,
+    '',
+    `Here's your week in TermPocket, ${week.label}.`,
+    '',
+    'THIS WEEK',
+    ...totalsText(weekTotals),
+    '',
+    `${termLabel.toUpperCase()} SO FAR`,
+    ...totalsText(termTotals),
+    '',
+    CONVERSION_LINE,
+  ];
+  if (topCategories.length > 0) {
+    text.push('', 'WHERE YOUR MONEY WENT');
+    for (const c of topCategories) text.push(`${pad(clip(c.category, 22), 24)}${money(c.amount)} (${pctOf(c.amount)}%)`);
+  }
+  text.push('', 'RECENT TRANSACTIONS');
+  for (const t of recent) text.push(`${pad(shortDay(t.day), 8)}${pad(`${t.income ? '+' : '-'}${t.amount}`, 14)}${t.description} (${t.category})`);
+  if (shownGoals.length > 0) {
+    text.push('', 'SAVINGS GOALS');
+    for (const g of shownGoals) {
+      text.push(`${g.name}: ${money(g.saved, g.currency)} of ${money(g.target, g.currency)}${g.percent === null ? '' : ` (${g.percent}%)`} - ${g.status}`);
+    }
+    if (moreGoals > 0) text.push(`And ${moreGoals} more in TermPocket.`);
+  }
+  text.push('', `Open your dashboard: ${dashboard}`, '', textFooter(WEEKLY_FOOTER_TEXT));
+
+  return { text: text.join('\n'), html };
 };
