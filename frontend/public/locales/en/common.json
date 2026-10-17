@@ -193,6 +193,17 @@
   "View All": "View All",
   "No savings goals yet": "No savings goals yet",
   "Create Your First Goal": "Create Your First Goal",
+  "goalTopUp": {
+    "title": "You had {{amount}} left over in {{month}}. Add some to a goal?",
+    "goal": "Goal",
+    "amount": "Amount to add ({{currency}})",
+    "preview": "{{name}}: {{from}} → {{to}} of {{target}}",
+    "invalidAmount": "Enter an amount greater than 0, with at most two decimals.",
+    "add": "Add to goal",
+    "notNow": "Not now",
+    "added": "Added {{amount}} to {{name}}.",
+    "notFound": "That goal no longer exists."
+  },
   "Loading...": "Loading...",
   "Load more": "Load more",
   "Search and filters apply only to the transactions loaded so far.": "Search and filters apply only to the transactions loaded so far.",

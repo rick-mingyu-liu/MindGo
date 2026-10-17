@@ -69,6 +69,13 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // The goals page's top-up suggestion reads last month's totals in the
+    // background and simply stays hidden when they fail (a missing exchange
+    // rate is a 500), so no dialog should interrupt the page.
+    if (error.config?.url?.startsWith('/summary/monthly') && response?.status !== 401) {
+      return Promise.reject(error)
+    }
+
     // The edit page reads one transaction and says "not found" itself, so a
     // missing, foreign or malformed id must not also raise the generic dialog.
     const ownsTransactionLookup = error.config?.method === 'get'
