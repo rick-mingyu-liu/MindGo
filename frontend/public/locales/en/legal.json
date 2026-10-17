@@ -1,9 +1,9 @@
 {
-  "updated": "16 October 2026",
+  "updated": "17 October 2026",
   "privacy": {
     "intro": [
-      "TermPocket is a free personal finance app for university students, run by its developer, [rick-mingyu-liu](https://github.com/rick-mingyu-liu) (“we”, “us”). This page explains what TermPocket stores, where it goes, how long it is kept, and how to ask for a copy or for deletion.",
-      "In short: we store what you type into TermPocket so the app can show it back to you. We do not sell it, show ads, or connect to your bank. The servers are in the United States, and if you use Pocky, the assistant, your messages and the records it looks up are processed by DeepSeek, an AI provider based in China."
+      "TermPocket is a free personal finance app for university students, run from Canada by its developer, [rick-mingyu-liu](https://github.com/rick-mingyu-liu) (“we”, “us”). This page explains what TermPocket stores, where it goes, how long it is kept, and how to ask for a copy or for deletion.",
+      "In short: we store what you type into TermPocket so the app can show it back to you. We do not sell it, show ads, or connect to your bank. The servers are in the United States, and if you use Pocky, the assistant, your messages and the records it looks up are processed by DeepSeek, the AI provider behind Pocky (see “Pocky and DeepSeek” below)."
     ],
     "sections": [
       {
@@ -36,7 +36,7 @@
           "any amounts or plans you describe, such as pay, rent or a savings target."
         ],
         "after": [
-          "DeepSeek is based in China, so this information is processed outside Canada and may be subject to the laws of the countries where it is processed. DeepSeek handles what it receives under its own terms and privacy policy. Deleting a conversation in TermPocket removes it from our database; we cannot promise that it is removed from DeepSeek’s systems.",
+          "DeepSeek, the AI provider behind Pocky, processes this information on its servers in China, outside Canada, where it may be subject to local laws. DeepSeek handles what it receives under its own terms and privacy policy. Deleting a conversation in TermPocket removes it from our database; we cannot promise that it is removed from DeepSeek’s systems.",
           "Do not include passwords, card numbers or other credentials in a message. If you do not want this information to reach DeepSeek, do not use Pocky; the rest of TermPocket works without it."
         ]
       },
@@ -46,13 +46,13 @@
           "Neon hosts the database, in Amazon Web Services’ us-east-1 region in the United States. Everything listed under “What we store” lives there.",
           "Render runs the server (the API) in Virginia, United States, and keeps its request logs.",
           "Vercel hosts the website, and Vercel Web Analytics records page visits so we can see which pages are used.",
-          "Google’s Gmail sends our email: the verification link when you sign up, and the weekly report, which contains a summary of your week’s income and spending. You can turn the weekly report off in Settings.",
+          "Resend, a service based in the United States, sends our email from noreply@termpocket.com: the verification link when you sign up, and the weekly report, which contains a summary of your week’s income and spending. You can turn the weekly report off in Settings.",
           "MailboxLayer (apilayer) may check that your email address can receive mail when you register. It receives the address only.",
           "Frankfurter provides exchange rates. It receives only the currencies being converted, nothing about you.",
           "If you connect an AI service of your own with a personal access token, that service receives the totals and savings goals it asks for (goal names, amounts and dates) and handles them under its own terms."
         ],
         "after": [
-          "Because these providers are in the United States (and DeepSeek in China), your information is stored and processed outside Canada."
+          "These providers store and process information outside Canada, in the United States (and, for Pocky, China)."
         ]
       },
       {
