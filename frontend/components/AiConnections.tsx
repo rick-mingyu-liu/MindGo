@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Copy, KeyRound, PlugZap, ShieldCheck, Trash2 } from 'lucide-react'
+import { BookOpen, Check, ChevronRight, Copy, KeyRound, PlugZap, ShieldCheck, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useTranslation } from 'next-i18next'
 import { AccessToken, MCP_ENDPOINT_URL, accessTokenAPI } from '@/utils/api'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,19 @@ import {
 const NAME_MAX = 60
 const COPY_TIMEOUT_MS = 1500
 
-type CopyTarget = 'secret' | 'endpoint' | 'header'
+type CopyTarget = 'secret' | 'endpoint' | 'header' | 'claude-code-cmd' | 'claude-code-json'
+
+const CLAUDE_CODE_CMD = `claude mcp add --transport http termpocket ${MCP_ENDPOINT_URL} \\
+  --header "Authorization: Bearer <your token>"`
+const CLAUDE_CODE_JSON = `{
+  "mcpServers": {
+    "termpocket": {
+      "type": "http",
+      "url": "${MCP_ENDPOINT_URL}",
+      "headers": { "Authorization": "Bearer \${TERMPOCKET_TOKEN}" }
+    }
+  }
+}`
 
 // created_at and last_used_at are instants, not days, so lib/date.ts's day
 // helpers do not apply; the viewer's own clock and locale name them.
@@ -64,6 +77,9 @@ export default function AiConnections() {
   const secretCodeRef = useRef<HTMLElement>(null)
   const endpointCodeRef = useRef<HTMLElement>(null)
   const headerCodeRef = useRef<HTMLElement>(null)
+  const cmdCodeRef = useRef<HTMLElement>(null)
+  const jsonCodeRef = useRef<HTMLElement>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   const [copied, setCopied] = useState<CopyTarget | null>(null)
@@ -276,9 +292,18 @@ export default function AiConnections() {
               </Button>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {t('Setup steps for each AI client are in the TermPocket README.')}
-          </p>
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">{t('How to connect an AI app')}</span>
+              <span className="block text-sm text-muted-foreground">{t('Step-by-step setup for Claude Code, Claude and other apps')}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
         </section>
 
         {secret && (
@@ -435,6 +460,71 @@ export default function AiConnections() {
             <Button variant="destructive" onClick={handleRevoke} disabled={revokeBusy}>
               {revokeBusy ? t('Revoking...') : t('Revoke access')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('How to connect an AI app')}</DialogTitle>
+            <DialogDescription>
+              {t('Read-only: a connected app sees totals and savings goals, never transaction descriptions. Revoke it here at any time.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>{t('Create a token above and copy it. It is shown only once.')}</li>
+              <li>{t('Add TermPocket to your AI app using the steps below, pasting the token where it says <your token>.')}</li>
+              <li>{t('Ask it about your term spending or savings goals.')}</li>
+            </ol>
+            <Tabs defaultValue="claude-code">
+              <TabsList className="h-auto flex-wrap justify-start">
+                <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
+                <TabsTrigger value="claude">{t('Claude (claude.ai)')}</TabsTrigger>
+                <TabsTrigger value="other">{t('Other apps')}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="claude-code" className="space-y-3">
+                <p>{t('Run this in a terminal. The endpoint is already filled in for this site.')}</p>
+                <div className="flex items-stretch gap-2">
+                  <pre className="flex-1 min-w-0 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={cmdCodeRef}>{CLAUDE_CODE_CMD}</code></pre>
+                  <Button type="button" variant="outline" size="sm" className="h-auto shrink-0"
+                    onClick={() => copy('claude-code-cmd', CLAUDE_CODE_CMD, cmdCodeRef.current)}
+                    aria-label={copied === 'claude-code-cmd' ? t('Copied') : t('Copy command')}>
+                    {copyIcon('claude-code-cmd')}
+                  </Button>
+                </div>
+                <p>{t('Then run claude mcp get termpocket. It should say Connected.')}</p>
+                <p className="text-muted-foreground">{t('To share a project config file, never put the token in it. Reference an environment variable instead:')}</p>
+                <div className="flex items-stretch gap-2">
+                  <pre className="flex-1 min-w-0 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={jsonCodeRef}>{CLAUDE_CODE_JSON}</code></pre>
+                  <Button type="button" variant="outline" size="sm" className="h-auto shrink-0"
+                    onClick={() => copy('claude-code-json', CLAUDE_CODE_JSON, jsonCodeRef.current)}
+                    aria-label={copied === 'claude-code-json' ? t('Copied') : t('Copy config')}>
+                    {copyIcon('claude-code-json')}
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="claude" className="space-y-2">
+                <ol className="list-decimal space-y-1 pl-5">
+                  <li>{t('In Claude, open Settings and add a custom connector.')}</li>
+                  <li>{t('Paste the MCP endpoint shown above as the connector URL.')}</li>
+                  <li>{t('In the request headers setting, add Authorization with the value Bearer <your token>.')}</li>
+                </ol>
+                <p className="text-muted-foreground">{t('This needs a public HTTPS endpoint. It has not been tested with TermPocket yet.')}</p>
+              </TabsContent>
+              <TabsContent value="other" className="space-y-2">
+                <p>{t('Any app that supports remote MCP servers over HTTP with a custom header can connect: use the endpoint above and the header Authorization: Bearer <your token>.')}</p>
+                <p className="text-muted-foreground">{t('Apps that only support signing in with OAuth cannot connect.')}</p>
+              </TabsContent>
+            </Tabs>
+            <p className="text-muted-foreground">
+              {t('If an app reports 401, the token is wrong or revoked, or the header lacks “Bearer ”. Create a new token. Your TermPocket login does not work here.')}
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">{t('Close')}</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
