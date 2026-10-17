@@ -84,7 +84,7 @@
         "h": "Deleting your data",
         "p": [
           "Settings → Danger zone → Clear All Data deletes all of your transactions, all of your savings goals and all of your Pocky conversations (with their messages, drafts and goal proposals). It does not delete your account itself (name, email address, password hash and preferences), your AI connection tokens (revoke those in Settings → AI connections), the import counts, or the short-lived records described above, which expire on their own.",
-          "There is no button to delete the account itself yet. To delete your account and everything linked to it, email us at the address below."
+          "Settings → Danger zone → Delete account deletes your account itself and everything linked to it, at once: your name, email address, password hash and preferences, your transactions, savings goals, Pocky conversations (with their messages, drafts, goal proposals, undo receipts and usage records), AI connection tokens and import counts. It asks for your password first. The shared demo account cannot be deleted."
         ]
       },
       {

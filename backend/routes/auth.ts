@@ -3,7 +3,7 @@ import { body } from 'express-validator';
 import authController = require('../controllers/authController');
 import auth = require('../middleware/auth');
 import config = require('../config');
-import { authLimiter } from '../middleware/rateLimiter';
+import { authLimiter, accountDeleteLimiter } from '../middleware/rateLimiter';
 
 const router = express.Router();
 
@@ -68,6 +68,15 @@ const updateProfileValidation = [
     .withMessage(`Last name must be at most ${config.validation.nameMaxLength} characters`)
 ];
 
+// bcrypt reads only the first 72 bytes; the cap keeps a huge body from being hashed at all.
+const deleteAccountValidation = [
+  body('password')
+    .isString().withMessage('Password is required')
+    .bail()
+    .notEmpty().withMessage('Password is required')
+    .isLength({ max: 1024 }).withMessage('Password is too long')
+];
+
 const resendVerificationValidation = [
   body('email').isEmail().withMessage('Please enter a valid email')
 ];
@@ -89,5 +98,7 @@ router.put('/profile', auth, updateProfileValidation, authController.updateProfi
 // Sends an email, so it is throttled like the credential routes.
 router.post('/test-email', authLimiter, auth, authController.sendTestEmail);
 router.put('/notifications', auth, authController.updateNotificationSettings);
+// Settings -> Danger zone -> Delete account. Per-user limiter: it checks the password.
+router.delete('/account', auth, accountDeleteLimiter, deleteAccountValidation, authController.deleteAccount);
 
 export = router;

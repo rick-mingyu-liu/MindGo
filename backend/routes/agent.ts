@@ -8,6 +8,7 @@ import runtime = require('../services/agent/runtime');
 import { recordsFor } from '../services/agent/investigation';
 import { AgentError } from '../services/agent/types';
 import { validateUuid, validateSettings, validateMessage } from '../services/agent/validation';
+import { onAccountDeleted } from '../services/accountService';
 
 const router = express.Router();
 router.use(auth);
@@ -27,6 +28,8 @@ const key = (userId:number,runId:string) => `${userId}:${runId}`;
 function abortOwned(userId:number,conversationId?:string) {
   for (const run of active.values()) if (run.userId===userId && (!conversationId || run.conversationId===conversationId)) run.controller.abort();
 }
+// A deleted account's turns in this process stop now rather than at their next check.
+onAccountDeleted((userId)=>abortOwned(userId));
 function object(value:unknown, keys:string[]):Record<string,unknown> {
   if (!value || typeof value!=='object' || Array.isArray(value)) throw new AgentError('agent_invalid_input');
   const body=value as Record<string,unknown>;
