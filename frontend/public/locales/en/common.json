@@ -469,6 +469,7 @@
     "failedHint": "This turn did not finish. Send your message again to start a new attempt.",
     "compose": "Your message",
     "placeholder": "Tell me what you spent or earned, ask about your records, or correct a pending entry…",
+    "enterHint": "Enter to send · Shift+Enter for a new line",
     "send": "Send",
     "deleteConversation": "Delete conversation",
     "deleteWarning": "This permanently deletes this conversation and its pending drafts. Transactions already saved remain in your records. This cannot be undone.",

@@ -106,6 +106,10 @@ export default function AgentPage() {
   const running = sending || state?.run?.status === 'running'
   const locked = busy || Boolean(running) || cancelling
   const unresolved = Boolean(retry || confirmRetry || goalRetry)
+  const sendDisabled = locked || unresolved || dirty || available !== true || !content.trim()
+  // Coarse pointer = phone/tablet: Enter stays a newline there and Send is the button.
+  const [enterSends, setEnterSends] = useState(false)
+  useEffect(() => { setEnterSends(!window.matchMedia('(pointer: coarse)').matches) }, [])
   const pendingDraft = state?.draft?.status === 'pending'
   const expired = Boolean(state?.draft && new Date(state.draft.expires_at).getTime() <= now)
   const validRows = rows.length > 0 && rows.every(row => AMOUNT_PATTERN.test(row.amount) && Number(row.amount) > 0 && row.description.trim() && row.date)
@@ -359,8 +363,14 @@ export default function AgentPage() {
                 if (previous) void send({ conversationId: state.conversation.id, body: { ...context, content: previous.content, requestId: crypto.randomUUID() } })
               }}>{t('agent.retryNew')}</Button></div>}
               <form onSubmit={event => { event.preventDefault(); void send() }} className="space-y-3">
-                <label className="block space-y-2 text-sm"><span className="font-medium">{t('agent.compose')}</span><Textarea ref={composer} rows={3} maxLength={4000} value={content} onChange={e => setContent(e.target.value)} disabled={locked || unresolved || available !== true} placeholder={t('agent.placeholder')} /></label>
-                <div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{t('agent.reviewHint')}</p><Button type="submit" disabled={locked || unresolved || dirty || available !== true || !content.trim()}><Send />{t('agent.send')}</Button></div>
+                <label className="block space-y-2 text-sm"><span className="font-medium">{t('agent.compose')}</span><Textarea ref={composer} rows={3} maxLength={4000} value={content} onChange={e => setContent(e.target.value)} onKeyDown={e => {
+                  if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return
+                  // Plain Enter sends only with a fine pointer; Cmd/Ctrl+Enter always does.
+                  if (!(e.metaKey || e.ctrlKey || enterSends)) return
+                  e.preventDefault()
+                  if (!sendDisabled) e.currentTarget.form?.requestSubmit()
+                }} disabled={locked || unresolved || available !== true} placeholder={t('agent.placeholder')} /></label>
+                <div className="flex items-center justify-between gap-3"><div className="space-y-1"><p className="text-xs text-muted-foreground">{t('agent.reviewHint')}</p>{enterSends && <p className="text-xs text-muted-foreground">{t('agent.enterHint')}</p>}</div><Button type="submit" disabled={sendDisabled}><Send />{t('agent.send')}</Button></div>
               </form>
               {state && <div className="border-t pt-3"><Button variant="ghost" size="sm" disabled={locked || unresolved} onClick={() => setDeleteOpen(true)}><Trash2 />{t('agent.deleteConversation')}</Button></div>}
             </CardContent></Card>
