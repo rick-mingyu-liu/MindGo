@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'next-i18next'
 import toast from 'react-hot-toast'
 import { PiggyBank } from 'lucide-react'
@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { formatCurrency } from '@/utils/formatters'
-import { toDay, previousMonth, formatMonth } from '@/lib/date'
+import { toDay, formatMonth } from '@/lib/date'
+import { useGoalTopUp, toCents } from '@/lib/useGoalTopUp'
 
 /** The goal fields this card reads. NUMERIC columns may arrive as strings. */
 interface TopUpGoal {
@@ -27,36 +28,9 @@ interface Props {
   onAdded: () => void
 }
 
-const toCents = (value: number | string | null) => Math.round(Number(value ?? 0) * 100)
 // Same shape the edit form accepts, but strictly positive and at most two
 // decimals: rounding a longer entry could add more than the user typed.
 const AMOUNT = /^\d+(\.\d{1,2})?$/
-
-/** One dismissal per viewer and month. Storage may throw; the card must still work. */
-function dismissalKey(): string {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}') as { id?: number }
-    return `goalTopUpDismissed:${user.id ?? 'unknown'}`
-  } catch {
-    return 'goalTopUpDismissed:unknown'
-  }
-}
-
-function readDismissed(month: string): boolean {
-  try {
-    return localStorage.getItem(dismissalKey()) === month
-  } catch {
-    return false
-  }
-}
-
-function storeDismissed(month: string) {
-  try {
-    localStorage.setItem(dismissalKey(), month)
-  } catch {
-    // Per-viewer convenience only: hidden for this visit either way.
-  }
-}
 
 /**
  * "You had $X left over last month. Add some to a goal?"
@@ -67,43 +41,10 @@ function storeDismissed(month: string) {
  */
 export default function GoalTopUpSuggestion({ goals, onAdded }: Props) {
   const { t, i18n } = useTranslation('common')
-  const month = useMemo(() => previousMonth(), [])
-  const [dismissed, setDismissed] = useState(true)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  // Last month's net, in cents, per currency it was converted into. null means
-  // the summary or a conversion failed: no suggestion rather than a wrong one.
-  const [leftover, setLeftover] = useState<Record<string, number | null>>({})
+  const { month, active, goal, currency, leftoverCents, available, dismiss } = useGoalTopUp(goals, selectedId)
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    setDismissed(readDismissed(month.key))
-  }, [month.key])
-
-  // Not yet reached, nearest target date first.
-  const active = useMemo(
-    () => goals
-      .filter((g) => toCents(g.current_amount) < toCents(g.target_amount))
-      .sort((a, b) => (toDay(a.target_date) ?? '9999').localeCompare(toDay(b.target_date) ?? '9999') || a.id - b.id),
-    [goals],
-  )
-  const goal = active.find((g) => g.id === selectedId) ?? active[0]
-  const currency = goal?.currency || 'CAD'
-  const leftoverCents = leftover[currency]
-
-  useEffect(() => {
-    if (dismissed || !goal || leftover[currency] !== undefined) return
-    let cancelled = false
-    api.get('/summary/monthly', { params: { year: month.year, month: month.month, targetCurrency: currency } })
-      .then((res) => {
-        const net = Number(res.data?.netIncome)
-        if (!cancelled) setLeftover((prev) => ({ ...prev, [currency]: Number.isFinite(net) ? Math.round(net * 100) : null }))
-      })
-      .catch(() => {
-        if (!cancelled) setLeftover((prev) => ({ ...prev, [currency]: null }))
-      })
-    return () => { cancelled = true }
-  }, [dismissed, goal, currency, leftover, month])
 
   // Prefill with what is left over, but no more than the goal still needs.
   useEffect(() => {
@@ -112,16 +53,11 @@ export default function GoalTopUpSuggestion({ goals, onAdded }: Props) {
     setAmount((Math.min(leftoverCents, remaining) / 100).toFixed(2))
   }, [goal, leftoverCents])
 
-  if (dismissed || !goal || leftoverCents == null || leftoverCents <= 0) return null
+  if (!available || !goal || leftoverCents == null) return null
 
   const valid = AMOUNT.test(amount.trim()) && Number(amount) > 0
   const addCents = valid ? toCents(amount.trim()) : 0
   const fromCents = toCents(goal.current_amount)
-
-  const dismiss = () => {
-    storeDismissed(month.key)
-    setDismissed(true)
-  }
 
   const add = async () => {
     if (!valid) return

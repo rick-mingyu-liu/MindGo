@@ -202,7 +202,8 @@
     "add": "Add to goal",
     "notNow": "Not now",
     "added": "Added {{amount}} to {{name}}.",
-    "notFound": "That goal no longer exists."
+    "notFound": "That goal no longer exists.",
+    "badge": "A savings suggestion is waiting on the Goals page"
   },
   "Loading...": "Loading...",
   "Load more": "Load more",
