@@ -464,20 +464,20 @@ export default function AiConnections() {
         </DialogContent>
       </Dialog>
       <Dialog open={guideOpen} onOpenChange={setGuideOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden">
+          <DialogHeader className="pr-6">
             <DialogTitle>{t('How to connect an AI app')}</DialogTitle>
             <DialogDescription>
               {t('Read-only: a connected app sees totals and savings goals, never transaction descriptions. Revoke it here at any time.')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 text-sm">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden break-words text-sm">
             <ol className="list-decimal space-y-1 pl-5">
               <li>{t('Create a token above and copy it. It is shown only once.')}</li>
               <li>{t('Add TermPocket to your AI app using the steps below, pasting the token where it says <your token>.')}</li>
               <li>{t('Ask it about your term spending or savings goals.')}</li>
             </ol>
-            <Tabs defaultValue="claude-code">
+            <Tabs defaultValue="claude-code" className="min-w-0">
               <TabsList className="h-auto flex-wrap justify-start">
                 <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
                 <TabsTrigger value="claude">{t('Claude (claude.ai)')}</TabsTrigger>
@@ -486,7 +486,7 @@ export default function AiConnections() {
               <TabsContent value="claude-code" className="space-y-3">
                 <p>{t('Run this in a terminal. The endpoint is already filled in for this site.')}</p>
                 <div className="flex items-stretch gap-2">
-                  <pre className="flex-1 min-w-0 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={cmdCodeRef}>{CLAUDE_CODE_CMD}</code></pre>
+                  <pre className="min-w-0 max-w-full flex-1 whitespace-pre-wrap break-all rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={cmdCodeRef}>{CLAUDE_CODE_CMD}</code></pre>
                   <Button type="button" variant="outline" size="sm" className="h-auto shrink-0"
                     onClick={() => copy('claude-code-cmd', CLAUDE_CODE_CMD, cmdCodeRef.current)}
                     aria-label={copied === 'claude-code-cmd' ? t('Copied') : t('Copy command')}>
@@ -496,7 +496,7 @@ export default function AiConnections() {
                 <p>{t('Then run claude mcp get termpocket. It should say Connected.')}</p>
                 <p className="text-muted-foreground">{t('To share a project config file, never put the token in it. Reference an environment variable instead:')}</p>
                 <div className="flex items-stretch gap-2">
-                  <pre className="flex-1 min-w-0 overflow-x-auto rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={jsonCodeRef}>{CLAUDE_CODE_JSON}</code></pre>
+                  <pre className="min-w-0 max-w-full flex-1 whitespace-pre-wrap break-all rounded-md border bg-muted px-3 py-2 font-mono text-xs"><code ref={jsonCodeRef}>{CLAUDE_CODE_JSON}</code></pre>
                   <Button type="button" variant="outline" size="sm" className="h-auto shrink-0"
                     onClick={() => copy('claude-code-json', CLAUDE_CODE_JSON, jsonCodeRef.current)}
                     aria-label={copied === 'claude-code-json' ? t('Copied') : t('Copy config')}>
