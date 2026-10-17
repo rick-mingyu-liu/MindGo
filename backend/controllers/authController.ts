@@ -9,6 +9,9 @@ import { maskEmail } from '../utils/privacy';
 import { sendWeeklyReport, generateWeeklyReport, sendEmailVerification } from '../services/emailService';
 import { validateEmail } from '../services/emailValidationService';
 import { reclaimStaleUnverifiedAccount } from '../services/cleanupService';
+import * as accountService from '../services/accountService';
+import logger = require('../utils/logger');
+import { errorSummary } from '../utils/errorSummary';
 
 // The columns the SELECT below names — narrower than the full UserRow.
 interface ExistingUserRow {
@@ -418,6 +421,43 @@ const authController = {
     } catch (error) {
       console.error('Update notification settings error:', error);
       res.status(500).json({ error: 'Failed to update notification settings' });
+    }
+  },
+
+  /**
+   * Settings -> Delete account: re-checks the password, then deletes the user
+   * and everything that belongs to them (services/accountService.ts). Logs the
+   * user id and row counts only — never the password, the address or a body.
+   * A wrong password is 403, not 401: the login token is still valid, and the
+   * client logs out on any 401.
+   */
+  async deleteAccount(req: Request, res: Response) {
+    res.set('Cache-Control', 'no-store');
+    const userId = req.user.userId;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      // errors.array() would echo the submitted value, which is the password.
+      return res.status(400).json({ errors: errors.array().map((e) => ({ msg: e.msg, path: 'path' in e ? e.path : undefined })) });
+    }
+    try {
+      const deleted = await accountService.deleteAccount(userId, req.body.password as string);
+      logger.audit('Account deleted', { userId, deleted });
+      accountService.accountDeleted(userId);
+      res.json({ deleted: true });
+    } catch (error) {
+      if (error instanceof accountService.AccountPasswordError) {
+        console.log(`[DeleteAccount] Refused, wrong password: user ${userId}`);
+        return res.status(403).json({ error: error.message, code: error.code });
+      }
+      if (error instanceof accountService.AccountDemoError) {
+        console.log(`[DeleteAccount] Refused, demo account: user ${userId}`);
+        return res.status(403).json({ error: error.message, code: error.code });
+      }
+      if (error instanceof accountService.AccountNotFoundError) {
+        return res.status(404).json({ error: error.message, code: error.code });
+      }
+      console.error('Delete account error:', { userId, ...errorSummary(error) });
+      res.status(500).json({ error: 'Server error' });
     }
   }
 };
