@@ -31,6 +31,10 @@ interface Fixture {
   term?: Array<{ currency: string; type: 'income' | 'expense'; category: string; total: string }>;
   recent?: Array<Record<string, string>>;
   goals?: Array<Record<string, string | null>>;
+  /** Groups for the previous-month window, keyed by its start day. */
+  previous?: Record<string, Fixture['week']>;
+  /** Any window not listed in `previous` answers with `week`: for tests whose `now` is not NOW. */
+  anyWindow?: boolean;
 }
 
 const queries: Array<{ text: string; params: unknown[] }> = [];
@@ -41,7 +45,8 @@ function answer(f: Fixture): void {
     const rows = (r: unknown[]) => ({ rows: r, rowCount: r.length });
     if (/FROM users/.test(text)) return rows(f.firstName === undefined ? [] : [{ first_name: f.firstName }]);
     if (/GROUP BY currency, type, category/.test(text)) {
-      const groups = params[1] === WEEK_START ? f.week : params[1] === TERM_START ? (f.term ?? f.week) : null;
+      const groups = f.previous?.[String(params[1])]
+        ?? (params[1] === WEEK_START || f.anyWindow ? f.week : params[1] === TERM_START ? (f.term ?? f.week) : null);
       assert.ok(groups, `unexpected window starting ${String(params[1])}`);
       return rows(groups.map((g) => ({ ...g, count: '1' })));
     }
@@ -193,6 +198,99 @@ describe('generateWeeklyReport', () => {
   test('a missing exchange rate fails the report instead of mailing a wrong total', async () => {
     answer({ ...FULL, week: [{ currency: 'EUR', type: 'expense', category: 'Travel', total: '10.00' }] });
     await assert.rejects(generateWeeklyReport(1, NOW), { name: 'RateUnavailableError' });
+  });
+});
+
+describe('generateWeeklyReport, last month\'s leftover', () => {
+  // Thursday Oct 1 2026 is a first-week day; Oct 7 the last one; Oct 8 the first that is not.
+  const day = (d: string): Date => new Date(`${d}T16:00:00Z`);
+  const OPEN_GOAL = { name: 'Laptop', current_amount: '300.00', target_amount: '1200.00', target_date: '2026-12-31', currency: 'CAD' };
+  const DONE_GOAL = { name: 'Done', current_amount: '100.00', target_amount: '100.00', target_date: null, currency: 'CAD' };
+  const SEPT = '2026-09-01';
+  const base = (over: Partial<Fixture> = {}): Fixture => ({
+    firstName: 'Alex',
+    anyWindow: true,
+    week: [{ currency: 'CAD', type: 'expense', category: 'Food', total: '10.00' }],
+    goals: [OPEN_GOAL],
+    previous: { [SEPT]: [
+      { currency: 'CAD', type: 'income', category: 'Salary', total: '1000.00' },
+      { currency: 'USD', type: 'income', category: 'Freelance', total: '100.00' },
+      { currency: 'CNY', type: 'expense', category: 'Food', total: '500.00' },
+      { currency: 'CAD', type: 'expense', category: 'Rent', total: '526.74' },
+    ] },
+    ...over,
+  });
+  // 1000 CAD + 100 USD (140) - 500 CNY (100) - 526.74 CAD = 513.26.
+
+  test('shown on days 1-7 with a positive leftover and an unreached goal, converted per currency', async () => {
+    answer(base());
+    for (const d of ['2026-10-01', '2026-10-04', '2026-10-07']) {
+      const { text, html } = await generateWeeklyReport(1, day(d));
+      assert.match(text, /LAST MONTH'S LEFTOVER\nYou had \$513\.26 left over in September\. Put some toward a goal\?\nAdd to a goal: https:\/\/app\.example\.test\/goals/, d);
+      assert.match(html, /Last month&#39;s leftover/);
+      assert.match(html, /You had \$513\.26 left over in September\./);
+      assert.ok(hrefs(html).includes(`${FRONTEND}/goals`));
+      assertLinksFromConfig(html);
+    }
+    const windows = queries.filter((q) => /GROUP BY/.test(q.text)).map((q) => q.params[1]);
+    assert.ok(windows.includes(SEPT));
+    assert.ok(queries.some((q) => q.params[1] === SEPT && q.params[2] === '2026-10-01'), 'half-open end is the 1st of this month');
+  });
+
+  test('hidden from day 8 on, without querying last month', async () => {
+    answer(base());
+    const { text, html } = await generateWeeklyReport(1, day('2026-10-08'));
+    assert.doesNotMatch(text + html, /leftover/i);
+    assert.ok(!queries.some((q) => q.params[1] === SEPT && q.params[2] === '2026-10-01'));
+  });
+
+  test('uses the Toronto day, not the UTC one: the 4th at 9 p.m. is the 5th in UTC', async () => {
+    answer(base());
+    const { text } = await generateWeeklyReport(1, new Date('2026-10-05T01:00:00Z'));
+    assert.match(text, /left over in September/);
+    assert.ok(queries.some((q) => q.params[1] === SEPT));
+    // The 7th at 9 p.m. Toronto is already the 8th in UTC, but still first week there.
+    answer(base());
+    const late = await generateWeeklyReport(1, new Date('2026-10-08T01:00:00Z'));
+    assert.match(late.text, /left over in September/);
+  });
+
+  test('hidden when the leftover is zero or negative', async () => {
+    for (const total of ['1000.00', '1200.00']) {
+      answer(base({ previous: { [SEPT]: [
+        { currency: 'CAD', type: 'income', category: 'Salary', total: '1000.00' },
+        { currency: 'CAD', type: 'expense', category: 'Rent', total },
+      ] } }));
+      const { text, html } = await generateWeeklyReport(1, day('2026-10-01'));
+      assert.doesNotMatch(text + html, /leftover/i, total);
+    }
+  });
+
+  test('hidden with no goals, only reached goals, or only a zero-target goal', async () => {
+    for (const goals of [[], [DONE_GOAL], [{ ...OPEN_GOAL, target_amount: '0.00' }]]) {
+      answer(base({ goals }));
+      const { text, html } = await generateWeeklyReport(1, day('2026-10-01'));
+      assert.doesNotMatch(text + html, /leftover/i);
+    }
+  });
+
+  test('shown when only one of several goals is unreached', async () => {
+    answer(base({ goals: [DONE_GOAL, OPEN_GOAL] }));
+    const { text } = await generateWeeklyReport(1, day('2026-10-01'));
+    assert.match(text, /left over in September/);
+  });
+
+  test('a January report looks at December of the year before', async () => {
+    // Thursday Jan 1 2026 in Toronto.
+    answer(base({ previous: { '2025-12-01': [{ currency: 'CAD', type: 'income', category: 'Salary', total: '75.50' }] } }));
+    const { text } = await generateWeeklyReport(1, day('2026-01-01'));
+    assert.match(text, /You had \$75\.50 left over in December\./);
+    assert.ok(queries.some((q) => q.params[1] === '2025-12-01' && q.params[2] === '2026-01-01'));
+  });
+
+  test('a missing exchange rate in last month fails the report', async () => {
+    answer(base({ previous: { [SEPT]: [{ currency: 'EUR', type: 'income', category: 'Salary', total: '10.00' }] } }));
+    await assert.rejects(generateWeeklyReport(1, day('2026-10-01')), { name: 'RateUnavailableError' });
   });
 });
 
