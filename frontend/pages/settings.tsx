@@ -15,6 +15,7 @@ import {
   LogOut,
   BookOpen,
   History,
+  PlayCircle,
   UserX,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -359,6 +360,16 @@ export default function Settings() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="mt-6 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-base font-medium leading-none">{t('onboarding.settings.title')}</p>
+                    <p className="text-sm text-muted-foreground">{t('onboarding.settings.hint')}</p>
+                  </div>
+                  <Button variant="outline" className="shrink-0" onClick={() => router.push('/?tour=1')}>
+                    <PlayCircle className="h-4 w-4" />
+                    {t('onboarding.settings.replay')}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
