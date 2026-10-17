@@ -115,6 +115,120 @@
       }
     },
     {
+      "id": "voice-en-spelled-amount",
+      "language": "en",
+      "message": "um so i got lunch at the slc for fifteen dollars today",
+      "note": "Dictated text: lowercase, no punctuation, a filler word, the amount spelled out.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"], "exclude": ["propose_goal"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "newRows": 1, "rows": [{ "type": "expense", "amount": "15.00", "currency": "CAD", "category": "Dining Out", "date": "2026-10-14" }] },
+        "goalProposal": null
+      }
+    },
+    {
+      "id": "voice-en-dollars-cents-run-together",
+      "language": "en",
+      "message": "uber home twenty three forty",
+      "note": "Spoken dollars and cents with no 'dollars' or 'point': twenty three forty is 23.40. No date word means today.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "rows": [{ "type": "expense", "amount": "23.40", "currency": "CAD", "category": "Transportation", "date": "2026-10-14" }] }
+      }
+    },
+    {
+      "id": "voice-en-run-on-two-entries",
+      "language": "en",
+      "message": "groceries at no frills sixty two eighteen yesterday and a bus ticket three fifty",
+      "note": "Two entries in one unpunctuated sentence. 'yesterday' is only asserted on the row it follows; the bus ticket's date is left open.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 2, "newRows": 2, "rows": [
+          { "type": "expense", "amount": "62.18", "currency": "CAD", "category": "Groceries", "date": "2026-10-13" },
+          { "type": "expense", "amount": "3.50", "currency": "CAD", "category": "Transportation" }
+        ] }
+      }
+    },
+    {
+      "id": "voice-en-spoken-thousands",
+      "language": "en",
+      "message": "paid rent one thousand one hundred and fifty dollars",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "rows": [{ "type": "expense", "amount": "1150.00", "currency": "CAD", "category": "Housing", "date": "2026-10-14" }] }
+      }
+    },
+    {
+      "id": "voice-en-self-correction",
+      "language": "en",
+      "message": "coffee four seventy five no wait five twenty five",
+      "note": "The speaker corrects themselves mid-sentence: one row with the second amount, not two rows.",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "newRows": 1, "rows": [{ "type": "expense", "amount": "5.25", "currency": "CAD", "category": ["Dining Out", "Groceries"], "date": "2026-10-14" }] }
+      }
+    },
+    {
+      "id": "voice-en-filler-income",
+      "language": "en",
+      "message": "uh i got paid uh my co-op paycheck came in two thousand four hundred and eighty dollars",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "rows": [{ "type": "income", "amount": "2480.00", "currency": "CAD", "category": "Salary", "date": "2026-10-14" }] }
+      }
+    },
+    {
+      "id": "voice-en-spoken-currency",
+      "language": "en",
+      "message": "twenty five us dollars on steam today",
+      "expect": {
+        "tools": { "include": ["propose_transactions"] },
+        "maxToolCalls": 2,
+        "draft": { "count": 1, "rows": [{ "type": "expense", "amount": "25.00", "currency": "USD", "category": "Entertainment", "date": "2026-10-14" }] }
+      }
+    },
+    {
+      "id": "voice-en-cut-off",
+      "language": "en",
+      "message": "um so i spent uh on the",
+      "note": "A recording that stopped mid-sentence (the 15-second cap, or the button released early): no amount, so no row, and a question back (asked with or without a question mark).",
+      "expect": {
+        "tools": { "exclude": ["propose_transactions", "propose_goal"] },
+        "draft": { "count": 0 },
+        "goalProposal": null,
+        "reply": { "mustContainAny": [["?", "could you", "can you", "please tell", "tell me"]], "mustNotContain": ["saved", "recorded"] }
+      }
+    },
+    {
+      "id": "en-bare-dollars-non-dollar-currency",
+      "language": "en",
+      "currency": "CNY",
+      "message": "spent 20 dollars on lunch today",
+      "note": "A bare \"dollars\" in a conversation whose currency is not a dollar: never CNY, and not silently USD. Pocky asks which dollars.",
+      "expect": {
+        "tools": { "exclude": ["propose_transactions"] },
+        "draft": { "count": 0 },
+        "reply": { "mustContain": ["?"] }
+      }
+    },
+    {
+      "id": "en-dollar-sign-non-dollar-currency",
+      "language": "en",
+      "currency": "GBP",
+      "message": "coffee $5 today",
+      "note": "A \"$\" in a GBP conversation is not pounds: before the prompt named EUR, GBP and CNY this drafted 5.00 GBP in 3 of 3 runs.",
+      "expect": {
+        "tools": { "exclude": ["propose_transactions"] },
+        "draft": { "count": 0 },
+        "reply": { "mustContain": ["?"] }
+      }
+    },
+    {
       "id": "en-correct-amount",
       "language": "en",
       "message": "Actually lunch was 14.25, not 12.50.",
