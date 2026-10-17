@@ -20,6 +20,7 @@ import { formatCurrency } from '@/utils/formatters';
 import { useTranslation } from 'next-i18next'
 import { toDay, formatDay, daysUntil } from '@/lib/date';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
+import GoalTopUpSuggestion from '@/components/GoalTopUpSuggestion';
 
 interface Goal {
   id: number
@@ -340,6 +341,7 @@ export default function Goals() {
         </header>
 
         <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
+          <GoalTopUpSuggestion goals={goals} onAdded={fetchGoals} />
           {goals.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
