@@ -215,7 +215,8 @@
     "add": "存入目标",
     "notNow": "暂不",
     "added": "已向「{{name}}」存入 {{amount}}。",
-    "notFound": "这个目标已不存在。"
+    "notFound": "这个目标已不存在。",
+    "badge": "目标页面有一条储蓄建议"
   },
   "Progress": "进度",
   "Current": "当前",

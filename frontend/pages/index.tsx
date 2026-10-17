@@ -13,7 +13,8 @@ import {
   Info,
   Edit,
   Settings as SettingsIcon,
-  ScanText } from 'lucide-react'
+  ScanText,
+  MessageCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
@@ -29,6 +30,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { categories as categoryTypeMap } from './transactions/new';
 import { useTranslation } from 'next-i18next'
 import { formatDay, formatDayRange } from '@/lib/date';
+import { useGoalTopUp } from '@/lib/useGoalTopUp';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface FinancialSummary {
@@ -199,6 +201,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
+  const topUp = useGoalTopUp(goals)
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
@@ -809,14 +812,28 @@ export default function Dashboard() {
                     <CardTitle>{t('Savings Goals')}</CardTitle>
                     <CardDescription>{t('Track your financial goals')}</CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push('/goals')}
-                  >
-                    {t('View All')}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {topUp.available && (
+                      <button
+                        type="button"
+                        onClick={() => router.push('/goals')}
+                        aria-label={t('goalTopUp.badge')}
+                        title={t('goalTopUp.badge')}
+                        className="relative rounded-full p-1.5 text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <MessageCircle className="w-5 h-5" aria-hidden="true" />
+                        <span className="absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" aria-hidden="true" />
+                      </button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/goals')}
+                    >
+                      {t('View All')}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
