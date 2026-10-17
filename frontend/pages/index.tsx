@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Image from 'next/image'
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -9,11 +10,12 @@ import {
   Plus,
   ArrowRight,
   BarChart3,
-  Sparkles,
+  PlayCircle,
   Info,
   Edit,
   Settings as SettingsIcon,
-  ScanText } from 'lucide-react'
+  ScanText,
+  MessageCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
 import { api } from '@/utils/api'
 import { formatCurrency, formatCompactCurrency } from '@/utils/formatters'
@@ -24,11 +26,14 @@ import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLogo } from '@/components/BrandLogo'
 import AgentPanel from '@/components/agent/AgentPanel'
+import OnboardingTour from '@/components/onboarding/OnboardingTour'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTheme } from '@/contexts/ThemeContext'
 import { categories as categoryTypeMap } from './transactions/new';
 import { useTranslation } from 'next-i18next'
 import { formatDay, formatDayRange } from '@/lib/date';
+import { useGoalTopUp } from '@/lib/useGoalTopUp';
+import { markTourShown, tourSeen } from '@/lib/onboarding';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 interface FinancialSummary {
@@ -199,9 +204,11 @@ export default function Dashboard() {
   const router = useRouter()
   const [summary, setSummary] = useState<FinancialSummary | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
+  const topUp = useGoalTopUp(goals)
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
+  const [tourOpen, setTourOpen] = useState(false)
   const { resolvedTheme } = useTheme();
   const [categoryView, setCategoryView] = useState<CategoryView>('all');
   const [period, setPeriod] = useState<PeriodKey>('thisTerm');
@@ -233,12 +240,15 @@ export default function Dashboard() {
       setGoals(goalsRes.data.goals)
       setTransactions(transactionsRes.data.transactions)
 
-      // Check if this is a new user (has very little data or sample data)
-      const hasVeryLittleData = summaryRes.data.transactions?.length <= 6 && 
-                               goalsRes.data.goals.length <= 1
-      
-      // Show welcome message for users with sample data or very little data
-      setIsNewUser(hasVeryLittleData)
+      // A new account: at most six transactions ever and at most one goal.
+      // Counted from the all-time list rather than the selected period's, so
+      // an established account does not look new on the first day of a term
+      // or when switching to an empty period. The demo account is several
+      // terms of data, so it never qualifies.
+      setIsNewUser(
+        (transactionsRes.data.transactions?.length ?? 0) <= 6 &&
+        (goalsRes.data.goals?.length ?? 0) <= 1
+      )
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -256,6 +266,20 @@ export default function Dashboard() {
 
     fetchDashboardData()
   }, [router, fetchDashboardData])
+
+  // The first-run tour opens by itself once per account, for new accounts only.
+  useEffect(() => {
+    if (loading || !isNewUser || tourSeen()) return
+    markTourShown()
+    setTourOpen(true)
+  }, [loading, isNewUser])
+
+  // Settings' "Show tour again" links here with ?tour=1.
+  useEffect(() => {
+    if (!router.isReady || router.query.tour !== '1') return
+    setTourOpen(true)
+    router.replace({ pathname: '/' }, undefined, { shallow: true })
+  }, [router])
 
   // Listen for navigation events to refresh data when returning to dashboard
   useEffect(() => {
@@ -449,7 +473,7 @@ export default function Dashboard() {
                 <button
                   className="fixed bottom-6 right-6 z-50 flex sm:hidden items-center justify-center w-16 h-16 rounded-full bg-primary text-white shadow-lg fab-add-transaction"
                   onClick={() => router.push('/transactions/new')}
-                  aria-label="Add Transaction"
+                  aria-label={t('Add Transaction')}
                 >
                   <Plus className="w-8 h-8" />
                 </button>
@@ -462,51 +486,34 @@ export default function Dashboard() {
         </header>
 
         <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Message for New Users */}
+          {/* Getting started: new accounts only; reopens the first-run tour */}
           {isNewUser && (
-            <Card className="mb-8 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50 transition-colors duration-200 hover:bg-blue-100 dark:hover:bg-blue-900/30">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-blue-600" />
-                    </div>
+            <Card className="mb-8 overflow-hidden">
+              <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e3f6e6] dark:bg-[#0d2a1d]">
+                    <Image src="/brand/termpocket-icon.svg" alt="" width={36} height={36} className="h-9 w-9 dark:hidden" />
+                    <Image src="/brand/termpocket-icon-dark.svg" alt="" width={36} height={36} className="hidden h-9 w-9 dark:block" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="font-semibold leading-tight">{t('onboarding.card.title')}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{t('onboarding.card.body')}</p>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-blue-900 dark:text-white mb-2">
-                      {t('Welcome to TermPocket! 🎉')}
-                    </h3>
-                    <p className="text-blue-800 dark:text-blue-200 mb-4">
-                      {t("You've started your journey to financial freedom. Let's get you started with some basic steps:")}
-                    </p>
-                    <ul className="text-blue-800 dark:text-blue-200 space-y-1 mb-4">
-                      <li>• <strong>{t('Add your own transactions')}</strong> {t('by clicking "Add Transaction"')}</li>
-                      <li>• <strong>{t('Create savings goals')}</strong> {t('to track your financial targets')}</li>
-                      <li>• <strong>{t('Receive your weekly financial report')}</strong> {t('to highlight your financial performance')}</li>
-                      <li>• <strong>{t('Manage your settings')}</strong> {t('to customize your experience')}</li>
-                    </ul>
-                    <div className="flex gap-2 flex-col sm:flex-row">
-                      <Button
-                        size="sm"
-                        onClick={() => router.push('/transactions/new')}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        {t('Add Your First Transaction')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => router.push('/goals')}
-                      >
-                        <Target className="w-4 h-4 mr-2" />
-                        {t('Create a Goal')}
-                      </Button>
-                    </div>
-                  </div>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setTourOpen(true)}>
+                    <PlayCircle />
+                    {t('onboarding.card.tour')}
+                  </Button>
+                  <Button size="sm" onClick={() => router.push('/transactions/new')}>
+                    <Plus />
+                    {t('onboarding.actions.add')}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           )}
+          <OnboardingTour open={tourOpen} onOpenChange={setTourOpen} />
 
           {/* Period selector — governs the summary cards and the trend chart */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -809,14 +816,28 @@ export default function Dashboard() {
                     <CardTitle>{t('Savings Goals')}</CardTitle>
                     <CardDescription>{t('Track your financial goals')}</CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push('/goals')}
-                  >
-                    {t('View All')}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {topUp.available && (
+                      <button
+                        type="button"
+                        onClick={() => router.push('/goals')}
+                        aria-label={t('goalTopUp.badge')}
+                        title={t('goalTopUp.badge')}
+                        className="relative rounded-full p-1.5 text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <MessageCircle className="w-5 h-5" aria-hidden="true" />
+                        <span className="absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" aria-hidden="true" />
+                      </button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/goals')}
+                    >
+                      {t('View All')}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

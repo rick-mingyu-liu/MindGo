@@ -48,19 +48,21 @@ const importValidation = [
   body('rows.*.edited').isBoolean({ strict: true }).withMessage('edited must be true or false'),
 ];
 
-// `months` here is not the `months` of GET /summary/rolling. There it means
-// "show me the last N months"; here it means "destroy everything older than N
-// months", with the same name, the same type and the same default of 4. It was
-// unvalidated: ?months=0 set the cutoff to today and deleted the caller's whole
-// history, ?months=-6 set it six months into the future and deleted everything
-// including future-dated rows, and ?months= (empty) threw inside toISOString()
-// and returned a 500 -- `const { months = 4 }` defaults only on undefined.
-//
-// 1-60 is not invented: it is the range updateDataRetentionSettings already
-// enforces on the same concept, so the write path and the settings path agree.
-const autoDeleteValidation = [
-  query('months').optional().isInt({ min: 1, max: 60 })
-    .withMessage('months must be a whole number between 1 and 60'),
+// Settings -> Automatic deletion. `retentionTerms` is one of the offered
+// numbers of terms, or null for off; nothing else is stored. Strict: "6" and
+// 6.0-as-string are refused rather than coerced, like every other setting.
+const { transactionRetentionTermChoices: retentionChoices } = config.dataRetention;
+const retentionUpdateValidation = [
+  body('retentionTerms').exists().withMessage('retentionTerms is required')
+    .bail()
+    .custom((value) => value === null || (typeof value === 'number' && retentionChoices.includes(value)))
+    .withMessage(`retentionTerms must be null or one of ${retentionChoices.join(', ')}`),
+];
+const retentionPreviewValidation = [
+  query('terms').not().isArray().withMessage('terms must be given once')
+    .bail()
+    .isIn(retentionChoices.map(String))
+    .withMessage(`terms must be one of ${retentionChoices.join(', ')}`),
 ];
 
 // Listing is paged: the largest page is 200 rows, and the default stays 50.
@@ -89,10 +91,11 @@ router.post('/', transactionValidation, transactionController.createTransaction)
 router.post('/import', importValidation, transactionController.importTransactions);
 router.get('/categories', transactionController.getCategories);
 router.delete('/clear-all', transactionController.clearAllTransactions);
-router.delete('/auto-delete', autoDeleteValidation, transactionController.autoDeleteOldTransactions);
-router.get('/retention-settings', transactionController.getDataRetentionSettings);
+// Before '/:id', which would otherwise claim these paths.
+router.get('/retention-settings', transactionController.getRetentionSettings);
+router.get('/retention-preview', retentionPreviewValidation, transactionController.previewRetention);
+router.put('/retention-settings', retentionUpdateValidation, transactionController.updateRetentionSettings);
 router.get('/:id', idValidation, transactionController.getTransaction);
-router.put('/retention-settings', transactionController.updateDataRetentionSettings);
 router.put('/:id', idValidation, transactionValidation, transactionController.updateTransaction);
 router.delete('/:id', idValidation, transactionController.deleteTransaction);
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import { BrandLogo } from '@/components/BrandLogo'
 import { useForm } from 'react-hook-form'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield, Target, CalendarRange, ScanText, Coins, AlertCircle, AlertTriangle } from 'lucide-react'
@@ -29,6 +30,11 @@ export default function Login() {
   const [verificationError, setVerificationError] = useState('')
   const [resendLoading, setResendLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
+  // The server renders the form before React attaches its submit handler. A
+  // click in that window would submit natively (a GET to this page, fields in
+  // the URL) or do nothing visible, so the button stays disabled until mounted.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => { setHydrated(true) }, [])
   
   const {
     register,
@@ -259,7 +265,7 @@ export default function Login() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading || !hydrated}>
                   {loading ? t('Signing in...') : t('Sign in')}
                 </Button>
               </form>
@@ -302,6 +308,10 @@ export default function Login() {
               </div>
             </CardContent>
           </Card>
+          <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground">
+            <Link href="/terms" className="underline-offset-2 hover:text-foreground hover:underline">{t('Terms of Service')}</Link>
+            <Link href="/privacy" className="underline-offset-2 hover:text-foreground hover:underline">{t('Privacy Policy')}</Link>
+          </div>
         </div>
       </div>
 
@@ -418,7 +428,7 @@ export default function Login() {
                 {t('Questions, feedback or ideas? We would love to hear from you.')}
               </p>
               <a
-                href="mailto:rickmyliu@gmail.com"
+                href="mailto:support@termpocket.com"
                 className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-green-600 dark:border-green-500 text-green-700 dark:text-green-300 bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
               >
                 {t('Contact Us')}
@@ -432,7 +442,7 @@ export default function Login() {
   )
 }
 
-export async function getServerSideProps({ locale }: { locale: string }) {
+export async function getStaticProps({ locale }: { locale: string }) {
   return {
     props: {
       ...(await serverSideTranslations(locale, ['common'])),

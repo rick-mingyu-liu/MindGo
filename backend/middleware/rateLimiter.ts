@@ -47,4 +47,17 @@ const accessTokenLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export { apiLimiter, authLimiter, importLimiter, accessTokenLimiter };
+// Deleting the account, keyed on the user. Mount after auth.
+const accountDeleteLimiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.accountDeleteMax,
+  keyGenerator: (req) => `user:${req.user.userId}`,
+  message: {
+    error: 'Too many attempts, please wait a few minutes.',
+    code: 'account_rate_limited',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export { apiLimiter, authLimiter, importLimiter, accessTokenLimiter, accountDeleteLimiter };

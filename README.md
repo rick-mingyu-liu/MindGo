@@ -1,19 +1,28 @@
-# TermPocket
-
-**Your money, term by term.**
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/termpocket-icon-dark.svg">
+    <img src="frontend/public/brand/termpocket-icon.svg" alt="TermPocket" width="96">
+  </picture>
+</p>
+<h1 align="center">TermPocket</h1>
+<p align="center">Your money, term by term.</p>
+<p align="center">
+  <a href="https://www.termpocket.com">Live app</a> ·
+  <a href="https://www.termpocket.com/privacy">Privacy</a> ·
+  <a href="https://www.termpocket.com/terms">Terms</a>
+</p>
 
 [![Node.js](https://img.shields.io/badge/Node.js-22-green.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-blue.svg)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
-[![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](docs/superpowers/specs/2026-09-16-ocr-import-design.md)
+[![OCR](https://img.shields.io/badge/OCR-PaddleOCR%20PP--OCRv6%2C%20on--device-orange.svg)](eval/)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-lightgrey.svg)](LICENSE.md)
 
-TermPocket is a personal finance app for university and college students in Canada. It helps students track income, spending and savings across study terms, co-op placements, internships and summer breaks — built around the **Waterloo term**, not the calendar month. (The repository, deployments and databases are still named MindGo.)
+Personal finance for students, organised by school term. Record spending by chatting with Pocky (English or 中文), import bank, Uber and WeChat Pay screenshots read entirely on-device, and track savings goals.
 
-A study term and a co-op term are both four months, and that is the unit students actually budget in — a co-op term earns, a study term spends down. TermPocket tracks income, expenses and savings goals against those boundaries, in six currencies and two languages — and it can read your transactions straight from a screenshot of your bank, Uber or WeChat Pay, **on your device**.
+TermPocket is built around the **Waterloo term** (Winter Jan–Apr, Spring May–Aug, Fall Sep–Dec), not the calendar month. A study term and a co-op term are both four months, and that is the unit students actually budget in: a co-op term earns, a study term spends down. (The repository is still named MindGo in places.)
 
-**Try it:** **[mind-go.vercel.app](https://mind-go.vercel.app/)** — sign in as `john.doe@example.com` / `password123`.
-
-The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not sleep.
+**Try it:** **[www.termpocket.com](https://www.termpocket.com)** — sign in as `john.doe@example.com` / `password123`. Where your data goes: see the [Privacy Policy](https://www.termpocket.com/privacy).
 
 ---
 
@@ -30,6 +39,7 @@ The API runs on Render's Starter instance (0.5 CPU, 512 MB), which does not slee
 - [API](#api)
 - [Deployment](#deployment)
 - [Stack](#stack) · [Database](#database) · [Known gaps](#known-gaps)
+- [License](#license) · [Contributing](#contributing)
 
 ---
 
@@ -54,16 +64,17 @@ The term calendar is **Winter** Jan–Apr, **Spring** May–Aug, **Fall** Sep–
 
 ## Features
 
-| | |
-|---|---|
-| **Transactions** | Income and expenses across 18 categories, in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in, and every total is shown in the display currency you choose. |
-| **Screenshot import** | Drop in screenshots from a bank app, a receipt photo, Uber, Uber Eats or WeChat Pay. The text is read **in your browser**, every row is checked and flagged, and nothing is saved until you confirm. [Details below](#screenshot-import). |
-| **Conversation recording** | When enabled by the deployment, describe actual income and spending in English, Chinese or both, correct the pending draft, then review and explicitly confirm selected rows. Conversations resume across visits; an unchanged saved batch can be undone for ten minutes. [Details below](#conversation-recording). |
-| **Term budgeting** | The dashboard's period selector (This term / Last term / This year / Last year), category breakdown, and month-by-month income-vs-expenses chart, all driven by the window you pick. The dashboard reloads its data whenever you come back to it. |
-| **Savings goals** | Create and edit targets with progress bars and days remaining. |
-| **Weekly report emails** | The past seven days plus a four-month rollup, **every Sunday at 7 p.m. Toronto time**, or on demand from the dashboard's *Send Report*. |
-| **Settings** | Theme (light / dark / system), display currency, language, the weekly report switch, and read-only AI connections. **Every control saves the moment it changes** — there is no Save button to forget, and nothing on the page is decorative. |
-| **English and 中文** | Every user-facing string, in both languages. |
+- **Term-based dashboard**: This term / Last term / This year / Last year, category breakdown and a month-by-month income-vs-expenses chart. See [Why terms](#why-terms).
+- **On-device screenshot import**: bank lists, receipts, Uber trips, Uber Eats orders and WeChat Pay. The image never leaves your browser and nothing is saved until you confirm. [Details](#screenshot-import).
+- **Pocky, the conversation assistant**: record income and spending by chatting in English, Chinese or both, with button-only confirmation and ten-minute undo; ask questions about your own recorded spending; plan with deterministic projections and goal proposals you confirm with a button. Messages go to an AI provider ([Privacy Policy](https://www.termpocket.com/privacy)). Off unless the deployment enables it. [Details](#conversation-recording).
+- **Savings goals**: targets with progress bars and days remaining, plus a monthly suggestion when last month left money over.
+- **Transactions**: income and expenses across 18 categories in CAD, USD, EUR, GBP, AUD and CNY. Conversion happens at read time, so a row keeps the currency it was entered in.
+- **English and 中文**: every user-facing string, in both languages.
+- **Weekly email report**: the past seven days and the current term so far in CAD, spending by category, goal progress, and in the first report of each month last month's leftover. Every Sunday at 7 p.m. Toronto time; turn it off in Settings.
+- **Read-only MCP access**: connect your own AI client with a personal access token (Settings → AI connections). [Details](#mcp--read-only-for-a-personal-agent).
+- **Automatic deletion of old terms**: opt-in, off by default; Settings shows how many transactions would go and asks first.
+- **Delete account**: Settings → Danger zone removes the account and everything belonging to it.
+- **Settings**: theme, display currency, language and the weekly report switch. Every control saves the moment it changes.
 
 ---
 
@@ -118,7 +129,7 @@ The [`eval/`](eval/) benchmark runs the same model the browser runs and scores e
 | Synthetic (48 images: bank lists and receipts) | 188 / 188 | 0 |
 | Real screenshots (7, kept private and never committed) | 27 / 27 | 0 |
 
-The recorded OCR output is replayed through the parser in CI, so a parser change that would introduce a silent error fails the build. Design, rules and measurements: [`docs/superpowers/specs/2026-09-16-ocr-import-design.md`](docs/superpowers/specs/2026-09-16-ocr-import-design.md).
+The recorded OCR output is replayed through the parser in CI, so a parser change that would introduce a silent error fails the build.
 
 ---
 
@@ -130,11 +141,11 @@ Only the confirmation endpoint creates financial records. Confirmation binds the
 
 Messages persist in TermPocket's database until their conversation is deleted. Each model request receives bounded recent history and the current pending draft. Pocky can also help plan: it averages your past months, lists your savings goals, runs deterministic cash projections from the numbers you give it (it asks for cash on hand rather than guessing, and will not call something affordable without it), and proposes one goal creation or change at a time, which only the goal card's Confirm button applies. Projections are estimates from stated inputs, not advice, and nothing is stored except the pending goal proposal. There are no conversation summaries, durable fact memory or voice input in this release. Manual recording, screenshot import, savings goals and external read-only MCP remain available.
 
-**Data handling:** messages, relevant history, pending rows and the displayed date/currency/timezone context are sent to DeepSeek. TermPocket stores conversations, and authorized administrators may access them. This is not end-to-end encrypted storage. DeepSeek handles submitted data under its own terms; deleting local history does not promise deletion from provider systems. Do not include account passwords or credentials. Operational agent logs contain metadata and safe error codes, not conversation contents or raw provider errors.
+**Data handling:** messages, relevant history, pending rows and the displayed date/currency/timezone context are sent to an AI provider. TermPocket stores conversations, and authorized administrators may access them. This is not end-to-end encrypted storage. The provider handles submitted data under its own terms; deleting local history does not promise deletion from provider systems. Do not include account passwords or credentials. Operational agent logs contain metadata and safe error codes, not conversation contents or raw provider errors. The in-app notice links the draft privacy policy at `/privacy` (terms at `/terms`), which names the provider and where data is processed.
 
 The feature is off by default. `AGENT_ENABLED=true` enables migrated agent storage; a configured `DEEPSEEK_API_KEY` additionally enables new model turns. If the key is removed while storage remains enabled, history, draft editing/confirmation, undo and deletion remain available. With `AGENT_ENABLED=false`, agent routes and agent maintenance make no agent database queries; existing stored history remains until storage is enabled and deleted or cleaned up under the rules below.
 
-Limits: one active turn per user, four active model requests per backend process, 20 new turns per user per rolling hour, 60 per user per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY`) and 600 across all users per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY_ALL_USERS`), which bounds the DeepSeek bill in turns (set a spending limit at DeepSeek too), 100 conversations per user and 200 messages per conversation. A request accepts 4,000 characters, uses at most 30 recent messages / 24,000 history characters, proposes at most 12 rows, and has a 90-second deadline with at most eight tool attempts. Cancellation stops the local request promptly; PostgreSQL checks prevent a late response from restoring a cancelled or deleted conversation. Use Refresh or the same request's recovery action after an uncertain response; the UI does not poll.
+Limits: one active turn per user, `AGENT_MAX_CONCURRENT_RUNS` active model requests per backend process (default 1), 20 new turns per user per rolling hour, 60 per user per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY`) and 600 across all users per rolling 24 hours (`AGENT_MAX_TURNS_PER_DAY_ALL_USERS`), which bounds the provider bill in turns (set a spending limit with the provider too), 100 conversations per user and 200 messages per conversation. A request accepts 4,000 characters, uses at most 30 recent messages / 24,000 history characters, proposes at most 12 rows, and has a 90-second deadline with at most eight tool attempts. Cancellation stops the local request promptly; PostgreSQL checks prevent a late response from restoring a cancelled or deleted conversation. Use Refresh or the same request's recovery action after an uncertain response; the UI does not poll.
 
 ---
 
@@ -144,7 +155,7 @@ Limits: one active turn per user, four active model requests per backend process
 
 ```bash
 git clone <repository-url>
-cd MindGo
+cd <repository-folder>
 (cd backend && npm install)   # also builds: `prepare` runs tsc into dist/
 (cd frontend && npm install)
 ```
@@ -156,21 +167,26 @@ cd MindGo
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/mindgo
 JWT_SECRET=<at least 32 characters>
+CORS_ORIGIN=http://localhost:3000   # one origin, or several separated by commas
 
 # Optional. Each one degrades gracefully when absent.
-MAILBOXLAYER_API_KEY=    # email validation (falls back to a local domain list)
-EMAIL_USER=              # weekly reports (Gmail)
-EMAIL_PASS=
+MAILBOXLAYER_API_KEY=    # email address validation (falls back to a local domain list)
+EMAIL_USER=              # weekly reports (SMTP login)
+EMAIL_PASS=              # SMTP password or API key
+EMAIL_HOST=              # optional SMTP server; unset = Gmail
+EMAIL_PORT=              # optional, default 465
+EMAIL_FROM=              # optional From header, e.g. TermPocket <noreply@example.com>
+WEEKLY_REPORT_ENABLED=   # unset: weekly reports only under NODE_ENV=production
 
 # Optional conversation recording: enable only after migration 013.
 AGENT_ENABLED=false
-DEEPSEEK_API_KEY=
-DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_API_KEY=        # AI provider key; without it, new model turns are unavailable
+DEEPSEEK_MODEL=          # optional model override
 AGENT_MAX_CONCURRENT_RUNS=1   # turns at once; each takes ~240 MB
 AGENT_RUNTIME=sdk          # or direct: same tools and budgets, in-process (see below)
 ```
 
-The app **refuses to boot** without database configuration and `JWT_SECRET`, and warns about missing email and address-validation credentials. Conversation recording reports its availability through `/agent/status`; a missing DeepSeek key does not stop the rest of the application.
+The app **refuses to boot** without database configuration and `JWT_SECRET`, and warns about missing email and address-validation credentials. Conversation recording reports its availability through `/agent/status`; a missing AI provider key does not stop the rest of the application.
 
 `frontend/.env` — see [`frontend/.env.example`](frontend/.env.example):
 
@@ -215,7 +231,7 @@ The alternation is the point: a study term is tuition and rent against part-time
 
 `npm run db:seed` is **re-runnable** and is how the demo stays current — it replaces the demo user's rows rather than adding to them. Amounts vary month to month but come from a generator seeded on the term and category, so re-seeding on the same day is byte-identical.
 
-To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true` to mount a 30-day refresh job. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.ts`](backend/services/demoAccountService.ts). The refresh discards anything a visitor adds while trying the demo.
+To keep it current without intervention, set `DEMO_REFRESH_ENABLED=true`. The hourly maintenance run then checks when the account was last refreshed (the earliest creation time among its transactions) and rewrites it when that is more than 14 days ago (`DEMO_REFRESH_STALE_DAYS`, minimum 7) or it has no transactions. A redeploy delays a due refresh by at most an hour, and rows a visitor adds or edits do not delay it at all. It is **off by default** because it deletes every row belonging to the demo account before rewriting them. It identifies that account by the `is_demo` column rather than by an email address anyone could register, never creates the account, and scopes every delete to the resolved user id. See [`backend/services/demoAccountService.ts`](backend/services/demoAccountService.ts). The refresh discards anything a visitor adds while trying the demo.
 
 ---
 
@@ -277,7 +293,6 @@ eval/                           screenshot-import benchmark (separate npm projec
 ├── exportFixtures.mjs          records OCR output for the backend tests
 └── private/                    real screenshots — gitignored, never committed
 
-docs/superpowers/specs/         design specs for screenshot import and the TypeScript backend
 ```
 
 **Request flow:** route → auth middleware → validation → controller → service/db.
@@ -315,7 +330,7 @@ npm run dev              # runs ocr-assets first
 npm run build            # runs ocr-assets first
 npm start
 npm run lint
-npm run check:locales    # fails on duplicate or unresolved keys
+npm run check:locales    # every locale namespace: fails on duplicate keys or keys missing from one locale; warns on unresolved keys
 npm run ocr-assets       # fetch + checksum the OCR model, copy ONNX Runtime
 
 # eval
@@ -344,7 +359,7 @@ To add a real screenshot to the private benchmark, put `name.png` and a hand-wri
 - planning projections in integer cents (weekly, two-weekly and monthly repeats, month-end clamping, leap years, window edges, conversion, reserve breaches, goal math) and goal-proposal validation
 - agent row validation, authenticated routes, unavailable-mode behavior, cancellation, runtime tool restrictions, token limits, safe failures and temporary-directory cleanup
 
-**Drift guards** (`sharedContracts.test.ts`, `demoData.test.ts`) pin what the backend and frontend both define: the seed's category list must match the picker's, and every category the picker offers must have a colour. The two projects are deliberately not npm workspaces, since workspaces move every lockfile to the repo root and break `npm ci` for both deploys (Render builds `backend`, Vercel `frontend`).
+**Drift guards** (`sharedContracts.test.ts`, `demoData.test.ts`) pin what the backend and frontend both define: the seed's category list must match the picker's, and every category the picker offers must have a colour. The two projects are deliberately not npm workspaces, since workspaces move every lockfile to the repo root and break `npm ci` for both deploys (each is built from its own directory).
 
 **Recorded OCR fixtures** (`importFixtures.test.ts`) replay real OCR output — captured by the [`eval/`](eval/) benchmark and checked into `backend/test/fixtures/ocr/` — through the live parser on every run, so a parser change is caught without re-running OCR in CI.
 
@@ -397,8 +412,9 @@ All routes except registration, login and email verification require `Authorizat
 | `GET, PUT /profile` | read and update the profile; `GET` includes the notification flags |
 | `PUT /notifications` | `weekly_reports_enabled`, `email_notifications_enabled` — the scheduled email needs both |
 | `POST /test-email` | send the weekly report now |
+| `DELETE /account` | `{ password }` — delete the account and everything belonging to it; `403` `account_password_incorrect` or `account_demo` deletes nothing |
 
-Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `/resend-verification` and `/test-email` **combined**.
+Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `/resend-verification` and `/test-email` **combined**. `DELETE /account` has its own budget instead, 5 attempts per 15 minutes per user (`RATE_LIMIT_ACCOUNT_DELETE_MAX`).
 
 ### `/transactions`
 | | |
@@ -408,8 +424,9 @@ Rate limited to 5 requests per 15 minutes per IP across `/register`, `/login`, `
 | `PUT /:id`, `DELETE /:id` | update, delete |
 | `GET /categories` | categories in use |
 | `DELETE /clear-all` | delete every transaction |
-| `DELETE /auto-delete?months=N` | delete everything older than N months (1–60) |
-| `GET, PUT /retention-settings` | retention preferences (not persisted — see Known gaps) |
+| `GET /retention-settings` | automatic deletion: `{available, demo, retentionTerms, choices, window}`; `retentionTerms` is `null` (off, the default) or 3, 6, 9 or 12 terms kept, the current term included; `window` gives the first kept term and the cutoff day |
+| `PUT /retention-settings` | `{retentionTerms: 3\|6\|9\|12\|null}`; stores it and answers as GET. 503 `retention_unavailable` before migration 016, 403 `retention_demo` for turning it on on the demo account |
+| `GET /retention-preview?terms=N` | deletes nothing: `{terms, keepFromTerm, cutoff, count}` — how many of your transactions keeping N terms would delete now |
 | `POST /import` | write confirmed screenshot-import rows (1–100, all or nothing) plus one `import_batches` record |
 
 ### `/import`
@@ -540,32 +557,32 @@ TermPocket implements one protocol version and refuses JSON-RPC batches.
 
   Create a new token in Settings.
 - **Claude Code shows `✘ Failed to connect` with no OAuth prompt.** This is expected when the header is set: Claude Code doesn't fall back to OAuth. Fix the token, then run `claude mcp get termpocket`.
-- **The first request is slow.** On a sleeping host, the first request waits for the server to wake.
+- **The first request is slow.** On a host that sleeps, the first request waits for the server to wake.
 - **`429` from Settings.** Creating and revoking tokens shares a per-user budget of 20 requests per 15 minutes (`RATE_LIMIT_ACCESS_TOKEN_MAX`).
 
 ---
 
 ## Deployment
 
-The backend runs on **Render** (Starter instance, Oregon), the frontend on **Vercel**, the database on **Neon** (AWS `us-east-1`).
+Current production setup: [STATUS.md](STATUS.md). To self-host you need a Node 22 host for the backend, a Next.js host for the frontend, and PostgreSQL 15+.
 
-The backend is built with `tsc` during Render's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. The frontend builds with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums.
+The frontend is built with `next build`, which first downloads the OCR model from a pinned commit and verifies its checksums; set `NEXT_PUBLIC_API_URL` to the backend's public URL. [`frontend/vercel.json`](frontend/vercel.json) skips a build when nothing under `frontend/` changed (`git diff --quiet HEAD^ HEAD -- .`, run from the project's root directory, `frontend`); to change anything the frontend build reads from outside `frontend/`, widen the command first.
 
-**Migration 014 (drop `watchlist` and `ai_plans`):** Deploy order: the Vercel frontend first (the previous build's Settings clear-all calls `DELETE /investments/watchlist/clear-all`, which now 404s), then the Render backend, then apply 014. Deploy the backend that no longer reads those tables before you apply `014_drop_watchlist_ai_plans.sql` through the direct endpoint. The order matters: the previous release queries `ai_plans` in its hourly maintenance job and its `/ai/plans` routes, and would error against a database without it. The migration is idempotent and prints only row counts.
+The backend is built with `tsc` during the host's build (`npm ci --include=dev`, which runs the `prepare` script), and `npm start` runs `node dist/app.js`. Set `DATABASE_URL`, `JWT_SECRET` and `CORS_ORIGIN` (see [Configure](#configure)). In production, database connections use SSL (`ssl: { rejectUnauthorized: false }`). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection. Use a direct (non-pooled) connection for `pg_dump`/restore and migrations.
 
-**Migration and enablement:** verify migration `013` on PostgreSQL 15+ locally or in staging before an operator applies it to production through the direct database endpoint. No production migration or deployment is performed by this implementation. `AGENT_ENABLED=false` permits the application to run without the new tables being queried by agent routes or maintenance. Enable it only after migration verification. Configure `DEEPSEEK_API_KEY` and, optionally, `DEEPSEEK_MODEL` (default `deepseek-flash`) for new model turns.
+**Migration 014 (drop `watchlist` and `ai_plans`):** deploy the frontend first (the previous build's Settings clear-all calls `DELETE /investments/watchlist/clear-all`, which now 404s), then the backend, then apply `014_drop_watchlist_ai_plans.sql`. The previous backend release queries `ai_plans` in its hourly maintenance job and its `/ai/plans` routes, and would error against a database without it. The migration is idempotent and prints only row counts.
+
+**Migration and enablement:** verify migration `013` on PostgreSQL 15+ locally or in staging before applying it to production. `AGENT_ENABLED=false` permits the application to run without the new tables being queried by agent routes or maintenance. Enable it only after migration verification, and configure `DEEPSEEK_API_KEY` (the AI provider key) for new model turns.
 
 **Agent runtime (`AGENT_RUNTIME`):** a model turn executes in one of two ways, chosen per turn from `config.agent.runtime`. `sdk` (the default) is the Claude Agent SDK, which spawns its Claude Code binary for every turn: 212–217 MB of resident memory for that child alone during one live preflight turn (about 335 MB for the whole process tree, against about 105 MB for the direct runtime; macOS arm64, sampled every 0.2 s). `direct` runs the same tool loop in the backend's own process with the plain `@anthropic-ai/sdk` HTTP client (pinned `0.131.0`): no child process, no temporary directory, no environment allowlist. Both send the same system prompt, the same JSON envelope and the same eight tools, and share one implementation of every guard: the deadline, cancellation, `assertActive` before each tool, the eight-attempt and eight-execution budgets, the tool-output, token and character limits, and the error codes. The direct runtime's request carries no date other than the envelope's `context` (the SDK's CLI adds the host's date to the model's context). Any value other than `direct` means `sdk`, and the startup check warns about it. `npm run agent:preflight` reports which runtime is active.
 
-**Agent hosting requirements:** with `AGENT_RUNTIME=sdk`, the backend needs a Node host that permits the Claude Agent SDK's platform-specific child process, writable temporary storage for isolated configuration/cwd, and outbound HTTPS to `https://api.deepseek.com/anthropic`. Retain the SDK's optional platform dependency during installation. Allow HTTP requests to run beyond the 90-second model deadline so terminal state and cleanup can finish; a short-lived edge handler is insufficient. Each run deletes its temporary directory and disables SDK session persistence. With `AGENT_RUNTIME=direct`, only the outbound HTTPS and the long request timeout apply. Local adapter tests exercised real DeepSeek calls, cancellation and failures; deployed Linux compatibility, memory capacity and provider throttling still need validation on the intended host. Four model requests per process is a process limit, not a fleet-wide cap. Set the email credentials separately when enabling reports.
+**Agent hosting requirements:** with `AGENT_RUNTIME=sdk`, the backend needs a Node host that permits the Claude Agent SDK's platform-specific child process, writable temporary storage for isolated configuration/cwd, and outbound HTTPS to the AI provider. Retain the SDK's optional platform dependency during installation. Allow HTTP requests to run beyond the 90-second model deadline so terminal state and cleanup can finish; a short-lived edge handler is insufficient. Each run deletes its temporary directory and disables SDK session persistence. With `AGENT_RUNTIME=direct`, only the outbound HTTPS and the long request timeout apply. Local adapter tests exercised real provider calls, cancellation and failures; deployed Linux compatibility, memory capacity and provider throttling still need validation on the intended host. `AGENT_MAX_CONCURRENT_RUNS` (default 1) is a per-process limit, not a fleet-wide cap; a turn refused because every slot is taken answers `agent_server_busy`, or `agent_busy` when one of those turns is the same user's. Set the email credentials separately when enabling reports.
 
-**Database connections:** `DATABASE_URL` points at Neon's *pooled* endpoint (`-pooler` in the host). Every query names tables unqualified, so `db/connection.ts` issues `SET search_path` on each new connection — defensive today, but Neon's Azure pooler handed out an empty `search_path` where every query failed. Use the **direct** endpoint (drop `-pooler`) for `pg_dump`/restore and migrations. In production, connections use `ssl: { rejectUnauthorized: false }`.
-
-**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto` (the host clock is UTC), plus one hourly maintenance job that deletes stale unverified accounts and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
+**Scheduled jobs** run in the backend process: weekly report emails via `node-cron` at 7 p.m. `America/Toronto`, scheduled only under `NODE_ENV=production` unless `WEEKLY_REPORT_ENABLED=true` (so a local backend never mails the users of the database it points at; `false` turns it off in production too), plus one hourly maintenance job that deletes stale unverified accounts, deletes old transactions for users who turned on automatic deletion, and, when agent storage is enabled, expires agent drafts and goal proposals and removes stale run/receipt/admission metadata. Nothing mounts them over HTTP. **`node-cron` must stay at 4.6 or later**: 4.2 computed the next Sunday as 2034 and never sent the email.
 
 ### Evaluating Pocky with fictional conversations
 
-From `backend/`, build once with `npm run build`, then opt in to paid DeepSeek turns:
+From `backend/`, build once with `npm run build`, then opt in to paid model turns:
 
 ```bash
 AGENT_ENABLED=true npm run agent:eval
@@ -573,9 +590,9 @@ AGENT_ENABLED=true npm run agent:eval -- --case en-record-single,zh-record-singl
 AGENT_ENABLED=true npm run agent:eval -- --json --min-pass 0.9
 ```
 
-`DEEPSEEK_API_KEY` is read through the usual backend configuration (`.env` or environment); `DEEPSEEK_MODEL` defaults to `deepseek-flash`. The eval runs whichever runtime `AGENT_RUNTIME` selects and prints it in its header (`AGENT_ENABLED=true AGENT_RUNTIME=direct npm run agent:eval`). Enabling the flag for this command only does not enable the deployed app. No database or migrations are needed. The runner replaces database queries and exchange rates with [`backend/eval/agent-fixture.json`](backend/eval/agent-fixture.json), blocks pool access, and rejects SQL it does not recognize. It executes the real runtime, tool validation, investigation and planning code. Its only external service is DeepSeek; it never confirms a transaction or goal, writes financial data, or reads your accounts.
+`DEEPSEEK_API_KEY` (the AI provider key) is read through the usual backend configuration (`.env` or environment). The eval runs whichever runtime `AGENT_RUNTIME` selects and prints it in its header (`AGENT_ENABLED=true AGENT_RUNTIME=direct npm run agent:eval`). Enabling the flag for this command only does not enable the deployed app. No database or migrations are needed. The runner replaces database queries and exchange rates with [`backend/eval/agent-fixture.json`](backend/eval/agent-fixture.json), blocks pool access, and rejects SQL it does not recognize. It executes the real runtime, tool validation, investigation and planning code. Its only external service is the AI provider; it never confirms a transaction or goal, writes financial data, or reads your accounts.
 
-The 47 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios, goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
+The 54 cases in [`backend/eval/agent-cases.json`](backend/eval/agent-cases.json) cover English, Chinese and mixed-language recording, dictated-style English (spelled-out amounts, filler words, no punctuation, mid-sentence corrections, cut-off recordings), the reply language under the automatic setting, corrections, missing information, chat confirmation boundaries, record totals and comparisons, spending habits over a whole year or term, conversion, hostile record descriptions, plain-text replies, cash-flow scenarios (including expenses taken from recorded averages rather than invented, and payday counts quoted from the tool), goal proposals and out-of-scope investment questions. The conversation date is fixed at October 14, 2026, independent of the machine clock. All content is fictional; keep new cases and fixtures fictional too.
 
 Each run reports successful/failed assertions, tool names, token usage and elapsed time. Failed reply assertions include a bounded excerpt; the key and raw provider errors are never printed. `--json` returns one report (use `npm run --silent agent:eval -- --json` to omit npm's banner). Exit status is 0 when every run passes, 1 for evaluation failures, and 2 for invalid arguments, fixture/case files or missing configuration. `--min-pass` deliberately relaxes the aggregate threshold; it does not hide individual failures. `--repeat` accepts 1–20; repeated `--case` flags and comma-separated IDs select cases.
 
@@ -591,22 +608,21 @@ This is an opt-in behavioral evaluation, not a CI model-quality guarantee: repli
 
 The order constraints: **frontend, then backend, then 014** (the previous frontend calls the removed watchlist endpoint, and the previous backend queries `ai_plans`). **013 before `AGENT_ENABLED=true`.** 015 is optional but recommended before enabling: without it goal proposals answer `agent_unavailable`.
 
-0. **Rehearse locally (optional, recommended).** With Docker running: `docker compose -f docker-compose.test.yml up -d --wait`, then `backend/scripts/rehearse-linux.sh --live`. In a fresh `node:<.node-version>` container it runs Render's `npm ci --include=dev`, loads the schema into the compose database (with SSL, as under `NODE_ENV=production`) and runs the preflight, including one fictional live turn. The source is streamed in without any `.env` file, and only `DEEPSEEK_API_KEY` is read from `backend/.env`, withheld from `npm ci`. It runs this machine's architecture: on an Apple-silicon Mac, QEMU aborts the SDK's x64 binary, so the real x64 check is step 4's preflight in the Render Shell.
-1. **Check the Render service.** Run `render login`, then confirm in the dashboard that the backend's instance type allows child processes, has a writable `/tmp`, and has enough memory to run the SDK's native binary (about 250 MB on disk) next to Node. Confirm that the request timeout is longer than the 90-second model deadline. Render web services allow long-running requests, but verify this for the current plan. The Render **Shell** used below is only available on paid instance types.
-2. **Merge to `main`.** Vercel deploys the frontend. If Render auto-deploys `main`, the backend deploys at the same time; the brief window where one is old is harmless, because the hard constraint is only that 014 waits until both are live. Confirm the first Render build log says Node 22 (from `backend/.node-version`).
-3. **Deploy the backend on Render** with `AGENT_ENABLED` unset or `false`. The build (`npm ci --include=dev`) must keep optional dependencies, because the SDK's `@anthropic-ai/claude-agent-sdk-linux-x64` binary is one.
-4. **Preflight before migrating.** In the Render Shell:
+0. **Rehearse locally (optional, recommended).** With Docker running: `docker compose -f docker-compose.test.yml up -d --wait`, then `backend/scripts/rehearse-linux.sh --live`. In a fresh `node:<.node-version>` container it runs `npm ci --include=dev`, loads the schema into the compose database (with SSL, as under `NODE_ENV=production`) and runs the preflight, including one fictional live turn. The source is streamed in without any `.env` file, and only `DEEPSEEK_API_KEY` is read from `backend/.env`, withheld from `npm ci`. It runs this machine's architecture: on an Apple-silicon Mac, QEMU aborts the SDK's x64 binary, so check an x64 host with step 3's preflight there.
+1. **Check the host.** Confirm that the backend's instance type allows child processes (for `AGENT_RUNTIME=sdk`), has a writable temporary directory and enough memory to run the SDK's native binary (about 250 MB on disk) next to Node, and that the request timeout is longer than the 90-second model deadline.
+2. **Deploy the frontend, then the backend,** with `AGENT_ENABLED` unset or `false`. The backend build (`npm ci --include=dev`) must keep optional dependencies, because the SDK's platform binary is one, and should use the Node version in `backend/.node-version`.
+3. **Preflight before migrating.** On the host:
 
    ```bash
    cd backend && npm run agent:preflight
    ```
 
    Expect `WARN` for `migration.013`, `migration.014` (with the two tables' row counts) and `migration.015`, and `PASS` for `db.server_version` (PostgreSQL 15+), `db.transaction_sources` (0 incompatible values), `host.sdk_binary`, `host.sdk_launch` and `network.deepseek`. Fix any FAIL before going on. A non-zero `db.transaction_sources` means 013 will abort; review those rows and do not rewrite them blindly.
-5. **Apply the migrations from your own machine**, through Neon's **direct** endpoint (the pooled host without `-pooler`), never the pooler. 013 and 015 need PostgreSQL 15 or later, and each migration is idempotent:
+4. **Apply the migrations** from your own machine, through a direct (non-pooled) database connection. 013 and 015 need PostgreSQL 15 or later, and each migration is idempotent:
 
    ```bash
    cd backend
-   read -rs 'DIRECT_URL?Neon direct URL: ' && export DIRECT_URL   # zsh; in bash: read -rsp 'Neon direct URL: ' DIRECT_URL
+   read -rs 'DIRECT_URL?Database URL: ' && export DIRECT_URL   # zsh; in bash: read -rsp 'Database URL: ' DIRECT_URL
    # Typed at a hidden prompt, so the connection string never reaches shell history.
    psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/013_conversational_transactions.sql
    # Before dropping anything, look at what 014 will drop (counts only):
@@ -617,16 +633,16 @@ The order constraints: **frontend, then backend, then 014** (the previous fronte
    ```
 
    013 prints its source audit and aborts without changing anything if a row is incompatible. 014 prints only row counts. Run the preflight again: `migration.013`, `.014` and `.015` should now PASS.
-6. **Enable.** In Render → Environment, set `AGENT_ENABLED=true` and `DEEPSEEK_API_KEY`. Leave `DEEPSEEK_MODEL` unset to use `deepseek-flash`. Save and redeploy.
-7. **Live preflight.** In the Render Shell:
+5. **Enable.** Set `AGENT_ENABLED=true` and `DEEPSEEK_API_KEY` in the backend's environment, then redeploy.
+6. **Live preflight.** On the host:
 
    ```bash
    cd backend && npm run agent:preflight -- --live
    ```
 
    This runs one fictional turn ("I spent 12.50 CAD on lunch today") through the runtime `AGENT_RUNTIME` selects (`config.agent_runtime` names it) against in-memory fake records. Under `AGENT_RUNTIME=direct`, `host.tmpdir`, `host.sdk_binary` and `host.sdk_launch` are at most WARNs, since that runtime uses none of them. It touches no database. It reports the tool-call count, token counts and latency, or a stable `agent_*` error code, and never the prompt or the reply. Expect `PASS  live.turn  sdk runtime, 1 tool call(s), 1 row(s) proposed, …` (or `direct runtime`).
-8. **Smoke-test in the app** with fictional input only. Open `/agent`, send "I spent 12.50 CAD on lunch today", check the drafted row, and confirm it. Check that the transaction appears with the right day and currency. Undo it within ten minutes and check that it is gone. Then delete the conversation.
-9. **Rollback.** Setting `AGENT_ENABLED=false` and redeploying turns off the agent routes and agent maintenance before any agent query. Leave the migrations in place and do not drop the agent tables: stored history and saved transactions stay intact for when the feature is turned back on. To stop model calls but keep history, edits, confirmation, undo and deletion working, remove `DEEPSEEK_API_KEY` instead and leave `AGENT_ENABLED=true`. `/agent/status` then reports that new turns are unavailable.
+7. **Smoke-test in the app** with fictional input only. Open `/agent`, send "I spent 12.50 CAD on lunch today", check the drafted row, and confirm it. Check that the transaction appears with the right day and currency. Undo it within ten minutes and check that it is gone. Then delete the conversation.
+8. **Rollback.** Setting `AGENT_ENABLED=false` and redeploying turns off the agent routes and agent maintenance before any agent query. Leave the migrations in place and do not drop the agent tables: stored history and saved transactions stay intact for when the feature is turned back on. To stop model calls but keep history, edits, confirmation, undo and deletion working, remove `DEEPSEEK_API_KEY` instead and leave `AGENT_ENABLED=true`. `/agent/status` then reports that new turns are unavailable.
 
 ---
 
@@ -638,13 +654,19 @@ The order constraints: **frontend, then backend, then 014** (the previous fronte
 
 **On-device OCR** — [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 small through [`ppu-paddle-ocr`](https://www.npmjs.com/package/ppu-paddle-ocr) and ONNX Runtime Web (single-threaded WASM, in a Web Worker); the benchmark uses `onnxruntime-node` and `@napi-rs/canvas`.
 
-**Conversation runtime** — [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) `0.3.300` (`AGENT_RUNTIME=sdk`) or the [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript) `0.131.0` (`AGENT_RUNTIME=direct`), Zod `4.6.7`, and DeepSeek's Anthropic-compatible API. The SDK's package-specific license applies; see its bundled `LICENSE.md`.
+**Conversation runtime** — [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-typescript) `0.3.300` (`AGENT_RUNTIME=sdk`) or the [Anthropic TypeScript SDK](https://github.com/anthropics/anthropic-sdk-typescript) `0.131.0` (`AGENT_RUNTIME=direct`), Zod `4.6.7`, against an Anthropic-compatible AI provider endpoint. The SDK's package-specific license applies; see its bundled `LICENSE.md`.
 
-**External services** — [Frankfurter](https://www.frankfurter.app/) for exchange rates; [MailboxLayer](https://mailboxlayer.com/) for address validation; Gmail SMTP for mail; [DeepSeek](https://api-docs.deepseek.com/guides/anthropic_api/) for optional conversation recording.
+**External services** — an exchange-rate service for currency conversion, an address-validation service (optional), a configurable SMTP server for mail, and an AI provider for optional conversation recording. See the [Privacy Policy](https://www.termpocket.com/privacy) for where your data goes.
 
 ## Database
 
-The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables. Migration `015` adds `agent_goal_proposals` (goal changes awaiting the Confirm button); until it is applied, goal proposals are unavailable and nothing else is affected.
+The original tables are `users`, `transactions`, `savings_goals`, `import_batches` and `access_tokens`. Migration `013` adds `agent_conversations`, `agent_messages`, `agent_runs`, `agent_drafts`, `agent_receipts` and `agent_admissions`. Compound foreign keys enforce owner and conversation associations. Saved transactions have no deletion dependency on conversations. Migration `014` drops the retired `watchlist` and `ai_plans` tables. Migration `015` adds `agent_goal_proposals` (goal changes awaiting the Confirm button); until it is applied, goal proposals are unavailable and nothing else is affected. Migration `016` adds `users.transaction_retention_terms` (automatic deletion; NULL, off, for everyone); until it is applied, Settings shows the option as unavailable and nothing is deleted.
+
+**Automatic deletion.** Off for every account unless its owner turns it on in Settings. A user keeps the last 3, 6, 9 or 12 terms (the current one included); the hourly maintenance run deletes that user's transactions dated before the first kept term's start, with the boundary from `utils/terms.ts`, so it removes whole terms and agrees with the dashboard's term view. Only transactions are deleted — goals, Pocky conversations, import records and tokens are not. At most 5,000 rows go per run across all users; the rest go on later runs. Each run audits one line per user with the user id and count only. The demo account is excluded: it cannot turn it on, and the sweep skips it. See [`backend/services/retentionService.ts`](backend/services/retentionService.ts).
+
+**Account deletion.** Settings → Danger zone → Delete account asks for the password again, then `DELETE /auth/account` deletes, in one transaction, the user's rows in every per-user table (Pocky goal proposals, messages, drafts, receipts, runs, admission records and conversations, access tokens, import counts, savings goals, transactions), then the user row with its preferences and retention setting. Every one of those tables also cascades from `users`; the explicit deletes make the result independent of the deployed foreign-key actions and give the audit line its counts (user id and counts only). Admission records go too: they outlive *conversation* deletion so clearing history cannot reset the turn budget, but a deleted account has no budget left to use, and re-registering means a new user id and a verified address. The demo account refuses (`403 account_demo`). A Pocky turn running for that user in this process is aborted. See [`backend/services/accountService.ts`](backend/services/accountService.ts).
+
+**Migration 016 (automatic deletion):** deploy the backend first (it tolerates the column's absence and notices it without a restart), then the frontend, then apply `016_transaction_retention.sql` with `psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f db/migrations/016_transaction_retention.sql` against a direct (non-pooled) database connection. It is additive and idempotent, and leaves every user off.
 
 `updated_at` is maintained by triggers. Monetary rows carry a `currency` column. `transactions.source` accepts `manual`, `ocr`, `ocr_llm` and `agent`; only confirmation writes `agent` rows. `import_batches` records counts for confirmed screenshot imports.
 
@@ -658,12 +680,27 @@ The improvement backlog is retired; the reasoning for anything already fixed liv
 - **Uber and Uber Eats imports can double-count** a card charge already imported from a bank screenshot. Duplicates are flagged only when the day, amount and currency all match.
 - **Each new app layout needs its own parser rules.** Every layout added so far needed at least one measured spacing rule; an unsupported app shows the recognised text for manual entry.
 - **The LLM fallback for screenshot import was not built.** The seven real screenshots tried so far were all read by the rule-based parser once their layouts were added; unsure rows report `ai_fallback_unavailable`.
-- **Retention settings do not persist.** `GET/PUT /transactions/retention-settings` reports a saved preference it never stores, and nothing acts on one. The settings page no longer shows or requests it.
 - **`/summary/rolling` returns every transaction twice** and aggregates in Node — one user's year is a ~154 kB response. This is the gate on an *All time* view.
 - **No frontend test runner**, so `lib/date.ts` and `lib/preferences.ts` are unguarded.
 - **Locale files are unguarded** against category drift; the backend and frontend category lists are pinned to each other, the translations are not.
 - **`LOG_LEVEL` is close to inert** — it gates `debug()` and nothing else.
 
+## License
+
+TermPocket is **source-available** under the [Functional Source License, Version 1.1, MIT Future License](LICENSE.md) (FSL-1.1-MIT).
+
+- **You may** read, run, modify and self-host it for your own use, for non-commercial education or research, or to build something that is not a competing product.
+- **You may not** offer it, or a modified version, as a commercial product or service that competes with TermPocket.
+- **Each version becomes MIT** on the second anniversary of its release, with no restrictions.
+
+The hosted app at [www.termpocket.com](https://www.termpocket.com) is free to use.
+
+The license covers every version that includes `LICENSE.md`, starting October 2026. Earlier commits were published without a license; ask the maintainer if you need to use one of them.
+
+The TermPocket name and Pocky are not licensed for use as your own product's name or branding.
+
 ## Contributing
 
-Private project. For collaboration, contact the maintainer directly.
+Issues and pull requests are welcome. By submitting a contribution, you agree that it is licensed under the same terms as the project and that the maintainer may relicense it, including under a commercial license, as part of TermPocket.
+
+For larger changes, open an issue first so we can agree on the approach.

@@ -8,6 +8,7 @@ import runtime = require('../services/agent/runtime');
 import { recordsFor } from '../services/agent/investigation';
 import { AgentError } from '../services/agent/types';
 import { validateUuid, validateSettings, validateMessage } from '../services/agent/validation';
+import { onAccountDeleted } from '../services/accountService';
 
 const router = express.Router();
 router.use(auth);
@@ -21,10 +22,14 @@ router.use((_req,_res,next) => { next(config.agent.enabled ? undefined : new Age
 // bounds local subprocesses and makes local cancellation prompt.
 const active = new Map<string,{userId:number;conversationId:string;controller:AbortController}>();
 let slots = 0;
+/** Slots held per user, from the moment one is taken: `active` is filled only once a run is admitted. */
+const holders = new Map<number,number>();
 const key = (userId:number,runId:string) => `${userId}:${runId}`;
 function abortOwned(userId:number,conversationId?:string) {
   for (const run of active.values()) if (run.userId===userId && (!conversationId || run.conversationId===conversationId)) run.controller.abort();
 }
+// A deleted account's turns in this process stop now rather than at their next check.
+onAccountDeleted((userId)=>abortOwned(userId));
 function object(value:unknown, keys:string[]):Record<string,unknown> {
   if (!value || typeof value!=='object' || Array.isArray(value)) throw new AgentError('agent_invalid_input');
   const body=value as Record<string,unknown>;
@@ -59,8 +64,11 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
   const conversationId=validateUuid(req.params.id);const userId=req.user.userId;
   const body=object(req.body,['requestId','content','currency','timezone','language']);
   const input={requestId:validateUuid(body.requestId),content:validateMessage(body.content),...validateSettings(body)};
-  if(slots>=config.agent.maxConcurrentRuns) throw new AgentError('agent_busy',429);
-  slots++;
+  // Every slot in this process is taken. When one of them is this user's own
+  // turn (a second tab, a double send) that is agent_busy, as beginTurn would
+  // say; only other users' turns make it agent_server_busy.
+  if(slots>=config.agent.maxConcurrentRuns) throw holders.has(userId)?new AgentError('agent_busy',409):new AgentError('agent_server_busy',429);
+  slots++;holders.set(userId,(holders.get(userId)??0)+1);
   const controller=new AbortController();let started=false;let timedOut=false;
   const close=()=>{if(!res.writableEnded) controller.abort();};res.on('close',close);
   const timer=setTimeout(()=>{timedOut=true;controller.abort();},config.agent.timeoutMs);timer.unref();
@@ -100,6 +108,7 @@ router.post('/conversations/:id/messages',route(async(req,res)=>{
     throw failure;
   } finally {
     clearTimeout(timer);res.off('close',close);if(started)active.delete(runKey);slots--;
+    const held=(holders.get(userId)??1)-1;if(held>0)holders.set(userId,held);else holders.delete(userId);
   }
 }));
 router.post('/conversations/:id/runs/:runId/cancel',route(async(req,res)=>{

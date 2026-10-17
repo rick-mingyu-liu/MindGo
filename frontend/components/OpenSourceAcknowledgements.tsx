@@ -100,7 +100,7 @@ export default function OpenSourceAcknowledgements({ open, onOpenChange, classNa
           </section>
           <section className="space-y-3">
             <h3 className="font-semibold">{t('Browser OCR')}</h3>
-            <p className="text-sm text-muted-foreground">{t('Screenshot recognition uses ppu-paddle-ocr and ONNX Runtime in your browser, with PaddleOCR models distributed by snowfluke. The model link identifies the version shipped by TermPocket.')}</p>
+            <p className="text-sm text-muted-foreground">{t('Screenshot recognition runs in your browser with ppu-paddle-ocr and ONNX Runtime, using PaddleOCR models converted for ppu-paddle-ocr and published on Hugging Face (snowfluke/ppu-paddle-ocr-models). The model link identifies the exact version TermPocket ships.')}</p>
             <ProjectLinks projects={ocrProjects} />
           </section>
           <section className="space-y-3 border-t pt-4">

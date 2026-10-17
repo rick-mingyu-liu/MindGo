@@ -165,11 +165,16 @@ export async function calculateScenario(raw: unknown, today: string, rate: RateL
 
   const occurrences: Array<{ date: string; kind: ScenarioEvent['kind']; cents: number }> = [];
   const ignored: Array<{ label: string; before_start: number; after_end: number }> = [];
-  for (const event of s.events) {
+  // Per input event, in input order: how often it lands inside the window, so a
+  // count of paydays is quoted from here rather than counted by the model.
+  const eventCounts: Array<{ index: number; label: string; kind: ScenarioEvent['kind']; occurrences: number; first_date: string | null; last_date: string | null }> = [];
+  for (const [index, event] of s.events.entries()) {
     // Converted once per event, so every occurrence of it carries the same cents.
     const cents = event.currency === s.currency ? event.cents : Math.round(event.cents * rates.get(event.currency)!);
     const found = occurrencesOf(event, s.start, s.end_exclusive, MAX_OCCURRENCES - occurrences.length);
     for (const date of found.inside) occurrences.push({ date, kind: event.kind, cents });
+    // found.inside is in date order: repeats only step forward.
+    eventCounts.push({ index, label: event.label, kind: event.kind, occurrences: found.inside.length, first_date: found.inside[0] ?? null, last_date: found.inside.at(-1) ?? null });
     if (found.before || found.after) ignored.push({ label: event.label, before_start: found.before, after_end: found.after });
   }
   occurrences.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -248,6 +253,7 @@ export async function calculateScenario(raw: unknown, today: string, rate: RateL
     status: missing.length ? 'incomplete' as const : 'complete' as const,
     missing,
     occurrences: occurrences.length,
+    event_counts: eventCounts,
     ignored,
     rates: [...rates.entries()].map(([from, value]) => ({ from, to: s.currency, rate: value })),
     notes,

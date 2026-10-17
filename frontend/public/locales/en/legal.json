@@ -1,0 +1,228 @@
+{
+  "updated": "17 October 2026",
+  "privacy": {
+    "intro": [
+      "TermPocket is a free personal finance app for university students, run from Canada by its developer, [rick-mingyu-liu](https://github.com/rick-mingyu-liu) (“we”, “us”). This page explains what TermPocket stores, where it goes, how long it is kept, and how to ask for a copy or for deletion.",
+      "In short: we store what you type into TermPocket so the app can show it back to you. We do not sell it, show ads, or connect to your bank. The servers are in the United States, and if you use Pocky, the assistant, your messages and the records it looks up are processed by DeepSeek, the AI provider behind Pocky (see “Pocky and DeepSeek” below)."
+    ],
+    "sections": [
+      {
+        "h": "What we store",
+        "items": [
+          "Your account: first and last name, email address, language, email preferences and whether your address is verified. Your password is stored only as a bcrypt hash, never as the password itself.",
+          "Your records: the transactions you enter or import (amount, currency, date, type, category, description and how it was added) and your savings goals (name, amounts, currency, target date and description).",
+          "Screenshot imports: a count of how many rows each import saved and how many you edited. The screenshot itself is not stored (see below).",
+          "Pocky conversations: your messages and Pocky’s replies, the entries it drafts for you to review, goal changes it proposes, and each conversation’s currency, timezone and language settings. We also keep technical records of each request (status, token counts, error codes, time) and short receipts that let you undo a save; receipts hold record IDs and version stamps, not amounts or descriptions.",
+          "AI connections: for each personal access token you create, its name, when it was created, last used and revoked, and a SHA-256 hash of the token. The token itself is shown to you once and is not stored.",
+          "Request logs: like most web services, our server logs each request, including your IP address, the time, the address requested and your browser’s user agent. These logs are kept by our hosting provider, Render."
+        ]
+      },
+      {
+        "h": "Screenshots stay on your device",
+        "p": [
+          "When you import a screenshot, text recognition runs in your browser. The image never leaves your device. The recognised text lines are sent to our server, which turns them into draft rows and sends them back without storing them. Only the rows you confirm are saved."
+        ]
+      },
+      {
+        "h": "Pocky and DeepSeek",
+        "p": [
+          "Pocky is optional. When you send it a message, our server sends the following to DeepSeek through api.deepseek.com so it can reply:"
+        ],
+        "items": [
+          "your message and the recent part of the conversation (up to 30 earlier messages);",
+          "the entries currently waiting for your review;",
+          "the conversation’s currency, timezone and reply language, and today’s date and term dates;",
+          "when Pocky looks up your records to answer a question or plan: the dates, amounts, currencies, descriptions and categories of the matching transactions, totals by category, and your savings goals (names, amounts, target dates and descriptions);",
+          "any amounts or plans you describe, such as pay, rent or a savings target."
+        ],
+        "after": [
+          "DeepSeek, the AI provider behind Pocky, processes this information on its servers in China, outside Canada, where it may be subject to local laws. DeepSeek handles what it receives under its own terms and privacy policy. Deleting a conversation in TermPocket removes it from our database; we cannot promise that it is removed from DeepSeek’s systems.",
+          "Do not include passwords, card numbers or other credentials in a message. If you do not want this information to reach DeepSeek, do not use Pocky; the rest of TermPocket works without it."
+        ]
+      },
+      {
+        "h": "Other services we use",
+        "items": [
+          "Neon hosts the database, in Amazon Web Services’ us-east-1 region in the United States. Everything listed under “What we store” lives there.",
+          "Render runs the server (the API) in Virginia, United States, and keeps its request logs.",
+          "Vercel hosts the website, and Vercel Web Analytics records page visits so we can see which pages are used.",
+          "Resend, a service based in the United States, sends our email from noreply@termpocket.com: the verification link when you sign up, and the weekly report, which contains a summary of your week’s income and spending. You can turn the weekly report off in Settings.",
+          "MailboxLayer (apilayer) may check that your email address can receive mail when you register. It receives the address only.",
+          "Frankfurter provides exchange rates. It receives only the currencies being converted, nothing about you.",
+          "If you connect an AI service of your own with a personal access token, that service receives the totals and savings goals it asks for (goal names, amounts and dates) and handles them under its own terms."
+        ],
+        "after": [
+          "These providers store and process information outside Canada, in the United States (and, for Pocky, China)."
+        ]
+      },
+      {
+        "h": "How we use it",
+        "items": [
+          "to run your account and show your records, summaries and goals back to you;",
+          "to send the verification email and, unless you turn it off, the weekly report;",
+          "to answer you through Pocky, when you use it;",
+          "to enforce usage limits, prevent abuse and fix problems."
+        ],
+        "after": [
+          "We do not sell your information, use it for advertising, or share it with anyone other than the services above."
+        ]
+      },
+      {
+        "h": "How long we keep it",
+        "items": [
+          "Unverified sign-ups: deleted once the verification link has expired (after 30 minutes), and in any case after 24 hours. A job runs about once an hour, so removal can take a little longer.",
+          "Your account and records: kept until you delete them or ask us to delete your account, except as automatic deletion below removes old transactions.",
+          "Automatic deletion: off unless you turn it on in Settings → Automatic deletion. You can choose to keep the last 3, 6, 9 or 12 terms, the current term included; transactions dated before the first kept term are then deleted by a job that runs about once an hour, and this cannot be undone. Only transactions are deleted, not savings goals, Pocky conversations or AI connections. It is not available on the demo account.",
+          "Pocky conversations: kept until you delete them, one at a time or all at once. Deleting a conversation does not delete the transactions you saved from it.",
+          "Pocky drafts and goal proposals: they expire 24 hours after Pocky proposes them. Expired drafts are removed; goal proposals that were confirmed, cancelled or expired are deleted 30 days later.",
+          "Pocky request records and undo receipts: deleted after 30 days, or sooner. Records used for usage limits are kept for up to 30 days even after you delete your conversations.",
+          "The demo account: it is shared by everyone and reset periodically, which deletes anything added to it.",
+          "Request logs: kept by Render under its own retention period."
+        ]
+      },
+      {
+        "h": "Deleting your data",
+        "p": [
+          "Settings → Danger zone → Clear All Data deletes all of your transactions, all of your savings goals and all of your Pocky conversations (with their messages, drafts and goal proposals). It does not delete your account itself (name, email address, password hash and preferences), your AI connection tokens (revoke those in Settings → AI connections), the import counts, or the short-lived records described above, which expire on their own.",
+          "Settings → Danger zone → Delete account deletes your account itself and everything linked to it, at once: your name, email address, password hash and preferences, your transactions, savings goals, Pocky conversations (with their messages, drafts, goal proposals, undo receipts and usage records), AI connection tokens and import counts. It asks for your password first. The shared demo account cannot be deleted."
+        ]
+      },
+      {
+        "h": "Your choices and requests",
+        "p": [
+          "You can see and change your records in the app at any time, and you can delete your account yourself in Settings (see “Deleting your data”). You can also ask us for a copy of the personal information we hold about you, ask us to correct it, or ask us to delete your account, by emailing privacy@termpocket.com from the address on your account. We may need to confirm that the request comes from you.",
+          "You can withdraw your consent at any time by no longer using Pocky or by deleting your account.",
+          "If you are not satisfied with our answer, you can complain to the [Office of the Privacy Commissioner of Canada](https://www.priv.gc.ca) or, if you live in Quebec, the [Commission d’accès à l’information du Québec](https://www.cai.gouv.qc.ca)."
+        ]
+      },
+      {
+        "h": "Security",
+        "p": [
+          "Passwords are stored as bcrypt hashes and access tokens as SHA-256 hashes. Stored data is not end-to-end encrypted: people who administer TermPocket can access it, including conversations. When you sign in, a login token valid for seven days is kept in your browser’s local storage, so anyone using your browser can use your account. Sign out on shared computers. No system is perfectly secure, and we cannot guarantee that your information will never be accessed without permission."
+        ]
+      },
+      {
+        "h": "Your browser",
+        "p": [
+          "TermPocket keeps your login token, a copy of your profile, your theme and your language and display preferences in your browser’s local storage. Signing out removes the login token and profile."
+        ]
+      },
+      {
+        "h": "Who TermPocket is for",
+        "p": [
+          "TermPocket is intended for students and anyone tracking their own money, including teenagers 13 and older with a parent’s or guardian’s permission where required. It is not meant for children under 13. If we learn that we hold an under-13 user’s information without a parent’s permission, we delete it; parents can contact privacy@termpocket.com."
+        ]
+      },
+      {
+        "h": "Changes to this policy",
+        "p": [
+          "If we change this policy, we will update the date at the top of this page. If a change affects how your existing information is used, we will tell you in the app or by email before it takes effect."
+        ]
+      },
+      {
+        "h": "Contact",
+        "p": [
+          "Mingyu Liu, the developer, is responsible for protecting personal information at TermPocket (the person in charge of the protection of personal information under Quebec law). Contact: privacy@termpocket.com.",
+          "Other questions or requests: privacy@termpocket.com."
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "intro": [
+      "These terms apply to the hosted TermPocket service, the website and app run by its developer, [rick-mingyu-liu](https://github.com/rick-mingyu-liu) (“we”, “us”). By creating an account or using TermPocket, you agree to them. If you do not agree, please do not use TermPocket. Our Privacy Policy explains how we handle your information."
+    ],
+    "sections": [
+      {
+        "h": "Who can use TermPocket",
+        "p": [
+          "You must be 13 or older to use TermPocket. If you are under the age of majority where you live, you need a parent’s or guardian’s permission, and they agree to these terms on your behalf."
+        ]
+      },
+      {
+        "h": "The service",
+        "p": [
+          "TermPocket is a free tool for recording and reviewing your own income, spending and savings goals. It is provided “as is” and “as available”. Features may change, be unavailable for a time, or be discontinued, and Pocky in particular depends on an outside AI provider and may be switched off. Keep your own copy of anything important."
+        ]
+      },
+      {
+        "h": "Not financial advice",
+        "p": [
+          "Nothing in TermPocket is financial, investment, tax or legal advice. Summaries reflect what you have recorded in TermPocket, not verified bank balances. Pocky’s projections are estimates from the inputs you state, not advice, and Pocky can make mistakes. Review every entry and goal before you confirm it: messages never save anything, only the confirmation buttons do. Decisions you make based on TermPocket are your own."
+        ]
+      },
+      {
+        "h": "Your account",
+        "items": [
+          "Use an email address you control, and keep your password to yourself.",
+          "An account is for one person. You are responsible for what is done with it.",
+          "Sign out on shared computers: your login stays active in that browser for up to seven days."
+        ]
+      },
+      {
+        "h": "Your information",
+        "p": [
+          "What you record is yours. You allow us to store and process it only to provide TermPocket to you, including sending it to the service providers named in the Privacy Policy, such as DeepSeek when you use Pocky."
+        ]
+      },
+      {
+        "h": "Acceptable use",
+        "items": [
+          "Do not use TermPocket for anything illegal, or to record someone else’s finances without their permission.",
+          "Do not try to access other people’s accounts or data, or test the security of TermPocket without our written permission.",
+          "Do not overload or disrupt the service, get around its usage limits, or create accounts in bulk.",
+          "Do not use Pocky for anything other than your own records and plans, or try to make it ignore its instructions.",
+          "The demo account is public: anyone can sign in to it and see or change what is in it, and it is reset periodically, which deletes anything added. Do not put real or personal information in it."
+        ]
+      },
+      {
+        "h": "AI connections",
+        "p": [
+          "If you create a personal access token and connect another AI service, that service can read the totals and savings goals TermPocket offers it (goal names, amounts and dates) until you revoke the token. You are responsible for which services you connect, and they handle what they receive under their own terms."
+        ]
+      },
+      {
+        "h": "Ending your use",
+        "p": [
+          "You can stop using TermPocket at any time, delete your records in Settings, and ask us to delete your account. We may suspend or close an account that breaks these terms or puts the service or other users at risk, and we may stop offering TermPocket. Where we can, we will give notice so you can keep a copy of your records first."
+        ]
+      },
+      {
+        "h": "Limitation of liability",
+        "p": [
+          "To the fullest extent the law allows, we are not liable for any loss arising from your use of TermPocket or from relying on it, including loss of data, mistakes in records, summaries or Pocky’s replies, or the service being unavailable. Nothing in these terms limits rights that you have by law and that cannot be waived."
+        ]
+      },
+      {
+        "h": "Source code",
+        "p": [
+          "TermPocket’s source code is published separately under the Functional Source License, Version 1.1, MIT Future License (FSL-1.1-MIT), found in the repository’s LICENSE.md. That license governs the code. These terms govern your use of the hosted service. Neither changes the other."
+        ],
+        "links": [
+          {
+            "label": "LICENSE.md",
+            "href": "https://github.com/rick-mingyu-liu/TermPocket/blob/main/LICENSE.md"
+          }
+        ]
+      },
+      {
+        "h": "Governing law",
+        "p": [
+          "These terms are governed by the laws of the Province of Ontario and the federal laws of Canada that apply there. This does not take away any protection you have under the consumer protection laws of the province or territory where you live."
+        ]
+      },
+      {
+        "h": "Changes to these terms",
+        "p": [
+          "If we change these terms, we will update the date at the top of this page. If you keep using TermPocket after a change takes effect, the new terms apply."
+        ]
+      },
+      {
+        "h": "Contact",
+        "p": [
+          "Questions about these terms: support@termpocket.com."
+        ]
+      }
+    ]
+  }
+}

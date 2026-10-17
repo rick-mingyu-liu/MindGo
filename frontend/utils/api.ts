@@ -63,6 +63,25 @@ api.interceptors.response.use(
       && response?.status >= 400 && response?.status < 500 && response?.status !== 401
     if (ownsClientErrors) return Promise.reject(error)
 
+    // Settings -> Automatic deletion reports its own failures in a toast next
+    // to the control (unavailable, demo account, a failed preview).
+    if (error.config?.url?.startsWith('/transactions/retention') && response?.status !== 401) {
+      return Promise.reject(error)
+    }
+
+    // Settings -> Delete account shows a wrong password, the demo refusal and
+    // the rate limit inside its own dialog. A 401 still logs out.
+    if (error.config?.url === '/auth/account' && response?.status !== 401) {
+      return Promise.reject(error)
+    }
+
+    // The goals page's top-up suggestion reads last month's totals in the
+    // background and simply stays hidden when they fail (a missing exchange
+    // rate is a 500), so no dialog should interrupt the page.
+    if (error.config?.url?.startsWith('/summary/monthly') && response?.status !== 401) {
+      return Promise.reject(error)
+    }
+
     // The edit page reads one transaction and says "not found" itself, so a
     // missing, foreign or malformed id must not also raise the generic dialog.
     const ownsTransactionLookup = error.config?.method === 'get'
@@ -122,6 +141,37 @@ export const accessTokenAPI = {
   // The secret comes back once, in this response, and is never retrievable again.
   create: (name: string) => api.post<{ token: AccessToken, secret: string }>('/access-tokens', { name }),
   revoke: (id: number) => api.delete<{ revoked: true }>(`/access-tokens/${id}`),
+}
+
+/** Where keeping the last `terms` terms draws the line today. */
+export interface RetentionWindow {
+  terms: number
+  /** The first kept term, e.g. '2024-fall'. */
+  keepFromTerm: string
+  /** Its first day: transactions dated before it are deleted. */
+  cutoff: string
+}
+
+export interface RetentionSetting {
+  /** False until the server's migration 016 is applied. */
+  available: boolean
+  demo: boolean
+  /** Terms kept, or null when automatic deletion is off. */
+  retentionTerms: number | null
+  choices: number[]
+  window: RetentionWindow | null
+}
+
+export const retentionAPI = {
+  get: () => api.get<RetentionSetting>('/transactions/retention-settings'),
+  // Deletes nothing: what turning it on would delete today.
+  preview: (terms: number) => api.get<RetentionWindow & { count: number }>('/transactions/retention-preview', { params: { terms } }),
+  set: (retentionTerms: number | null) => api.put<RetentionSetting>('/transactions/retention-settings', { retentionTerms }),
+}
+
+export const accountAPI = {
+  // Deletes the account and everything in it; the password is checked again.
+  delete: (password: string) => api.delete<{ deleted: true }>('/auth/account', { data: { password } }),
 }
 
 export { api }

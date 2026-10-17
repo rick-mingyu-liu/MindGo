@@ -75,3 +75,22 @@ export function daysUntil(value: DayInput, now: Date = new Date()): number | nul
   const today = atLocalNoon(todayDay(now))
   return Math.round((atLocalNoon(day).getTime() - today.getTime()) / 86_400_000)
 }
+
+/**
+ * The calendar month before the viewer's current one, as integers (month
+ * 1–12) plus its 'YYYY-MM' key. Integer arithmetic only, so no timezone can
+ * move it into another month.
+ */
+export function previousMonth(now: Date = new Date()): { year: number; month: number; key: string } {
+  const [year, month] = todayDay(now).split('-').map(Number)
+  const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+  return { ...prev, key: `${prev.year}-${String(prev.month).padStart(2, '0')}` }
+}
+
+/** A month's name in the viewer's locale, with the year only when it is not this year. */
+export function formatMonth(year: number, month: number, locale?: string, now: Date = new Date()): string {
+  const options: Intl.DateTimeFormatOptions = year === now.getFullYear()
+    ? { month: 'long' }
+    : { month: 'long', year: 'numeric' }
+  return atLocalNoon(`${year}-${String(month).padStart(2, '0')}-15`).toLocaleDateString(locale, options)
+}

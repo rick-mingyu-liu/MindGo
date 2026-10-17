@@ -55,7 +55,9 @@ const config = {
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // Comma-separated, so a new domain and the old one can both work while
+    // links already sent point at the old one. `cors` matches each exactly.
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean),
     credentials: true,
   },
 
@@ -65,6 +67,22 @@ const config = {
   email: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
+    // Optional SMTP provider (e.g. smtp.resend.com). Unset host = Gmail, as
+    // before. A port that is unset or not a positive integer falls back to 465.
+    host: process.env.EMAIL_HOST || undefined,
+    port: intFromEnv('EMAIL_PORT', 465),
+    // Optional From header, e.g. `TermPocket <noreply@termpocket.com>`. Unset
+    // keeps `"TermPocket" <EMAIL_USER>`.
+    from: process.env.EMAIL_FROM || undefined,
+    // Where email footers send questions.
+    supportAddress: process.env.EMAIL_SUPPORT_ADDRESS || 'support@termpocket.com',
+    // The Sunday report mails every opted-in address in whatever database this
+    // process points at. A local backend on the Neon dev branch, which holds
+    // copies of real users' addresses, sent them a report too. So it runs only
+    // in production unless WEEKLY_REPORT_ENABLED says otherwise ('true' or
+    // 'false'; anything else, including unset, means "production only").
+    weeklyReportsEnabled: process.env.WEEKLY_REPORT_ENABLED === 'true'
+      || (process.env.WEEKLY_REPORT_ENABLED !== 'false' && process.env.NODE_ENV === 'production'),
   },
 
   apiKeys: {
@@ -122,6 +140,10 @@ const config = {
     // Per user: creating and revoking MCP access tokens together. Each create
     // mints a credential, and a person managing a handful needs few.
     accessTokenMax: intFromEnv('RATE_LIMIT_ACCESS_TOKEN_MAX', 20),
+    // Per user: DELETE /auth/account attempts. Each checks the password, so
+    // this bounds guessing it with a stolen login token; a person deleting
+    // their account needs one, or a few after typos.
+    accountDeleteMax: intFromEnv('RATE_LIMIT_ACCOUNT_DELETE_MAX', 5),
   },
 
   // Screenshot import. The OCR itself runs in the browser; these bound what
@@ -150,7 +172,6 @@ const config = {
     // plans) or used (verification tokens), so a later sweep never lets an
     // expired row back in.
     maintenance: 60 * 60 * 1000, // 1 hour
-    demoRefresh: 30 * 24 * 60 * 60 * 1000, // 30 days
   },
 
   demo: {
@@ -160,6 +181,12 @@ const config = {
     // not something to opt out of — it is something to opt in to. Set
     // DEMO_REFRESH_ENABLED=true only where a demo account is actually wanted.
     refreshEnabled: process.env.DEMO_REFRESH_ENABLED === 'true',
+    // How many days after the last refresh the hourly maintenance run rewrites
+    // the demo account again. Staleness, not a timer: a timer restarts with
+    // every deploy and, on a host that redeploys daily, never fires. At least
+    // 7: the refresh deletes everything a visitor added, and a smaller value
+    // would turn a demo into something that resets under people mid-visit.
+    staleDays: Math.max(7, intFromEnv('DEMO_REFRESH_STALE_DAYS', 14)),
   },
 
   // Email verification
@@ -182,6 +209,16 @@ const config = {
     // unauthenticated and takes only an address) would keep someone else's
     // unverified registration of an address alive forever.
     unverifiedAccountMaxMinutes: 24 * 60,
+    // Settings → Automatic deletion: a user may keep only their last N terms
+    // of transactions (the current term counts as one). Off unless the user
+    // picks one of these; NULL in users.transaction_retention_terms is off.
+    // Migration 016's CHECK allows 3-12, so a value here outside that range
+    // could never be stored. Three terms is one calendar year.
+    transactionRetentionTermChoices: [3, 6, 9, 12] as readonly number[],
+    // At most this many transactions per hourly run, across all users. A
+    // first run after someone opts in with years of history finishes over
+    // several hours rather than as one long statement.
+    transactionRetentionBatch: 5000,
   },
 
   validation: {

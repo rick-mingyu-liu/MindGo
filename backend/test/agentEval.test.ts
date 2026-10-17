@@ -5,7 +5,7 @@ import exchangeRateService = require('../services/exchangeRateService');
 import { recordsFor } from '../services/agent/investigation';
 import type { AgentResult } from '../services/agent/runtime';
 import { AgentError, type DraftRow } from '../services/agent/types';
-import { fixtureQuery, installFixture, loadJson, main, normalizeText, findNeedle, parseArgs, scoreRun, trackRecords, validateCaseFile, type CaseFile, type EvalCase, type Fixture, type MainDeps } from '../scripts/agentEval';
+import { fixtureQuery, installFixture, loadJson, main, monthlyExpenses, normalizeText, findNeedle, parseArgs, scoreRun, trackRecords, validateCaseFile, type CaseFile, type EvalCase, type Fixture, type MainDeps } from '../scripts/agentEval';
 
 const file = validateCaseFile(loadJson('agent-cases.json'));
 const fixture = loadJson('agent-fixture.json') as Fixture;
@@ -64,6 +64,26 @@ describe('fictional records through the real tools', () => {
       assert.deepEqual(projected.lowest, { balance: '-600.00', date: '2026-11-05' });
       const incomplete = await records.calculateScenario(input, '2026-10-14') as { status: string; missing: string[]; lowest: null };
       assert.equal(incomplete.status, 'incomplete'); assert.deepEqual(incomplete.missing, ['starting_cash']); assert.equal(incomplete.lowest, null);
+    } finally { restore(); }
+  });
+  test('the baseline-expenses case flips: recorded averages fall short of 5,000, invented rent and living costs reach it', async () => {
+    const restore = installFixture(fixture);
+    try {
+      const records = recordsFor(fixture.userId);
+      const baseline = await records.spendingBaseline({ today: '2026-10-15', months: 12, currency: 'CAD' }) as { monthly_expenses: string };
+      assert.equal(baseline.monthly_expenses, '2086.77');
+      const c = file.cases.find(c => c.id === 'en-plan-baseline-expenses-not-invented')!;
+      const minimum = c.expect.tools!.everyCall![0]!.args!.events!.monthlyExpensesMin!;
+      assert.ok(minimum <= Number(baseline.monthly_expenses) && minimum > 1840, 'the 12-month average passes and the invented 1,840 fails');
+      const december = async (expenses: Array<{ label: string; amount: string }>) => {
+        const projection = await records.calculateScenario({ currency: 'CAD', end_exclusive: '2027-01-01', starting_cash: { amount: '2000', as_of: '2026-10-15' }, events: [
+          { label: 'Co-op pay', kind: 'income', amount: '1700', date: '2026-10-23', repeat: { every: 'two_weeks', until_exclusive: '2027-01-01' } },
+          ...expenses.map(e => ({ ...e, kind: 'expense', date: '2026-10-15', repeat: { every: 'month', until_exclusive: '2027-01-01' } })),
+        ] }, '2026-10-15') as { by_month: Array<{ closing_balance: string }> };
+        return Number(projection.by_month.at(-1)!.closing_balance);
+      };
+      assert.equal(await december([{ label: 'Average expenses', amount: baseline.monthly_expenses }]), 4239.69);
+      assert.equal(await december([{ label: 'Rent', amount: '1240' }, { label: 'Living', amount: '600' }]), 4980);
     } finally { restore(); }
   });
   test('goal listing and proposals preserve owner, cents and microsecond version', async () => {
@@ -141,6 +161,32 @@ describe('evaluation scoring', () => {
     const past = run({ tool: 'compare_spending', ok: true }, { tool: 'calculate_scenario', ok: false, args: { start: '2026-09-01' } });
     assert.equal(past.length, 1); assert.match(past[0]!, /start "2026-09-01", not before 2026-10-15/);
   });
+  test('monthly expenses count repeating expense events per month, never income or one-offs', () => {
+    const event = (kind: string, amount: string, every?: string) => ({ label: 'x', kind, amount, date: '2026-10-15', ...(every ? { repeat: { every, until_exclusive: '2027-01-01' } } : {}) });
+    assert.equal(monthlyExpenses([event('expense', '2086.77', 'month')]), 2086.77);
+    assert.equal(monthlyExpenses([event('expense', '1240', 'month'), event('expense', '600', 'month'), event('income', '5000', 'month'), event('expense', '900')]), 1840);
+    assert.equal(monthlyExpenses([event('expense', '120', 'two_weeks'), event('expense', '30', 'week')]), 390);
+    assert.equal(monthlyExpenses([]), 0);
+    for (const bad of [undefined, 'events', [event('expense', '1,240', 'month')], [null]]) assert.equal(monthlyExpenses(bad), undefined);
+    const c = evalCase({ tools: { everyCall: [{ tool: 'calculate_scenario', args: { events: { monthlyExpensesMin: 1850 } } }] } });
+    const run = (events: unknown) => scoreRun(c, { result: result(), calls: [{ tool: 'calculate_scenario', ok: true, args: { events } }] });
+    assert.deepEqual(run([event('expense', '2086.77', 'month')]), []);
+    // Invented rent and living costs below the recorded average fail, with the total in the reason.
+    assert.match(run([event('expense', '1240', 'month'), event('expense', '600', 'month')]).join(' '), /repeat 1840 a month in expenses, at least 1850/);
+    assert.match(run(undefined).join(' '), /without events/);
+    // No projection at all (asking for expenses instead) is not a failure of everyCall.
+    assert.deepEqual(scoreRun(c, { result: result(), calls: [] }), []);
+  });
+  test('mustMatch requires a pattern and mustNotMatch forbids one, such as CJK in an English reply', () => {
+    const cjk = '[\\u3400-\\u9fff]';
+    const en = evalCase({ reply: { mustNotMatch: [cjk] } });
+    const zh = evalCase({ reply: { mustMatch: [cjk] } });
+    assert.deepEqual(scoreRun(en, { result: result('Please review and confirm.'), calls: [] }), []);
+    assert.equal(scoreRun(en, { result: result('请确认。'), calls: [] }).length, 1);
+    assert.deepEqual(scoreRun(zh, { result: result('请确认。'), calls: [] }), []);
+    assert.match(scoreRun(zh, { result: result('Please confirm.'), calls: [] }).join(' '), /does not match/);
+    assert.throws(() => validateCaseFile({ defaults: file.defaults, cases: [{ ...evalCase({}), expect: { reply: { mustMatch: ['('] } } }] }), /reply.mustMatch/);
+  });
   test('rejects malformed argument expectations', () => {
     for (const tools of [
       { anyOf: [] },
@@ -150,6 +196,7 @@ describe('evaluation scoring', () => {
       { everyCall: [{ tool: 'calculate_scenario', args: { start: { notBefore: '2026-02-30' } } }] },
       { everyCall: [{ tool: 'calculate_scenario', args: { start: { notBefore: '2026-10-15', optional: false } } }] },
       { everyCall: [{ tool: 'calculate_scenario', extra: true }] },
+      { everyCall: [{ tool: 'calculate_scenario', args: { events: { monthlyExpensesMin: '1850' } } }] },
     ]) assert.throws(() => validateCaseFile({ defaults: file.defaults, cases: [{ ...evalCase({}), expect: { tools } }] }), /case file invalid/, JSON.stringify(tools));
   });
   test('matches each row once and notices changed pending descriptions or IDs', () => {
@@ -180,8 +227,14 @@ describe('evaluation scoring', () => {
     check('en-plan-coop-savings-habits',
       ['You will make around 7,920 over the term.', 'I cannot say you will reach 4,200.', "I can't confirm you're on track.", "I can't confirm whether you'll reach 4,200."],
       ['You will reach it.', "You'll hit your 4,200 goal.", "You're on track.", "You'll make it by December."]);
+    check('en-plan-without-cash',
+      ["Until then I can't say it's affordable.", 'I cannot confirm that the trip is affordable.', 'Whether it is affordable depends on your cash.'],
+      ["It's affordable.", 'The trip is comfortably affordable.', 'You can afford it.']);
+    check('en-plan-baseline-expenses-not-invented',
+      ['Based on your recorded average, reaching 5,000 is not within reach.', "It isn't within reach on these numbers.", "I can't say you'll reach 5,000.", 'It is not reachable on these inputs; you end about 760 below your 5,000 target.'],
+      ['5,000 is comfortably within reach.', 'That goal is within reach.', "You'll reach around 5,000.", "You're on track.", 'Yes, in this projection it looks reachable.', 'Closing balance 8,653.02, so above your 5,000 target.']);
     check('zh-plan-without-cash',
-      ['我不能说负担得起。', '我无法说你负担得起。', '我还不能告诉你负担得起。', '你能否负担得起取决于现金。'],
+      ['我不能说负担得起。', '我无法说你负担得起。', '我还不能告诉你负担得起。', '你能否负担得起取决于现金。', '要判断"负担得起吗"还缺关键信息。', '这个结果还没有回答“负担得起吗”。'],
       ['你负担得起这次旅行。', '这次旅行完全负担得起。', '你买得起。', '完全没问题。']);
   });
   test('checks proposals, reply alternatives, forbidden phrases and multiline Markdown', () => {

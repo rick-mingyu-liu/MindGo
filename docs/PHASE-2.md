@@ -1,6 +1,6 @@
 # TermPocket — phase 2 plan
 
-Drafted 2026-10-15. Phase 1 put Pocky into production: recording, investigation and planning, live on Render with migrations 013–015 on Neon ([`STATUS.md`](../STATUS.md)). Phase 2 takes TermPocket from "works for its owner" to "safe to post publicly", and adds voice input.
+Drafted 2026-10-15. Updated 2026-10-17. Phase 1 put Pocky into production: recording, investigation and planning, live on Render with migrations 013–015 on Neon ([`STATUS.md`](../STATUS.md)). Phase 2 takes TermPocket from "works for its owner" to "safe to post publicly", and adds voice input.
 
 ## Goals
 
@@ -14,17 +14,17 @@ Out of scope: a spoken, real-time voice agent; stocks or one-shot AI plans (reti
 
 ### A. Launch blockers
 
-These must be done before any public post.
+These must be done before any public post. Status as of 2026-10-17; "owner check" means the repo cannot show it.
 
-| Item | Why | Done when | Size |
-| --- | --- | --- | --- |
-| Privacy policy and terms | The app stores financial records, and Pocky sends messages, matching records, dates, currencies and timezone to DeepSeek, outside Canada. The current notice does not name DeepSeek, which was a deliberate choice for personal use. Most users will be Canadian students, and PIPEDA expects cross-border processing to be disclosed. | `/privacy` and `/terms` pages in en and zh, linked from registration and the Pocky notice; the notice names the provider; reviewed against a template or by someone qualified | 1 day |
-| DeepSeek spending cap | Sign-up is open, and each account gets 20 turns per hour. Nothing caps the total. | A provider-side spending limit or prepaid balance, plus an app-side daily turn cap per account (`config.agent`). Login already requires a verified email, so throwaway accounts each need a working mailbox | ½ day |
-| Retention setting | Settings shows an auto-delete preference that is never stored and never acts. | It is stored and enforced by the hourly job through `utils/terms.ts`, or removed from the UI | ½–1 day |
-| Transactional email on our own domain | Verification mail comes from a personal mailbox, which hits spam and sending limits once volume grows. | Resend or Postmark sending from `noreply@<domain>`, SPF/DKIM/DMARC passing, `EMAIL_*` config switched | ½ day, after the domain |
-| Custom domain | A real address for posting. | Apex domain on Vercel and `api.` on Render, both with TLS; `CORS_ORIGIN`, `FRONTEND_URL` and `NEXT_PUBLIC_API_URL` updated; `mind-go.vercel.app` still works | ½ day |
-| Demo account refresh | The demo dashboard empties about monthly. | `DEMO_REFRESH_ENABLED=true` on Render | 5 min |
-| Phone OCR speed | Screenshot import is the headline feature, and it has only been timed on a laptop. | Timed on one mid-range phone; if it is slow, a clear in-app expectation | 1 hour |
+| Item | Why | Done when | Size | Status |
+| --- | --- | --- | --- | --- |
+| Privacy policy and terms | The app stores financial records, and Pocky sends messages, matching records, dates, currencies and timezone to DeepSeek, outside Canada. The current notice does not name DeepSeek, which was a deliberate choice for personal use. Most users will be Canadian students, and PIPEDA expects cross-border processing to be disclosed. | `/privacy` and `/terms` pages in en and zh, linked from registration and the Pocky notice; the notice names the provider; reviewed against a template or by someone qualified | 1 day | Drafted and linked (#101, #104, #121, #123, #127, #133, #136); the Pocky notice still does not name DeepSeek, by the owner's decision, but the policy does. Review by someone qualified, a French version and a Quebec impact assessment: not done |
+| DeepSeek spending cap | Sign-up is open, and each account gets 20 turns per hour. Nothing caps the total. | A provider-side spending limit or prepaid balance, plus an app-side daily turn cap per account (`config.agent`). Login already requires a verified email, so throwaway accounts each need a working mailbox | ½ day | App-side done (60 turns a day per user, 600 across all users, #90). Provider-side limit or balance: owner check |
+| Retention setting | Settings shows an auto-delete preference that is never stored and never acts. | It is stored and enforced by the hourly job through `utils/terms.ts`, or removed from the UI | ½–1 day | Done (#103, migration 016). Whether 016 is applied to Neon `production`: owner check |
+| Transactional email on our own domain | Verification mail comes from a personal mailbox, which hits spam and sending limits once volume grows. | Resend or Postmark sending from `noreply@<domain>`, SPF/DKIM/DMARC passing, `EMAIL_*` config switched | ½ day, after the domain | Done: Resend, domain verified, delivery tested by the owner (#122, #124) |
+| Custom domain | A real address for posting. | Apex domain on Vercel and `api.` on Render, both with TLS; `CORS_ORIGIN`, `FRONTEND_URL` and `NEXT_PUBLIC_API_URL` updated; `mind-go.vercel.app` still works | ½ day | Done with a change: https://www.termpocket.com on Vercel, apex redirects, `mind-go.vercel.app` redirects (307) to www; the API stays on `termpocket-api.onrender.com` (no `api.` subdomain); `CORS_ORIGIN` list (#120) |
+| Demo account refresh | The demo dashboard empties about monthly. | `DEMO_REFRESH_ENABLED=true` on Render | 5 min | Owner check |
+| Phone OCR speed | Screenshot import is the headline feature, and it has only been timed on a laptop. | Timed on one mid-range phone; if it is slow, a clear in-app expectation | 1 hour | Owner check |
 
 ### B. Pocky quality
 
@@ -34,6 +34,9 @@ These must be done before any public post.
 | Planning habits and projection start (second real question: 3-month baseline for "habits", a projection offered from a past date) | `fix/agent-planning-habits`: 12 months or term comparison for habits, projections from today |
 | A week of real use | Every wrong draft, wrong number or refusal is written down and added to `backend/eval/` as a fictional case |
 | Evaluation in the loop | `npm run agent:eval` passes before any prompt, tool or limit change merges |
+| Runtime | Direct in-process runtime (#89, #93, #99, #100) in production with `AGENT_RUNTIME=direct` (per the description of #102; Render Shell preflight output not in the repo: owner check). #102 removes the SDK runtime; it is a draft, gated until about 2026-10-22 |
+| Open | #94 (dictated-style evaluation cases and the bare "dollars" currency fix, awaiting owner review) |
+| Status | The week of real use has started; nothing is recorded in the repo yet. Evaluation cases added: #112, #113 |
 
 ### C. Voice dictation
 
@@ -47,6 +50,8 @@ Speech-to-text in the browser, tap to start and tap to stop by default (push-to-
 
 ### D. Pocky memory (after B's week of use)
 
+Not started.
+
 As planned in [`STATUS.md`](../STATUS.md): remembered facts (rent, co-op pay, reserve) with Remember and Forget, saved plans, and per-account currency, timezone and reply language. **Done when** deleting a fact removes it from everything Pocky sees, and the evaluation set still passes.
 
 ### E. Data growth
@@ -59,33 +64,38 @@ The production database is 8.7 MB, within Neon's free-plan limit of 0.5 GB per p
 | 100 active users, about 10 turns a day each | About 30 MB a month | About 15 months |
 | One account at its cap (100 conversations × 200 messages) | About 20–40 MB, and it takes at least 500 hours at 20 turns an hour | — |
 
-Work: before launch, add a usage panel (database size and agent turns per day) to the owner's routine checks. After launch, delete conversations idle for 12 months (policy text in A), and lower `maxConversations` if one account approaches its cap. Upgrading Neon is the fallback, not the plan.
+Status 2026-10-17: not started; idle-conversation retention is still undecided. Work: before launch, add a usage panel (database size and agent turns per day) to the owner's routine checks. After launch, delete conversations idle for 12 months (policy text in A), and lower `maxConversations` if one account approaches its cap. Upgrading Neon is the fallback, not the plan.
 
 ### F. Product polish
 
 - **Transactions list:** 200 per page with "Load more" and a keyset cursor (#83, merged).
+- **Goals decision (2026-10-17):** the owner chose a "suggested top-up" (a card on Goals, #130, a dashboard badge, #131, and a leftover-to-goal section in the first weekly report of each month, #134) and dropped automatic linking of savings transactions to goals as too much.
+- **Also merged:** account deletion from Settings (#114), Enter to send in Pocky (#128), an in-app MCP setup dialog (#129, #132), a first-run onboarding tour (#135), redesigned emails (#124), and many QA and layout fixes (#97, #109–#111, #115–#119).
 - **Dashboard summaries in SQL:** removes the double serialisation in `/summary/rolling`, which blocks an "All time" period.
 - **A frontend test runner:** starting with `lib/date.ts`, the untested twin of a tested backend module.
 
 ### G. Later
 
-- Clear the frontend's remaining 7 high advisories, which come only from build tooling, by migrating to Tailwind 4. See [`frontend/DEPENDENCIES.md`](../frontend/DEPENDENCIES.md).
-- Put Render (Oregon) and Neon (us-east-1) in the same region.
+- Clear the frontend's remaining advisories (2 open Dependabot alerts: `braces` high, `postcss-selector-parser` moderate), which come only from build tooling, by migrating to Tailwind 4. No patched `braces` release exists; the owner decided on 2026-10-17 to leave them open and revisit after launch. See [`frontend/DEPENDENCIES.md`](../frontend/DEPENDENCIES.md).
 - Rename the leftover MindGo infrastructure.
+- French version of the legal pages (Quebec's Charter of the French language) and a written privacy impact assessment for transfers outside Quebec.
+- Decide on the name "Pocky", a Glico trademark flagged as a naming risk.
 
 ## Order
 
 | Week | Work | Gate |
 | --- | --- | --- |
-| 1 | B: fix the planning limit, start the week of real use. A: privacy policy, spending cap, demo refresh. Buy the domain. F: transactions list | Planning question passes; spending cap in place |
-| 2 | A: retention setting, email and domain, phone OCR timing. C: voice spike | Every launch blocker in A is done |
+| 1 | B: fix the planning limit, start the week of real use. A: privacy policy, spending cap, demo refresh. Buy the domain. F: transactions list | Planning question passes; spending cap in place. Status 2026-10-17: planning fixed (#84, #87), app-side cap done, privacy policy drafted, domain bought, transactions list done |
+| 2 | A: retention setting, email and domain, phone OCR timing. C: voice spike | Every launch blocker in A is done. Status 2026-10-17: retention, email, domain done; open owner checks are the provider-side spending limit, demo refresh, phone OCR timing, and 016 in production. The voice spike has not started |
 | 3 | Public post. C: build voice if the spike passes. B: evaluation cases from real failures | Spike measurements meet "Done when" in C |
 | 4+ | D: memory. E: idle-conversation deletion. F: summaries in SQL | — |
 
 ## Decisions needed from the owner
 
-- [ ] The privacy policy: write it from a template, or have it reviewed. Whether the Pocky notice should name DeepSeek; this plan recommends yes for a public launch.
-- [ ] The spending cap: a monthly amount, and a daily turn cap per account.
-- [ ] The retention setting: implement it or remove it.
-- [ ] The domain name and email provider.
+- [x] The privacy policy: drafted in the repo (#101, #104 and later); the Pocky notice still does not name DeepSeek by the owner's decision, the policy does.
+- [ ] Review of the privacy policy and terms by someone qualified.
+- [ ] The spending cap: the app-side caps are done (60 turns a day per user, 600 across all users). A provider-side limit or prepaid balance is an owner check.
+- [x] The retention setting: implemented — stored per user (migration 016), enforced by the hourly job through `utils/terms.ts`.
+- [x] The domain name and email provider: termpocket.com, Resend (2026-10-16).
 - [ ] How long idle conversations are kept (proposed: 12 months).
+- [ ] When to do the French version and the Quebec impact assessment, and whether to keep the name "Pocky".

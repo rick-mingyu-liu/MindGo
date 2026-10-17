@@ -1,7 +1,7 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MessageCreateParamsNonStreaming, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages';
-import { createDirectRuntime, type DirectResponse, type MessagesClient } from '../services/agent/runtime';
+import { cacheOnSuccess, createDirectRuntime, type DirectResponse, type MessagesClient } from '../services/agent/runtime';
 import config = require('../config');
 import { AgentError, type AgentRecords } from '../services/agent/types';
 import logger = require('../utils/logger');
@@ -172,7 +172,7 @@ test('direct: assertActive runs before every tool execution', async () => {
   assert.equal(r.requests.length, 1);
 });
 
-test('direct: each budget trips agent_limit_exceeded and logs its reason with counts only', async () => {
+test('direct: each budget trips a 429 agent_limit_exceeded and logs its reason with counts only', async () => {
   const many = (n: number, name = 'list_goals'): Array<[string, unknown]> => Array.from({ length: n }, () => [name, {}]);
   const cases: Array<{ reason: string; steps: Step[]; records?: AgentRecords; before?: () => void }> = [
     // Every execution is first an attempt, so a ninth call of any kind trips the
@@ -199,6 +199,8 @@ test('direct: each budget trips agent_limit_exceeded and logs its reason with co
       const s = scripted(steps);
       const { error, reason, fields } = await limitReason(() => s.runtime({ ...input, records: c.records ?? noRecords }));
       assert.equal(error.code, 'agent_limit_exceeded', c.reason);
+      // Mid-turn or at the final reply, a limit is the same 429.
+      assert.equal(error.status, 429, c.reason);
       assert.equal(reason, c.reason);
       assert.deepEqual(Object.keys(fields!).sort(), ['inputTokens', 'observedChars', 'outputTokens', 'reason', 'thinkingBlocks', 'toolAttempts', 'toolCalls', 'toolOutputChars']);
       assert.ok(error.usage, `${c.reason} carries usage`);
@@ -340,4 +342,53 @@ test('direct: a disabled or keyless agent never loads the client', async () => {
   const runtime = createDirectRuntime(async () => assert.fail('client loaded'));
   const oldKey = config.agent.apiKey; config.agent.apiKey = undefined;
   try { await assert.rejects(runtime(input), { code: 'agent_unavailable' }); } finally { config.agent.apiKey = oldKey; }
+});
+
+test('direct: responses that repeat or omit an id are each counted against the token budgets', async () => {
+  const same = (r: DirectResponse, id: string) => ({ ...r, id }) as DirectResponse;
+  // Two requests, one shared id: both are billed, so both count.
+  const s = scripted([same(uses([['list_goals', {}]], { input_tokens: 100, output_tokens: 20 }), 'msg_same'), same(reply('Done.', { input_tokens: 150, output_tokens: 15 }), 'msg_same')]);
+  const result = await s.runtime({ ...input, records: okRecords().records });
+  assert.deepEqual(result.usage, { inputTokens: 250, outputTokens: 35 });
+  // Empty ids, each request just over half the budget: together they trip it.
+  const half = Math.floor(config.agent.maxTotalTokens / 2) + 1;
+  const e = scripted([same(uses([['list_goals', {}]], { input_tokens: half, output_tokens: 0 }), ''), same(reply('Done.', { input_tokens: half, output_tokens: 0 }), '')]);
+  const { error, reason } = await limitReason(() => e.runtime({ ...input, records: okRecords().records }));
+  assert.equal(error.code, 'agent_limit_exceeded');
+  assert.equal(reason, 'total_tokens');
+});
+
+test('direct: an empty text block is not echoed into the next request', async () => {
+  const s = scripted([uses([['list_goals', {}]], zero, [{ type: 'text', text: '' }]), reply('Done.')]);
+  await s.runtime({ ...input, records: okRecords().records });
+  const echoed = s.requests[1]!.messages[1]!.content as Array<{ type: string }>;
+  assert.deepEqual(echoed.map(b => b.type), ['tool_use']);
+  assert.ok(!JSON.stringify(s.requests[1]!.messages).includes('"text":""'));
+});
+
+test('direct: a client that fails to load is retried on the next turn, and a loaded one is reused', async () => {
+  let loads = 0;
+  const client: MessagesClient = { messages: { create: async () => reply('Hello.') } };
+  const load = cacheOnSuccess(async () => { if (++loads === 1) throw Object.assign(new Error('Cannot find module'), { code: 'MODULE_NOT_FOUND' }); return client; });
+  const runtime = createDirectRuntime(load);
+  const spy = mock.method(logger, 'error', () => {});
+  try {
+    await assert.rejects(runtime(input), { code: 'agent_provider_error' });
+  } finally { spy.mock.restore(); }
+  assert.equal((await runtime(input)).text, 'Hello.');
+  assert.equal((await runtime(input)).text, 'Hello.');
+  assert.equal(loads, 2);
+});
+
+test('direct: a response cut off at max_tokens never runs its tools', async () => {
+  for (const stop of ['max_tokens', 'model_context_window_exceeded']) {
+    const fake = okRecords();
+    const cut = { ...uses([['list_goals', {}], ['spending_summary', window]], { input_tokens: 10, output_tokens: 10 }), stop_reason: stop } as DirectResponse;
+    const s = scripted([cut]);
+    const { error, reason } = await limitReason(() => s.runtime({ ...input, records: fake.records }));
+    assert.equal(error.code, 'agent_limit_exceeded', stop);
+    assert.equal(reason, 'max_tokens');
+    assert.deepEqual(fake.calls, []);
+    assert.equal(s.requests.length, 1);
+  }
 });

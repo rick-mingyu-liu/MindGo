@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import Link from 'next/link'
 import {
   ArrowLeft,
   Trash2,
@@ -13,9 +14,13 @@ import {
   Monitor,
   LogOut,
   BookOpen,
+  History,
+  PlayCircle,
+  UserX,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { api, logout } from '@/utils/api'
+import { api, accountAPI, logout, retentionAPI, RetentionSetting, RetentionWindow } from '@/utils/api'
+import { formatDay } from '@/lib/date'
 import { agentAPI, agentUnavailable } from '@/utils/agentApi'
 import { useTheme } from '@/contexts/ThemeContext'
 import AiConnections from '@/components/AiConnections'
@@ -55,8 +60,12 @@ const THEMES = [
 /**
  * Every control here takes effect and is kept the moment it changes — there
  * is no Save button to forget. Currency and language
- * live in this browser; the weekly report switch is the one server setting.
+ * live in this browser; the weekly report switch and automatic deletion are
+ * stored on the server. Turning automatic deletion on is the one change that
+ * asks first, because it permanently deletes transactions.
  */
+
+const SEASONS: Record<string, string> = { winter: 'Winter', spring: 'Spring', fall: 'Fall' }
 export default function Settings() {
   const router = useRouter()
   const { theme, setTheme, resolvedTheme } = useTheme()
@@ -68,6 +77,16 @@ export default function Settings() {
   const [clearing, setClearing] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [ackDialogOpen, setAckDialogOpen] = useState(false)
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  // Shown inside the dialog: wrong password, demo account, rate limit.
+  const [accountError, setAccountError] = useState<string | null>(null)
+  // null until the server says, like the weekly report switch.
+  const [retention, setRetention] = useState<RetentionSetting | null>(null)
+  const [retentionBusy, setRetentionBusy] = useState(false)
+  // What turning it on would delete now, shown before anything is stored.
+  const [retentionPreview, setRetentionPreview] = useState<(RetentionWindow & { count: number }) | null>(null)
 
   useEffect(() => {
     if (!localStorage.getItem('token')) {
@@ -82,7 +101,50 @@ export default function Settings() {
         setWeeklyReports(Boolean(weekly && email))
       })
       .catch(() => toast.error(t('Could not load your notification setting.')))
+
+    retentionAPI.get()
+      .then(({ data }) => setRetention(data))
+      .catch(() => toast.error(t('retention.loadError')))
   }, [router, t])
+
+  // '2024-fall' -> 'Fall 2024' / '2024年秋季', the way the dashboard names a term.
+  const termName = (termId: string) => {
+    const [year, season] = termId.split('-')
+    return t('{{season}} {{year}}', { season: t(SEASONS[season] ?? season), year })
+  }
+
+  const storeRetention = async (terms: number | null) => {
+    setRetentionBusy(true)
+    try {
+      const { data } = await retentionAPI.set(terms)
+      setRetention(data)
+      setRetentionPreview(null)
+      saved()
+    } catch {
+      toast.error(t('Could not save. Please try again.'))
+    } finally {
+      setRetentionBusy(false)
+    }
+  }
+
+  // Off is stored at once. Any window first shows what it would delete now
+  // and is stored only from the confirmation dialog.
+  const changeRetention = async (value: string) => {
+    if (retentionBusy) return
+    if (value === 'off') {
+      await storeRetention(null)
+      return
+    }
+    setRetentionBusy(true)
+    try {
+      const { data } = await retentionAPI.preview(Number(value))
+      setRetentionPreview(data)
+    } catch {
+      toast.error(t('retention.previewError'))
+    } finally {
+      setRetentionBusy(false)
+    }
+  }
 
   const saved = () => toast.success(t('Saved'), { id: 'settings-saved' })
 
@@ -145,6 +207,36 @@ export default function Settings() {
       toast.error(t('Could not clear all data. Some of it may already be deleted; please try again.'))
     } finally {
       setClearing(false)
+    }
+  }
+
+  const openAccountDialog = (open: boolean) => {
+    if (deletingAccount) return
+    setAccountDialogOpen(open)
+    setAccountPassword('')
+    setAccountError(null)
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deletingAccount || !accountPassword) return
+    setDeletingAccount(true)
+    setAccountError(null)
+    try {
+      await accountAPI.delete(accountPassword)
+      setAccountPassword('')
+      toast.success(t('deleteAccount.done'))
+      // Clears the stored login and goes to the login page.
+      logout()
+    } catch (error) {
+      const response = (error as { response?: { status?: number, data?: { code?: string } } }).response
+      const code = response?.data?.code
+      setAccountError(t(
+        code === 'account_password_incorrect' ? 'deleteAccount.wrongPassword'
+          : code === 'account_demo' ? 'deleteAccount.demoRefused'
+            : response?.status === 429 ? 'deleteAccount.rateLimited'
+              : 'deleteAccount.error'
+      ))
+      setDeletingAccount(false)
     }
   }
 
@@ -269,6 +361,16 @@ export default function Settings() {
                     </Select>
                   </div>
                 </div>
+                <div className="mt-6 flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-base font-medium leading-none">{t('onboarding.settings.title')}</p>
+                    <p className="text-sm text-muted-foreground">{t('onboarding.settings.hint')}</p>
+                  </div>
+                  <Button variant="outline" className="shrink-0" onClick={() => router.push('/?tour=1')}>
+                    <PlayCircle className="h-4 w-4" />
+                    {t('onboarding.settings.replay')}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -300,6 +402,47 @@ export default function Settings() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  {t('retention.heading')}
+                </CardTitle>
+                <CardDescription>
+                  {t('retention.summary')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2 md:max-w-sm">
+                  <Label htmlFor="retention">{t('retention.label')}</Label>
+                  <Select
+                    value={retention?.retentionTerms ? String(retention.retentionTerms) : 'off'}
+                    onValueChange={changeRetention}
+                    disabled={!retention || !retention.available || retentionBusy || (retention.demo && retention.retentionTerms === null)}
+                  >
+                    <SelectTrigger id="retention">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">{t('retention.off')}</SelectItem>
+                      {(retention?.choices ?? []).map((terms) => (
+                        <SelectItem key={terms} value={String(terms)}>{t(`retention.keep${terms}`)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {!retention ? null
+                    : !retention.available ? t('retention.notAvailable')
+                      : retention.demo ? t('retention.demo')
+                        : retention.window
+                          ? t('retention.onHint', { date: formatDay(retention.window.cutoff, i18n.language), term: termName(retention.window.keepFromTerm) })
+                          : t('retention.offHint')}
+                </p>
+                <p className="text-sm text-muted-foreground">{t('retention.scope')}</p>
+              </CardContent>
+            </Card>
+
             <AiConnections />
 
             <Card>
@@ -328,7 +471,9 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+              <Link href="/terms" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{t('Terms of Service')}</Link>
+              <Link href="/privacy" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">{t('Privacy Policy')}</Link>
               <Button variant="ghost" onClick={() => setAckDialogOpen(true)} className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
                 {t('Open Source Acknowledgements')}
@@ -348,6 +493,18 @@ export default function Settings() {
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('Clear All Data')}
                 </Button>
+                <div className="space-y-4 border-t border-destructive/20 pt-4">
+                  <div className="space-y-1">
+                    <p className="font-medium">{t('deleteAccount.deleteHeading')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('deleteAccount.deleteSummary')}
+                    </p>
+                  </div>
+                  <Button variant="destructive" onClick={() => openAccountDialog(true)} disabled={deletingAccount}>
+                    <UserX className="mr-2 h-4 w-4" />
+                    {t('deleteAccount.button')}
+                  </Button>
+                </div>
               </div>
             </details>
           </div>
@@ -372,6 +529,90 @@ export default function Settings() {
             </DialogClose>
             <Button variant="destructive" onClick={handleClearData} disabled={clearing || deleteConfirmation !== 'DELETE'}>
               {clearing ? t('Clearing...') : t('Yes, Delete Everything')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={accountDialogOpen} onOpenChange={openAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {t('deleteAccount.deleteTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('deleteAccount.body')}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            <li>{t('deleteAccount.item1')}</li>
+            <li>{t('deleteAccount.item2')}</li>
+            <li>{t('deleteAccount.item3')}</li>
+            <li>{t('deleteAccount.item4')}</li>
+          </ul>
+          <p className="text-sm text-muted-foreground">{t('deleteAccount.note')}</p>
+          <form
+            className="space-y-2"
+            onSubmit={(event) => { event.preventDefault(); handleDeleteAccount() }}
+          >
+            <Label htmlFor="delete-account-password">{t('deleteAccount.passwordLabel')}</Label>
+            <Input
+              id="delete-account-password"
+              type="password"
+              autoComplete="current-password"
+              value={accountPassword}
+              onChange={(event) => { setAccountPassword(event.target.value); setAccountError(null) }}
+              disabled={deletingAccount}
+              aria-invalid={accountError !== null}
+              aria-describedby={accountError ? 'delete-account-error' : undefined}
+            />
+            {accountError && (
+              <p id="delete-account-error" role="alert" className="text-sm font-medium text-destructive">{accountError}</p>
+            )}
+          </form>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deletingAccount}>{t('Cancel')}</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={deletingAccount || !accountPassword}>
+              {deletingAccount ? t('deleteAccount.deleting') : t('deleteAccount.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={retentionPreview !== null} onOpenChange={(open) => { if (!open && !retentionBusy) setRetentionPreview(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {t('retention.confirmTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {retentionPreview && t('retention.confirmBody', {
+                terms: retentionPreview.terms,
+                date: formatDay(retentionPreview.cutoff, i18n.language),
+                term: termName(retentionPreview.keepFromTerm),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          {retentionPreview && (
+            <div className="space-y-2 text-sm">
+              <p className="font-medium">{t('retention.confirmCount', { count: retentionPreview.count })}</p>
+              <p className="text-muted-foreground">{t('retention.scope')}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={retentionBusy}>{t('Cancel')}</Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              disabled={retentionBusy || !retentionPreview}
+              onClick={() => { if (retentionPreview) storeRetention(retentionPreview.terms) }}
+            >
+              {t('retention.confirmButton')}
             </Button>
           </DialogFooter>
         </DialogContent>

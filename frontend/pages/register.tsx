@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Swal from 'sweetalert2'
-import { useTranslation } from 'next-i18next'
+import Link from 'next/link'
+import { Trans, useTranslation } from 'next-i18next'
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations'
 
 interface RegisterForm {
@@ -81,6 +82,11 @@ export default function Register() {
   const [userEmail, setUserEmail] = useState('')
   const [registerError, setRegisterError] = useState('')
   const [language, setLanguage] = useState('en');
+  // The server renders the form before React attaches its submit handler. A
+  // click in that window would submit natively (a GET to this page, fields in
+  // the URL) or do nothing visible, so the button stays disabled until mounted.
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => { setHydrated(true) }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -409,9 +415,19 @@ export default function Register() {
                   </div>
                 )}
 
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading}>
+                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={loading || !hydrated}>
                   {loading ? t('Creating account...') : t('Create account')}
                 </Button>
+                <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                  <Trans
+                    i18nKey="legalConsent"
+                    t={t}
+                    components={{
+                      terms: <Link href="/terms" className="underline underline-offset-2 hover:text-foreground" />,
+                      privacy: <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground" />,
+                    }}
+                  />
+                </p>
               </form>
 
               <div className="mt-6">
@@ -443,7 +459,7 @@ export default function Register() {
   )
 } 
 
-export async function getServerSideProps({ locale }: { locale: string }) {
+export async function getStaticProps({ locale }: { locale: string }) {
   return {
     props: {
       ...(await serverSideTranslations(locale, ['common'])),
